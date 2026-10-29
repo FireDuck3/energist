@@ -11,7 +11,7 @@ function fact(label, value) {
   return h('div', { class: 'fact' }, h('span', { class: 'fact-label' }, label), h('span', { class: 'fact-value' }, value));
 }
 
-function renderSpot(spot, host, { blackout }, store, session) {
+function renderSpot(spot, host, { blackout }, store, session, userHistory) {
   const hostName = spot.hostName ?? host.name;
   const now = new Date();
   const rating = spotRating(spot);
@@ -68,12 +68,12 @@ function renderSpot(spot, host, { blackout }, store, session) {
           : h('p', { class: isOpenAt(spot, now) ? 'open-now' : 'muted' },
             isOpenAt(spot, now) ? `Відчинено до ${spot.schedule.to}` : `Зачинено · відкриється о ${spot.schedule.from}`),
         h('button', { type: 'button', class: 'btn btn-primary btn-lg btn-block', disabled: dark,
-          onclick: () => session.requireAuth(() => openBooking(spot, store, { session }), 'Увійдіть, щоб забронювати зарядку') },
+          onclick: () => session.requireAuth(() => openBooking(spot, store, { session, userHistory }), 'Увійдіть, щоб забронювати зарядку') },
         'Забронювати'),
         h('p', { class: 'book-note muted' }, '🔒 Гроші заморожуються і списуються лише за фактично отриману енергію'))));
 }
 
-export function render({ id }, root, store, session) {
+export function render({ id }, root, store, session, userHistory) {
   function update() {
     const state = store.getState();
     const spot = state.spots.find((s) => s.id === id);
@@ -82,8 +82,9 @@ export function render({ id }, root, store, session) {
       return;
     }
     const host = state.hosts.find((x) => x.id === spot.hostId);
-    root.replaceChildren(renderSpot(spot, host, state, store, session));
+    root.replaceChildren(renderSpot(spot, host, state, store, session, userHistory));
   }
   update();
+  if (store.getState().spots.some((s) => s.id === id)) userHistory?.recordSpot(id);
   return store.subscribe(update);
 }

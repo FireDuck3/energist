@@ -22,7 +22,7 @@ function row(label, value, cls = '') {
   return h('div', { class: `sum-row ${cls}` }, h('span', {}, label), h('b', {}, value));
 }
 
-export function openBooking(spot, store, { now = new Date(), session } = {}) {
+export function openBooking(spot, store, { now = new Date(), session, userHistory } = {}) {
   const todayStarts = availableStarts(spot.schedule, 'today', now);
   const sel = {
     device: spot.devices[0],
@@ -166,6 +166,10 @@ export function openBooking(spot, store, { now = new Date(), session } = {}) {
     if (step !== 2) return;
     cancelAnimationFrame(rafId);
     store.finishCharging(booking.id, round2(currentKwh));
+    const paid = store.getState().bookings.find((b) => b.id === booking.id);
+    if (paid.actualKwh > 0) {
+      userHistory?.recordCharge({ spot_id: spot.id, spot_title: spot.title, district: spot.district, kwh: paid.actualKwh, total: paid.total });
+    }
     stepPaid();
   }
 

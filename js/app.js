@@ -2,6 +2,7 @@
 import { createStore, safeLocalStorage, memoryStorage } from './store.js';
 import { createSession } from './auth.js';
 import { loadSupabase } from './supabase.js';
+import { createUserHistory } from './user-history.js';
 import { startRouter, currentPath } from './router.js';
 import { h, toast } from './ui.js';
 import * as landing from './views/landing.js';
@@ -14,8 +15,9 @@ import { openAuthModal } from './views/auth-modal.js';
 
 export const store = createStore(safeLocalStorage() ?? memoryStorage());
 export const session = createSession(loadSupabase);
+export const userHistory = createUserHistory(session);
 
-const view = (mod) => (params, root) => mod.render(params, root, store, session);
+const view = (mod) => (params, root) => mod.render(params, root, store, session, userHistory);
 
 const signIn = () => session.requireAuth(() => {}, '');
 

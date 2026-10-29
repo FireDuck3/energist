@@ -649,3 +649,29 @@ body.blackout .mark-us span { color: #141833; }
 .profile-head h1 { font-size: 1.5rem; margin: 0; }
 .profile-head p { margin: 0; }
 .profile-actions { display: flex; justify-content: space-between; gap: 10px; }
+
+/* ---------- Пошук на карті ---------- */
+.search { position: relative; margin-bottom: 14px; }
+.search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: .95rem; pointer-events: none; }
+.search-input { padding-left: 40px; padding-right: 40px; height: 46px; border-radius: 999px; }
+.search-input::-webkit-search-cancel-button { display: none; }
+.search-clear {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 34px; height: 34px;
+  border: 0; border-radius: 50%; background: var(--surface-2); color: var(--muted); font-size: 1.2rem; cursor: pointer;
+}
+.search-clear[hidden], .search-panel[hidden] { display: none; }
+.search-panel {
+  position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 1200;
+  padding: 8px; display: grid; gap: 6px; max-height: min(60vh, 420px); overflow-y: auto;
+}
+.search-section { display: grid; gap: 2px; }
+.search-head { display: flex; justify-content: space-between; align-items: center; padding: 4px 8px; font-size: .78rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.search-item { display: flex; align-items: center; }
+.search-pick {
+  flex: 1; display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 6px 10px; border: 0; border-radius: 10px;
+  background: none; color: var(--text); font: inherit; text-align: left; text-decoration: none; cursor: pointer;
+}
+.search-pick:hover { background: var(--surface-2); }
+.search-remove { width: 36px; height: 36px; border: 0; border-radius: 50%; background: none; color: var(--muted); font-size: 1.1rem; cursor: pointer; }
+.search-remove:hover { background: var(--surface-2); color: var(--text); }
+.search-hint { padding: 8px 10px; margin: 0; font-size: .9rem; }

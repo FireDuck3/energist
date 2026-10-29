@@ -3,6 +3,7 @@ import { h, stars, spotCover, plural } from '../ui.js';
 import { filterSpots, spotRating, isLiveInBlackout, isOpenAt } from '../filters.js';
 import { formatUAH } from '../pricing.js';
 import { DEVICES, SOURCES, CONNECTORS, VINNYTSIA_CENTER } from '../data.js';
+import { searchBox } from './search-box.js';
 
 // Тайли OpenStreetMap; світлу й темну (блекаут) тему дає CSS-фільтр на .leaflet-tile-pane.
 export const TILES = {
@@ -57,7 +58,8 @@ function popupContent(spot) {
 const chip = (label, active, onclick) =>
   h('button', { type: 'button', class: `chip${active ? ' active' : ''}`, 'aria-pressed': String(active), onclick }, label);
 
-export function render(_params, root, store) {
+export function render(_params, root, store, _session, userHistory) {
+  const search = searchBox(store, userHistory);
   const list = h('div', { class: 'spot-list' });
   const count = h('p', { class: 'result-count' });
   const banner = h('div', { class: 'blackout-banner', hidden: true },
@@ -72,7 +74,7 @@ export function render(_params, root, store) {
   root.append(h('div', { class: 'map-layout' },
     h('aside', { class: 'map-sidebar' },
       h('h1', { class: 'map-title' }, 'Розетки у Вінниці'),
-      banner, filtersBox, count, list),
+      search.el, banner, filtersBox, count, list),
     h('div', { class: 'map-pane' }, mapEl, fallback)));
 
   // ---- Фільтри: будуються один раз, щоб повзунок не губив фокус ----
@@ -161,6 +163,7 @@ export function render(_params, root, store) {
     const visible = filterSpots(spots, filters, { blackout, now });
 
     renderFilters(filters);
+    search.update(filters);
     banner.hidden = !blackout;
     count.textContent = `Знайдено ${visible.length} ${plural(visible.length, ['точку', 'точки', 'точок'])}`;
 
@@ -184,6 +187,7 @@ export function render(_params, root, store) {
   const unsubscribe = store.subscribe(update);
   return () => {
     unsubscribe();
+    search.destroy();
     resizeObserver?.disconnect();
     map?.remove();
   };
