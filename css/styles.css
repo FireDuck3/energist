@@ -615,3 +615,37 @@ body.blackout .mark-us span { color: #141833; }
   .account-button { padding: 4px; }
   .switch-label { display: none; }
 }
+
+/* ---------- Вхід і профіль ---------- */
+.modal-auth { max-width: 440px; }
+.auth { display: grid; gap: 14px; }
+.auth h2 { font-size: 1.35rem; margin: 0; }
+.auth p { margin: 0; }
+.auth-brand { display: flex; align-items: center; gap: 10px; font-size: 1.15rem; }
+.auth-brand .logo-mark { width: 32px; height: 32px; font-size: .95rem; }
+.auth-reason { background: var(--indigo-soft); color: var(--indigo); font-weight: 600; border-radius: 12px; padding: 10px 14px; }
+.auth-tabs { display: grid; grid-template-columns: 1fr 1fr; background: var(--surface-2); border-radius: 999px; padding: 4px; }
+.auth-tabs button { border: 0; background: none; border-radius: 999px; padding: 9px 0; font: inherit; font-weight: 600; color: var(--muted); cursor: pointer; }
+.auth-tabs button.active { background: var(--surface); color: var(--indigo); box-shadow: var(--shadow); }
+.auth-form { display: grid; gap: 12px; }
+.auth-links { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.link-btn { border: 0; background: none; padding: 4px 0; font: inherit; font-size: .92rem; font-weight: 600; color: var(--indigo); cursor: pointer; }
+.link-btn:disabled { color: var(--muted); cursor: default; }
+.auth-error { background: var(--danger-soft); color: var(--danger); border-radius: 12px; padding: 10px 14px; font-size: .92rem; font-weight: 600; display: grid; gap: 4px; justify-items: start; }
+.code-input { font-size: 1.5rem; letter-spacing: .4em; text-align: center; font-variant-numeric: tabular-nums; }
+.role-choice { display: grid; gap: 8px; }
+.role-choice .chip { min-height: 48px; text-align: left; padding: 10px 14px; font-size: .95rem; }
+
+.gate { padding: 56px 16px; display: grid; place-items: center; }
+.gate-card { max-width: 460px; padding: 32px; text-align: center; display: grid; gap: 10px; justify-items: center; }
+.gate-card h1 { font-size: 1.5rem; margin: 0; }
+.gate-icon { font-size: 2.4rem; }
+.demo-note { background: var(--surface-2); border-radius: 12px; padding: 10px 14px; color: var(--muted); font-size: .92rem; margin: -8px 0 20px; }
+
+.profile-page { padding: 40px 16px 56px; display: grid; justify-items: center; }
+.profile-card { width: 100%; max-width: 520px; padding: 28px; display: grid; gap: 18px; }
+.profile-card > div:last-child { display: grid; gap: 16px; }
+.profile-head { display: flex; align-items: center; gap: 14px; }
+.profile-head h1 { font-size: 1.5rem; margin: 0; }
+.profile-head p { margin: 0; }
+.profile-actions { display: flex; justify-content: space-between; gap: 10px; }

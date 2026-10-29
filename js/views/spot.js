@@ -11,7 +11,8 @@ function fact(label, value) {
   return h('div', { class: 'fact' }, h('span', { class: 'fact-label' }, label), h('span', { class: 'fact-value' }, value));
 }
 
-function renderSpot(spot, host, { blackout }, store) {
+function renderSpot(spot, host, { blackout }, store, session) {
+  const hostName = spot.hostName ?? host.name;
   const now = new Date();
   const rating = spotRating(spot);
   const dark = blackout && !isLiveInBlackout(spot);
@@ -32,9 +33,9 @@ function renderSpot(spot, host, { blackout }, store) {
     h('div', { class: 'spot-grid' },
       h('div', { class: 'spot-main' },
         h('div', { class: 'host-row' },
-          h('span', { class: 'avatar' }, host.name[0]),
+          h('span', { class: 'avatar' }, hostName[0].toUpperCase()),
           h('div', {},
-            h('b', {}, `Господар — ${host.name}`),
+            h('b', {}, `Господар — ${hostName}`),
             h('div', { class: 'muted' },
               `${host.chargesCount} ${plural(host.chargesCount, ['зарядка', 'зарядки', 'зарядок'])} · на ЕнерГості з ${host.sinceYear} року`))),
 
@@ -67,11 +68,12 @@ function renderSpot(spot, host, { blackout }, store) {
           : h('p', { class: isOpenAt(spot, now) ? 'open-now' : 'muted' },
             isOpenAt(spot, now) ? `Відчинено до ${spot.schedule.to}` : `Зачинено · відкриється о ${spot.schedule.from}`),
         h('button', { type: 'button', class: 'btn btn-primary btn-lg btn-block', disabled: dark,
-          onclick: () => openBooking(spot, store) }, 'Забронювати'),
+          onclick: () => session.requireAuth(() => openBooking(spot, store, { session }), 'Увійдіть, щоб забронювати зарядку') },
+        'Забронювати'),
         h('p', { class: 'book-note muted' }, '🔒 Гроші заморожуються і списуються лише за фактично отриману енергію'))));
 }
 
-export function render({ id }, root, store) {
+export function render({ id }, root, store, session) {
   function update() {
     const state = store.getState();
     const spot = state.spots.find((s) => s.id === id);
@@ -80,7 +82,7 @@ export function render({ id }, root, store) {
       return;
     }
     const host = state.hosts.find((x) => x.id === spot.hostId);
-    root.replaceChildren(renderSpot(spot, host, state, store));
+    root.replaceChildren(renderSpot(spot, host, state, store, session));
   }
   update();
   return store.subscribe(update);

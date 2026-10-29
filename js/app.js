@@ -9,6 +9,8 @@ import * as map from './views/map.js';
 import * as spot from './views/spot.js';
 import * as host from './views/host.js';
 import * as calculator from './views/calculator.js';
+import * as profile from './views/profile.js';
+import { openAuthModal } from './views/auth-modal.js';
 
 export const store = createStore(safeLocalStorage() ?? memoryStorage());
 export const session = createSession(loadSupabase);
@@ -72,8 +74,7 @@ store.subscribe(() => {
   renderHeader();
 });
 session.subscribe(renderHeader);
-// Тимчасово до вікна входу (Task 5 плану).
-session.onNeedAuth((reason) => toast(reason || 'Увійдіть, щоб продовжити'));
+session.onNeedAuth((reason) => openAuthModal(session, { reason }));
 
 document.getElementById('reset-demo').addEventListener('click', () => {
   store.reset();
@@ -88,6 +89,7 @@ startRouter({
   '/spot/:id': view(spot),
   '/host': view(host),
   '/calc': view(calculator),
+  '/profile': view(profile),
 }, document.getElementById('app'), {
   onChange(path) {
     const role = path.startsWith('/host') ? 'host' : (path.startsWith('/map') || path.startsWith('/spot')) ? 'guest' : null;

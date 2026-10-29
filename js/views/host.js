@@ -6,6 +6,7 @@ import { formatUAH, formatKwh } from '../pricing.js';
 import { DEMO_HOST_ID, DEVICES, SOURCES, CONNECTORS, VINNYTSIA_CENTER, SPOTS } from '../data.js';
 import { spotRating } from '../filters.js';
 import { TILES } from './map.js';
+import { signInPrompt } from './auth-modal.js';
 
 const STATUS = {
   pending: ['Очікує підтвердження', 'badge-warn'],
@@ -67,7 +68,7 @@ function ownSpotCard(spot) {
 }
 
 // ---- Форма «Додати розетку» ----
-function openAddSpot(store) {
+function openAddSpot(store, hostName) {
   const input = {
     title: '', district: 'Вишенька', lat: null, lng: null, source: 'solar', connector: 'type2',
     powerKw: 7.4, pricePerKwh: 11, devices: ['ev', 'ecoflow', 'gadget'], schedule: { from: '08:00', to: '20:00' },
@@ -157,14 +158,29 @@ function openAddSpot(store) {
       form.querySelector('.field-error:not([hidden])')?.closest('.form-field')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
-    store.addSpot({ ...input, title: input.title.trim() });
+    store.addSpot({ ...input, title: input.title.trim(), hostName });
     modal.close();
     toast('Розетку додано — її вже видно на карті гостей');
   }
 }
 
-export function render(_params, root, store) {
+export function render(_params, root, store, session) {
   function update() {
+    const { status } = session.getState();
+    if (status === 'loading') {
+      root.replaceChildren(h('div', { class: 'container gate muted' }, 'Завантаження…'));
+      return;
+    }
+    if (status !== 'signedIn' && status !== 'demo') {
+      root.replaceChildren(signInPrompt({
+        title: 'Кабінет господаря доступний після входу',
+        text: 'Увійдіть, щоб додавати свої розетки й бачити бронювання гостей.',
+        reason: 'Увійдіть, щоб відкрити кабінет господаря',
+      }, session));
+      return;
+    }
+    const signedIn = status === 'signedIn';
+    const addSpot = () => openAddSpot(store, signedIn ? session.currentName() : undefined);
     const state = store.getState();
     const host = state.hosts.find((x) => x.id === DEMO_HOST_ID);
     const now = new Date();
@@ -175,9 +191,11 @@ export function render(_params, root, store) {
     root.replaceChildren(h('div', { class: 'container host-page' },
       h('div', { class: 'host-head' },
         h('div', {},
-          h('h1', {}, `Вітаємо, ${host.vocative ?? host.name}! 👋`),
+          h('h1', {}, `Вітаємо, ${signedIn ? session.currentName() : host.vocative ?? host.name}! 👋`),
           h('p', { class: 'lead' }, 'Ваша сонячна станція заробляє, поки ви займаєтесь своїми справами.')),
-        h('button', { type: 'button', class: 'btn btn-primary btn-lg', onclick: () => openAddSpot(store) }, '+ Додати розетку')),
+        h('button', { type: 'button', class: 'btn btn-primary btn-lg', onclick: addSpot }, '+ Додати розетку')),
+      signedIn && h('p', { class: 'demo-note' },
+        '🧪 Демо-кабінет: статистика — приклад господаря Олега з Вишеньки. Розетки, які ви додасте, з\'являться тут.'),
 
       h('div', { class: 'stats' },
         tile(`Заробіток за ${MONTH_NAMES[now.getMonth()]}`, formatUAH(s.monthEarned), 'після комісії сервісу'),
@@ -201,9 +219,11 @@ export function render(_params, root, store) {
       h('h2', { class: 'own-title' }, 'Мої точки'),
       h('div', { class: 'own-spots' },
         s.spots.map(ownSpotCard),
-        h('button', { type: 'button', class: 'own-spot add-card', onclick: () => openAddSpot(store) },
+        h('button', { type: 'button', class: 'own-spot add-card', onclick: addSpot },
           h('span', { class: 'add-plus' }, '+'), 'Додати розетку'))));
   }
   update();
-  return store.subscribe(update);
+  const offStore = store.subscribe(update);
+  const offSession = session.subscribe(update);
+  return () => { offStore(); offSession(); };
 }
