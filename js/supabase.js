@@ -74,6 +74,23 @@ export async function loadSupabase() {
       signOut: () => call(auth.signOut()),
       loadProfile: (uid) => call(client.from('profiles').select('name, role').eq('id', uid).maybeSingle()),
       saveProfile: (uid, { name, role }) => call(client.from('profiles').upsert({ id: uid, name, role })),
+
+      // Історія: по 50 останніх, новіші першими. Postgres віддає numeric рядком — перетворюємо на числа.
+      async loadHistory(uid) {
+        const [searches, charges] = await Promise.all([
+          call(client.from('search_history').select('kind, value, created_at')
+            .eq('user_id', uid).order('created_at', { ascending: false }).limit(50)),
+          call(client.from('charge_history').select('spot_id, spot_title, district, kwh, total, charged_at')
+            .eq('user_id', uid).order('charged_at', { ascending: false }).limit(50)),
+        ]);
+        return { searches, charges: charges.map((c) => ({ ...c, kwh: Number(c.kwh), total: Number(c.total) })) };
+      },
+      addSearch: (uid, { kind, value }) => call(client.from('search_history').insert({ user_id: uid, kind, value })),
+      removeSearch: (uid, { kind, value }) =>
+        call(client.from('search_history').delete().eq('user_id', uid).eq('kind', kind).eq('value', value)),
+      clearSearches: (uid) => call(client.from('search_history').delete().eq('user_id', uid).eq('kind', 'query')),
+      addCharge: (uid, { spot_id, spot_title, district, kwh, total }) =>
+        call(client.from('charge_history').insert({ user_id: uid, spot_id, spot_title, district, kwh, total })),
     };
   } catch {
     return null;
