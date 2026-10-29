@@ -29,7 +29,7 @@ export const CONNECTORS = {
 };
 
 export const VINNYTSIA_CENTER = [49.2331, 28.4682];
-export const VINNYTSIA_BOUNDS = [[49.18, 28.36], [49.28, 28.56]];
+export const VINNYTSIA_BOUNDS = [[49.17, 28.35], [49.29, 28.60]];
 
 export const DEMO_HOST_ID = 'oleh';
 export const DEMO_GUEST_NAME = 'Саша';
@@ -63,7 +63,7 @@ export const HOSTS = [
 const r = (author, stars, text, daysAgo) => ({ author, stars, text, date: isoDay(-daysAgo) });
 
 export const SPOTS = [
-  { id: 'oleh-ses', title: 'Сонячний дах Олега', district: 'Вишенька', lat: 49.2208, lng: 28.4072,
+  { id: 'oleh-ses', title: 'Сонячний дах Олега', district: 'Вишенька', lat: 49.2262, lng: 28.409,
     hostId: 'oleh', source: 'solar', powerKw: 7.4, connector: 'type2', devices: ['ev', 'ecoflow', 'gadget'],
     pricePerKwh: 12, schedule: { from: '08:00', to: '20:00' }, blackoutHours: 6,
     reviews: [
@@ -71,7 +71,7 @@ export const SPOTS = [
       r('Андрій П.', 5, 'Під час відключень — просто порятунок. Ціна втричі нижча, ніж на заправці.', 9),
       r('Марія', 4, 'Трохи складно знайти заїзд, але далі все чудово.', 21),
     ] },
-  { id: 'oleh-garage', title: 'Гараж Олега: розетка 220 В', district: 'Вишенька', lat: 49.2189, lng: 28.4120,
+  { id: 'oleh-garage', title: 'Гараж Олега: розетка 220 В', district: 'Вишенька', lat: 49.2245, lng: 28.4128,
     hostId: 'oleh', source: 'battery', powerKw: 3.6, connector: 'socket220', devices: ['ev', 'ecoflow', 'gadget'],
     pricePerKwh: 10, schedule: { from: '07:00', to: '22:00' }, blackoutHours: 8,
     reviews: [
@@ -86,7 +86,7 @@ export const SPOTS = [
       r('Влад', 5, 'Працює навіть коли весь центр без світла.', 6),
       r('Данило', 4, 'Іноді всі розетки зайняті, краще бронювати.', 12),
     ] },
-  { id: 'old-town-house', title: 'Будинок біля Південного Бугу', district: 'Старе місто', lat: 49.2372, lng: 28.4555,
+  { id: 'old-town-house', title: 'Будинок біля Південного Бугу', district: 'Старе місто', lat: 49.2195, lng: 28.484,
     hostId: 'maksym', source: 'solar', powerKw: 7.4, connector: 'type2', devices: ['ev', 'ecoflow', 'gadget'],
     pricePerKwh: 11, schedule: { from: '08:00', to: '19:00' }, blackoutHours: 7,
     reviews: [
@@ -100,7 +100,7 @@ export const SPOTS = [
       r('Ігор', 4, 'Дешево і близько до дому. Але при відключеннях не працює.', 5),
       r('Катя', 5, 'Оксана дуже привітна, все пояснила.', 18),
     ] },
-  { id: 'slovianka-cottage', title: 'СЕС на даху котеджу', district: 'Слов\'янка', lat: 49.2143, lng: 28.4618,
+  { id: 'slovianka-cottage', title: 'СЕС на даху котеджу', district: 'Слов\'янка', lat: 49.229, lng: 28.442,
     hostId: 'andrii', source: 'solar', powerKw: 11, connector: 'type2', devices: ['ev'],
     pricePerKwh: 13, schedule: { from: '08:00', to: '20:00' }, blackoutHours: 9,
     reviews: [
@@ -109,14 +109,14 @@ export const SPOTS = [
       r('Петро', 4, 'Тільки для авто, EcoFlow не підключиш.', 15),
       r('Олена', 5, 'Користуюсь щотижня.', 25),
     ] },
-  { id: 'tiazhyliv-garage', title: 'Гараж з Type 2', district: 'Тяжилів', lat: 49.2588, lng: 28.4652,
+  { id: 'tiazhyliv-garage', title: 'Гараж з Type 2', district: 'Тяжилів', lat: 49.251, lng: 28.562,
     hostId: 'natalia', source: 'solar', powerKw: 7.4, connector: 'type2', devices: ['ev', 'ecoflow'],
     pricePerKwh: 10, schedule: { from: '07:00', to: '21:00' }, blackoutHours: 6,
     reviews: [
       r('Богдан', 5, 'Ідеально, коли живеш на Тяжилові без власного гаража.', 3),
       r('Аня', 4, 'Добре, але взимку сонця менше — уточнюйте наперед.', 20),
     ] },
-  { id: 'piatnychany-battery', title: 'Будинок з батареями', district: 'П\'ятничани', lat: 49.2245, lng: 28.5208,
+  { id: 'piatnychany-battery', title: 'Будинок з батареями', district: 'П\'ятничани', lat: 49.2488, lng: 28.4575,
     hostId: 'taras', source: 'battery', powerKw: 5, connector: 'socket220', devices: ['ev', 'ecoflow', 'gadget'],
     pricePerKwh: 12, schedule: { from: '06:00', to: '22:00' }, blackoutHours: 10,
     reviews: [
@@ -124,14 +124,14 @@ export const SPOTS = [
       r('Микола', 5, 'Зарядив два EcoFlow за раз.', 7),
       r('Світлана', 4, 'Трохи далеко від центру, але воно того варте.', 16),
     ] },
-  { id: 'academic-parking', title: 'Сонячний паркінг', district: 'Академічний', lat: 49.2128, lng: 28.3965,
+  { id: 'academic-parking', title: 'Сонячний паркінг', district: 'Академічний', lat: 49.2055, lng: 28.421,
     hostId: 'yulia', source: 'solar', powerKw: 11, connector: 'type2', devices: ['ev'],
     pricePerKwh: 13, schedule: { from: '08:00', to: '19:00' }, blackoutHours: 5,
     reviews: [
       r('Андрій', 5, 'Залишаю авто на день і забираю повним.', 5),
       r('Віка', 4, 'Добре, але закривається о 19:00.', 13),
     ] },
-  { id: 'sabariv-estate', title: 'Садиба з СЕС', district: 'Сабарів', lat: 49.2012, lng: 28.4955,
+  { id: 'sabariv-estate', title: 'Садиба з СЕС', district: 'Сабарів', lat: 49.1985, lng: 28.453,
     hostId: 'bohdan', source: 'solar', powerKw: 7.4, connector: 'type2', devices: ['ev', 'ecoflow', 'gadget'],
     pricePerKwh: 9, schedule: { from: '08:00', to: '20:00' }, blackoutHours: 8,
     reviews: [
@@ -139,7 +139,7 @@ export const SPOTS = [
       r('Ліза', 5, 'Діти гралися у дворі, поки заряджалось авто.', 10),
       r('Степан', 5, 'Рекомендую!', 30),
     ] },
-  { id: 'podillia-office', title: 'Офіс з резервним живленням', district: 'Поділля', lat: 49.2475, lng: 28.4405,
+  { id: 'podillia-office', title: 'Офіс з резервним живленням', district: 'Поділля', lat: 49.2195, lng: 28.446,
     hostId: 'kateryna', source: 'battery', powerKw: 3.6, connector: 'socket220', devices: ['ecoflow', 'gadget'],
     pricePerKwh: 15, schedule: { from: '09:00', to: '18:00' }, blackoutHours: 4,
     reviews: [
@@ -153,7 +153,7 @@ export const SPOTS = [
       r('Ната', 4, 'Для телефона і ноутбука — норм. Під час відключень не працює.', 2),
       r('Артем', 5, 'Зручно в центрі.', 9),
     ] },
-  { id: 'vyshenka-private', title: 'СЕС у приватному секторі', district: 'Вишенька', lat: 49.2235, lng: 28.4148,
+  { id: 'vyshenka-private', title: 'СЕС у приватному секторі', district: 'Вишенька', lat: 49.2278, lng: 28.404,
     hostId: 'roman', source: 'solar', powerKw: 7.4, connector: 'type2', devices: ['ev', 'ecoflow'],
     pricePerKwh: 11, schedule: { from: '08:00', to: '20:00' }, blackoutHours: 7,
     reviews: [
@@ -168,7 +168,7 @@ export const SPOTS = [
       r('Тетяна', 5, 'Олена завжди на зв\'язку.', 11),
       r('Кирило', 4, 'Повільно, краще на ніч.', 22),
     ] },
-  { id: 'tiazhyliv-roof', title: 'Станція на даху гаража', district: 'Тяжилів', lat: 49.2555, lng: 28.4560,
+  { id: 'tiazhyliv-roof', title: 'Станція на даху гаража', district: 'Тяжилів', lat: 49.247, lng: 28.556,
     hostId: 'vasyl', source: 'solar', powerKw: 3.6, connector: 'socket220', devices: ['ev', 'ecoflow', 'gadget'],
     pricePerKwh: 10, schedule: { from: '08:00', to: '20:00' }, blackoutHours: 6,
     reviews: [
