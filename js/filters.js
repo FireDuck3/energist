@@ -1,6 +1,17 @@
 // Чисті функції відбору точок і слотів. Без DOM і стану.
 
-export const DEFAULT_FILTERS = { device: null, maxPrice: 15, minRating: 0, availableNow: false };
+export const DEFAULT_FILTERS = { device: null, maxPrice: 15, minRating: 0, availableNow: false, query: '' };
+
+// «  П’ЯТНИЧАНИ » → «п'ятничани»: регістр, різні апострофи й зайві пробіли не важать.
+export function normalizeQuery(s) {
+  return String(s ?? '').toLowerCase().replace(/[’ʼ`]/g, "'").replace(/\s+/g, ' ').trim();
+}
+
+export function matchSpots(spots, query) {
+  const q = normalizeQuery(query);
+  if (!q) return spots;
+  return spots.filter((s) => normalizeQuery(s.title).includes(q) || normalizeQuery(s.district).includes(q));
+}
 
 const toMinutes = (hhmm) => {
   const [h, m] = hhmm.split(':').map(Number);
@@ -23,7 +34,7 @@ export function isOpenAt(spot, date) {
 }
 
 export function filterSpots(spots, filters, { blackout, now }) {
-  return spots.filter((s) =>
+  return matchSpots(spots, filters.query).filter((s) =>
     (!blackout || isLiveInBlackout(s)) &&
     (!filters.device || s.devices.includes(filters.device)) &&
     s.pricePerKwh <= filters.maxPrice &&
