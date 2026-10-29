@@ -64,6 +64,14 @@ test('підтвердити і відхилити запит', () => {
     ['held', 'declined']);
 });
 
+test('скидання фільтрів очищає і пошуковий запит', () => {
+  const store = createStore(memoryStorage());
+  store.setFilters({ query: 'вишенька' });
+  eq(store.getState().filters.query, 'вишенька');
+  store.resetFilters();
+  eq(store.getState().filters.query, '');
+});
+
 test('фільтри зливаються і скидаються', () => {
   const store = createStore(memoryStorage());
   store.setFilters({ device: 'ev' });
