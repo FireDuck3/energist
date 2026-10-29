@@ -20,7 +20,9 @@
       document.getElementById('summary').textContent = `FAIL load: ${e.message}`;
     });
     try {
-      await import('./pricing.test.js');
+      for (const file of ['pricing', 'data', 'filters', 'validate']) {
+        await import(`./${file}.test.js`);
+      }
       run();
     } catch (err) {
       document.title = 'FAIL load';
