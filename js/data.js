@@ -1,5 +1,8 @@
 // Усі ціни, константи й засіяні дані демо. Перед пітчем цифри правляться тут.
 
+// Збільште після зміни засіяних даних: збережений у браузері стан старої версії скинеться сам.
+export const DATA_VERSION = 1;
+
 export const COMMISSION = 0.10;          // комісія ЕнерГостя
 export const HOME_TARIFF = 4.32;         // домашній тариф, грн/кВт·год
 export const COMMERCIAL_PRICE = 35;      // типова комерційна зарядка, грн/кВт·год
@@ -43,7 +46,7 @@ export function isoDay(offset = 0, from = new Date()) {
 
 export const HOSTS = [
   // pastMonths — заробіток за 5 попередніх місяців, від найстарішого (для графіка в кабінеті).
-  { id: 'oleh', name: 'Олег', chargesCount: 47, sinceYear: 2025, sesCost: 190000,
+  { id: 'oleh', name: 'Олег', vocative: 'Олеже', chargesCount: 47, sinceYear: 2025, sesCost: 190000,
     pastMonths: [1890, 3120, 3480, 3260, 2410] },
   { id: 'iryna', name: 'Ірина', chargesCount: 112, sinceYear: 2025 },
   { id: 'maksym', name: 'Максим', chargesCount: 63, sinceYear: 2025 },

@@ -1,6 +1,7 @@
 import { test, eq } from './runner.js';
 import { createStore, memoryStorage, STORAGE_KEY } from '../js/store.js';
 import { spotRating, DEFAULT_FILTERS } from '../js/filters.js';
+import { DATA_VERSION } from '../js/data.js';
 
 const spot = (state, id) => state.spots.find((s) => s.id === id);
 
@@ -91,6 +92,15 @@ test('стара форма стану без spots — засіяний ста�
   const storage = memoryStorage();
   storage.setItem(STORAGE_KEY, '{"blackout":true}');
   eq(createStore(storage).getState().spots.length, 15);
+});
+
+test('стан іншої версії даних — засіяний стан', () => {
+  const storage = memoryStorage();
+  const store = createStore(storage);
+  store.setBlackout(true);
+  const saved = JSON.parse(storage.getItem(STORAGE_KEY));
+  storage.setItem(STORAGE_KEY, JSON.stringify({ ...saved, version: DATA_VERSION - 1 }));
+  eq(createStore(storage).getState().blackout, false);
 });
 
 test('сховище кидає винятки — store працює', () => {

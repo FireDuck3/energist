@@ -461,3 +461,82 @@ body.blackout .leaflet-control-zoom a, body.blackout .leaflet-control-attributio
   .wizard-steps li { font-size: 0; padding-right: 0; }
   .wizard-steps li span { font-size: .75rem; }
 }
+
+/* ---------- Кабінет господаря ---------- */
+.host-page { padding-top: 28px; padding-bottom: 56px; }
+.host-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; flex-wrap: wrap; margin-bottom: 24px; }
+.host-head h1 { font-size: clamp(1.7rem, 3vw, 2.4rem); }
+.host-head .lead { margin: 0; }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+.stat { padding: 18px 20px; display: grid; gap: 2px; }
+.stat-label { color: var(--muted); font-size: .88rem; font-weight: 600; }
+.stat-value { font-size: 1.7rem; font-weight: 800; letter-spacing: -.01em; }
+.stat-note { color: var(--muted); font-size: .8rem; }
+.host-grid { display: grid; grid-template-columns: 1fr 1.15fr; gap: 20px; align-items: start; }
+.panel { padding: 22px; }
+.panel-title { font-size: 1.2rem; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+.bars { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; height: 220px; align-items: end; margin: 12px 0 20px; }
+.bar-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 6px; }
+.bar { width: 100%; max-width: 52px; background: var(--sky); border-radius: 8px 8px 4px 4px; transition: height .4s ease; }
+.bar-col.current .bar { background: var(--indigo); }
+.bar-value { font-size: .75rem; font-weight: 700; color: var(--muted); white-space: nowrap; }
+.bar-col.current .bar-value { color: var(--indigo); }
+.bar-label { font-size: .85rem; color: var(--muted); }
+.payback { display: grid; gap: 6px; }
+.payback-head { display: flex; justify-content: space-between; font-weight: 600; }
+.progress { height: 12px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, var(--sun), var(--orange)); border-radius: 999px; }
+
+.bookings { list-style: none; padding: 0; margin: 0; display: grid; }
+.booking { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); align-items: start; }
+.booking:last-child { border-bottom: 0; }
+.booking-main { display: grid; gap: 3px; min-width: 0; }
+.booking-meta { font-size: .85rem; }
+.booking-side { display: grid; justify-items: end; gap: 2px; text-align: right; }
+.booking-actions { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.badge { justify-self: start; font-size: .75rem; font-weight: 700; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+.badge-warn { background: var(--orange-soft); color: #B85A12; }
+.badge-info { background: var(--indigo-soft); color: var(--indigo); }
+.badge-ok { background: var(--ok-soft); color: var(--ok); }
+.badge-muted { background: var(--surface-2); color: var(--muted); }
+body.blackout .badge-warn { color: var(--sun); }
+
+.own-title { margin-top: 36px; font-size: 1.4rem; }
+.own-spots { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+.own-spot { overflow: hidden; text-decoration: none; color: inherit; display: flex; flex-direction: column; }
+.own-spot img { width: 100%; height: 130px; object-fit: cover; }
+.own-spot-body { padding: 14px; display: grid; gap: 4px; justify-items: start; }
+.add-card {
+  border: 2px dashed var(--sky-2); background: transparent; border-radius: var(--radius); min-height: 220px;
+  align-items: center; justify-content: center; gap: 8px; font: inherit; font-weight: 700; color: var(--indigo); cursor: pointer;
+}
+.add-card:hover { background: var(--indigo-soft); }
+.add-plus { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; background: var(--indigo-soft); font-size: 1.8rem; }
+
+/* Форма */
+.add-form { display: grid; gap: 16px; }
+.add-form h2 { margin-bottom: 0; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 18px; }
+.form-field { display: grid; gap: 6px; align-content: start; }
+.mini-map { height: 240px; border-radius: 14px; overflow: hidden; position: relative; background: var(--surface-2); cursor: crosshair; }
+.mini-map .map-fallback { position: absolute; }
+.time-row { display: flex; align-items: center; gap: 8px; }
+.field-error { color: var(--danger); font-size: .85rem; font-weight: 600; }
+.field-error[hidden] { display: none; }
+select.input { height: 44px; }
+input.input { height: 44px; }
+
+@media (max-width: 900px) {
+  .stats { grid-template-columns: 1fr 1fr; }
+  .host-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+  .form-grid { grid-template-columns: 1fr; }
+  .stat-value { font-size: 1.35rem; }
+  .bars { gap: 6px; }
+  .bar-value { font-size: .65rem; }
+  .booking { grid-template-columns: auto 1fr; }
+  .booking-side { grid-column: 2; justify-items: start; text-align: left; }
+  .booking-actions { justify-content: flex-start; }
+}

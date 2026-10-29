@@ -1,5 +1,5 @@
 // Стан демо: одне джерело правди для всіх екранів, зберігається в localStorage.
-import { SPOTS, HOSTS, SEED_BOOKINGS, DEMO_HOST_ID, DEMO_GUEST_NAME, isoDay } from './data.js';
+import { SPOTS, HOSTS, SEED_BOOKINGS, DEMO_HOST_ID, DEMO_GUEST_NAME, DATA_VERSION, isoDay } from './data.js';
 import { DEFAULT_FILTERS } from './filters.js';
 import { estimateKwh, holdAmount, sessionCost } from './pricing.js';
 
@@ -7,7 +7,7 @@ export const STORAGE_KEY = 'energist-demo-v1';
 
 export function seedState() {
   return structuredClone({
-    role: 'guest', blackout: false, filters: DEFAULT_FILTERS,
+    version: DATA_VERSION, role: 'guest', blackout: false, filters: DEFAULT_FILTERS,
     spots: SPOTS, hosts: HOSTS, bookings: SEED_BOOKINGS,
   });
 }
@@ -36,7 +36,8 @@ export function safeLocalStorage() {
 function load(storage) {
   try {
     const parsed = JSON.parse(storage.getItem(STORAGE_KEY));
-    const valid = ['spots', 'hosts', 'bookings'].every((k) => Array.isArray(parsed?.[k]));
+    const valid = parsed?.version === DATA_VERSION &&
+      ['spots', 'hosts', 'bookings'].every((k) => Array.isArray(parsed[k]));
     if (!valid) return null;
     return { ...seedState(), ...parsed, filters: { ...DEFAULT_FILTERS, ...parsed.filters } };
   } catch {
