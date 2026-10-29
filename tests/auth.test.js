@@ -1,8 +1,5 @@
 import { test, eq } from './runner.js';
-import {
-  createSession, validateProfile, authErrorMessage, rememberLinkEmail, takeLinkEmail,
-} from '../js/auth.js';
-import { memoryStorage } from '../js/store.js';
+import { createSession, validateProfile, authErrorMessage } from '../js/auth.js';
 
 const user = { uid: 'u1', email: 'a@b.ua', name: 'Ірина', photoURL: null, provider: 'google', emailVerified: true };
 const tick = () => new Promise((r) => setTimeout(r, 0));
@@ -162,18 +159,9 @@ test('validateProfile', () => {
 
 test('authErrorMessage', () => {
   eq(authErrorMessage('auth/invalid-credential'), 'Невірний email або пароль');
-  eq(authErrorMessage('auth/wrong-password'), 'Невірний email або пароль');
-  eq(authErrorMessage('auth/popup-closed-by-user'), '');
-  eq(authErrorMessage('auth/popup-blocked'), 'Браузер заблокував вікно входу — дозвольте спливні вікна і спробуйте ще раз');
-  eq(authErrorMessage('auth/expired-action-code'), 'Посилання застаріло або вже використане — надішліть нове');
+  eq(authErrorMessage('auth/invalid-code'), 'Код невірний або застарів — надішліть новий');
+  eq(authErrorMessage('auth/email-rate-limit'), 'Забагато листів за годину. Спробуйте пізніше або увійдіть паролем');
+  eq(authErrorMessage('auth/email-not-allowed'), 'Вхід кодом зараз недоступний для цієї пошти — увійдіть паролем');
+  eq(authErrorMessage('auth/popup-blocked'), 'Щось пішло не так. Спробуйте ще раз'); // Google-входу більше немає
   eq(authErrorMessage('щось/нове'), 'Щось пішло не так. Спробуйте ще раз');
-});
-
-test('посилання з пошти: email запам\'ятовується, видається один раз', () => {
-  const st = memoryStorage();
-  rememberLinkEmail('a@b.ua', '#/spot/oleh-ses', st);
-  eq(takeLinkEmail(st), { email: 'a@b.ua', returnTo: '#/spot/oleh-ses' });
-  eq(takeLinkEmail(st), null);
-  st.setItem('energist-signin-email', '{bad');
-  eq(takeLinkEmail(st), null);
 });

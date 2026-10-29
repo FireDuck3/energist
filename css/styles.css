@@ -588,3 +588,30 @@ body.blackout .mark-us span { color: #141833; }
   .calc-results { grid-template-columns: 1fr; }
   .result-value { font-size: 1.45rem; }
 }
+
+/* ---------- Акаунт у шапці ---------- */
+.account-placeholder { display: inline-block; width: 96px; height: 36px; }
+.account { position: relative; }
+.account-button {
+  list-style: none; display: flex; align-items: center; gap: 8px; cursor: pointer;
+  padding: 4px 10px 4px 4px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface);
+  font-weight: 600; font-size: .92rem; white-space: nowrap; max-width: 200px;
+}
+.account-button::-webkit-details-marker { display: none; }
+.account-name { overflow: hidden; text-overflow: ellipsis; }
+.account-menu {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 1100; min-width: 200px;
+  padding: 8px; display: grid; gap: 2px;
+}
+.account-menu a, .account-menu button {
+  display: block; text-align: left; padding: 10px 12px; border-radius: 10px; border: 0; background: none;
+  font: inherit; color: var(--text); text-decoration: none; cursor: pointer;
+}
+.account-menu a:hover, .account-menu button:hover { background: var(--surface-2); }
+.account-email { padding: 6px 12px 8px; font-size: .82rem; border-bottom: 1px solid var(--line); margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; }
+
+@media (max-width: 560px) {
+  .account-name { display: none; }
+  .account-button { padding: 4px; }
+  .switch-label { display: none; }
+}

@@ -1,8 +1,11 @@
-// Сесія користувача: стани входу, «спершу увійди», профіль. Не знає про Firebase —
-// працює з будь-яким AuthService (див. js/firebase.js), тому тестується з підробкою.
+// Сесія користувача: стани входу, «спершу увійди», профіль. Не знає про конкретний сервіс —
+// працює з будь-яким AuthService (реалізація: js/supabase.js), тому тестується з підробкою.
+//
+// AuthService: onUser(cb), loadProfile(uid), saveProfile(uid, {name, role}, {create}),
+//   signUpWithPassword, signInWithPassword, sendLoginCode, verifyLoginCode,
+//   sendResetCode, resetPassword, signOut; помилки — { code: 'auth/…' }.
 import { DEMO_GUEST_NAME } from './data.js';
 
-const LINK_KEY = 'energist-signin-email';
 const ROLES = ['guest', 'host'];
 const FALLBACK_MESSAGE = 'Щось пішло не так. Спробуйте ще раз';
 const MESSAGES = {
@@ -11,17 +14,11 @@ const MESSAGES = {
   'auth/weak-password': 'Пароль має бути щонайменше 6 символів',
   'auth/email-already-in-use': 'Цей email уже зареєстровано — увійдіть',
   'auth/invalid-credential': 'Невірний email або пароль',
-  'auth/wrong-password': 'Невірний email або пароль',
-  'auth/user-not-found': 'Невірний email або пароль',
+  'auth/invalid-code': 'Код невірний або застарів — надішліть новий',
+  'auth/email-rate-limit': 'Забагато листів за годину. Спробуйте пізніше або увійдіть паролем',
+  'auth/email-not-allowed': 'Вхід кодом зараз недоступний для цієї пошти — увійдіть паролем',
   'auth/too-many-requests': 'Забагато спроб. Спробуйте за кілька хвилин',
-  'auth/popup-blocked': 'Браузер заблокував вікно входу — дозвольте спливні вікна і спробуйте ще раз',
-  'auth/popup-closed-by-user': '',
-  'auth/cancelled-popup-request': '',
   'auth/network-request-failed': 'Немає з\'єднання з інтернетом',
-  'auth/unauthorized-domain': 'Вхід з цієї адреси не дозволено',
-  'auth/invalid-action-code': 'Посилання застаріло або вже використане — надішліть нове',
-  'auth/expired-action-code': 'Посилання застаріло або вже використане — надішліть нове',
-  'auth/account-exists-with-different-credential': 'Цей email уже використовується з іншим способом входу',
   'auth/operation-not-allowed': 'Цей спосіб входу зараз вимкнено',
 };
 
@@ -38,28 +35,6 @@ export function validateProfile({ name, role } = {}) {
   else if (value.name.length > 60) errors.name = 'Ім\'я — до 60 символів';
   if (!ROLES.includes(role)) errors.role = 'Оберіть, для чого вам ЕнерГість';
   return { ok: Object.keys(errors).length === 0, errors, value };
-}
-
-function browserStorage() {
-  try { return window.localStorage; } catch { return null; }
-}
-
-// Перед надсиланням посилання запам'ятовуємо email і сторінку, з якої людина пішла.
-export function rememberLinkEmail(email, returnTo, storage = browserStorage()) {
-  try { storage?.setItem(LINK_KEY, JSON.stringify({ email, returnTo })); } catch { /* без збереження попросимо email ще раз */ }
-}
-
-// Видає збережене один раз; інший браузер, зіпсовані дані чи заблоковане сховище — null.
-export function takeLinkEmail(storage = browserStorage()) {
-  try {
-    const raw = storage?.getItem(LINK_KEY);
-    storage?.removeItem(LINK_KEY);
-    if (!raw) return null;
-    const saved = JSON.parse(raw);
-    return typeof saved?.email === 'string' ? { email: saved.email, returnTo: saved.returnTo || '#/' } : null;
-  } catch {
-    return null;
-  }
 }
 
 export function createSession(loadService) {
