@@ -93,7 +93,7 @@ export function render(_params, root, store, session, userHistory) {
             oninput: (e) => { draft.name = e.target.value; } }),
           errors.name && h('span', { class: 'field-error' }, errors.name)),
         h('div', { class: 'form-field' }, h('span', { class: 'field-label' }, 'Email'), h('span', {}, user.email)),
-        h('div', { class: 'form-field' }, h('span', { class: 'field-label' }, 'Для чого вам ЕнерГість?'),
+        h('div', { class: 'form-field' }, h('span', { class: 'field-label' }, 'Для чого вам WattWay?'),
           h('div', { class: 'role-choice' }, ROLES.map(([value, label]) =>
             h('button', { type: 'button', class: `chip${draft.role === value ? ' active' : ''}`, disabled: busy,
               onclick: () => { draft.role = value; draw(); } }, label))),

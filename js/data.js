@@ -3,7 +3,7 @@
 // Збільште після зміни засіяних даних: збережений у браузері стан старої версії скинеться сам.
 export const DATA_VERSION = 2;
 
-export const COMMISSION = 0.10;          // комісія ЕнерГостя
+export const COMMISSION = 0.10;          // комісія WattWay
 export const HOME_TARIFF = 4.32;         // домашній тариф, грн/кВт·год
 export const COMMERCIAL_PRICE = 35;      // типова комерційна зарядка, грн/кВт·год
 export const COMMERCIAL_RANGE = [30, 40];

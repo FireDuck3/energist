@@ -33,7 +33,7 @@ export function validateProfile({ name, role } = {}) {
   const errors = {};
   if (!value.name) errors.name = 'Вкажіть ім\'я';
   else if (value.name.length > 60) errors.name = 'Ім\'я — до 60 символів';
-  if (!ROLES.includes(role)) errors.role = 'Оберіть, для чого вам ЕнерГість';
+  if (!ROLES.includes(role)) errors.role = 'Оберіть, для чого вам WattWay';
   return { ok: Object.keys(errors).length === 0, errors, value };
 }
 

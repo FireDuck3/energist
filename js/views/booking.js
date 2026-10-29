@@ -190,7 +190,7 @@ export function openBooking(spot, store, { now = new Date(), session, userHistor
         row('Отримано енергії', formatKwh(paid.actualKwh)),
         row('Сума до сплати', formatUAH(paid.total), 'sum-total'),
         row(`Господарю (${hostName})`, formatUAH(paid.hostPayout), 'sum-sub'),
-        row(`Комісія ЕнерГість ${Math.round(COMMISSION * 100)}%`, formatUAH(paid.fee), 'sum-sub'),
+        row(`Комісія WattWay ${Math.round(COMMISSION * 100)}%`, formatUAH(paid.fee), 'sum-sub'),
         row('Повернуто із заморожених', formatUAH(round2(paid.heldAmount - paid.total)))),
       saved > 0 && h('div', { class: 'saved-banner' },
         `💚 Ви зекономили ${formatUAH(saved)} порівняно з комерційною зарядкою (~${COMMERCIAL_PRICE} грн/кВт·год)`),

@@ -1,4 +1,4 @@
--- ЕнерГість: профілі користувачів. Виконується один раз у Supabase → SQL Editor.
+-- WattWay: профілі користувачів. Виконується один раз у Supabase → SQL Editor.
 -- Кожен бачить і змінює лише свій рядок; видалення з клієнта заборонене.
 
 create table if not exists public.profiles (
