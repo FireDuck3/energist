@@ -1,6 +1,7 @@
 // Головна: що таке ЕнерГість, для кого, як працює.
 import { h } from '../ui.js';
 import { HOME_TARIFF, COMMERCIAL_RANGE } from '../data.js';
+import { mountCalculator } from './calculator.js';
 
 const STEPS = [
   { icon: '🔍', title: 'Пошук', text: 'Знаходиш розетку на карті за кілька кліків' },
@@ -22,6 +23,8 @@ function story({ img, alt, who, quote, facts, punchline, cta, href }) {
 
 export function render(_params, root) {
   const [lo, hi] = COMMERCIAL_RANGE;
+  const calcBox = h('div', { id: 'calc-compact' });
+  mountCalculator(calcBox, { compact: true });
   root.append(
     h('section', { class: 'hero' },
       h('div', { class: 'container hero-inner' },
@@ -82,7 +85,8 @@ export function render(_params, root) {
     h('section', { class: 'section' },
       h('div', { class: 'container' },
         h('h2', { class: 'section-title' }, 'Скільки це дає'),
-        h('div', { id: 'calc-compact' }))),
+        calcBox,
+        h('p', { class: 'calc-more' }, h('a', { href: '#/calc' }, 'Детальний калькулятор →')))),
 
     h('section', { class: 'section' },
       h('div', { class: 'container' },
