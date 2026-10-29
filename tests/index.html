@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <title>Тести ЕнерГість</title>
+  <style>
+    body { font: 15px/1.5 system-ui, sans-serif; margin: 24px; }
+    .pass { color: #1a7f37; }
+    .fail { color: #c62828; font-weight: 600; }
+    #summary { font-size: 20px; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <p id="summary">Завантаження…</p>
+  <ul id="results"></ul>
+  <script type="module">
+    import { run } from './runner.js';
+    window.addEventListener('error', (e) => {
+      document.title = 'FAIL load';
+      document.getElementById('summary').textContent = `FAIL load: ${e.message}`;
+    });
+    try {
+      await import('./pricing.test.js');
+      run();
+    } catch (err) {
+      document.title = 'FAIL load';
+      document.getElementById('summary').textContent = `FAIL load: ${err.message}`;
+    }
+  </script>
+</body>
+</html>
