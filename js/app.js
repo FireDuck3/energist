@@ -1,5 +1,7 @@
-// Точка входу: store, шапка, маршрути.
+// Точка входу: store, сесія, шапка, маршрути.
 import { createStore, safeLocalStorage, memoryStorage } from './store.js';
+import { createSession } from './auth.js';
+import { loadSupabase } from './supabase.js';
 import { startRouter, currentPath } from './router.js';
 import { h, toast } from './ui.js';
 import * as landing from './views/landing.js';
@@ -7,10 +9,37 @@ import * as map from './views/map.js';
 import * as spot from './views/spot.js';
 import * as host from './views/host.js';
 import * as calculator from './views/calculator.js';
+import * as profile from './views/profile.js';
+import { openAuthModal } from './views/auth-modal.js';
 
 export const store = createStore(safeLocalStorage() ?? memoryStorage());
+export const session = createSession(loadSupabase);
 
-const view = (mod) => (params, root) => mod.render(params, root, store);
+const view = (mod) => (params, root) => mod.render(params, root, store, session);
+
+const signIn = () => session.requireAuth(() => {}, '');
+
+function accountArea() {
+  const { status, user } = session.getState();
+  if (status === 'loading') return h('span', { class: 'account-placeholder', 'aria-hidden': 'true' });
+  if (status === 'signedOut' || status === 'unavailable') {
+    return h('button', { type: 'button', class: 'btn btn-primary btn-sm', onclick: signIn }, 'Увійти');
+  }
+  if (status === 'needsProfile') {
+    return h('button', { type: 'button', class: 'btn btn-secondary btn-sm', onclick: signIn }, 'Завершити профіль');
+  }
+  const demo = status === 'demo';
+  const name = session.currentName();
+  return h('details', { class: 'account' },
+    h('summary', { class: 'account-button', 'aria-label': 'Меню акаунта' },
+      h('span', { class: 'avatar avatar-sm' }, name[0].toUpperCase()),
+      h('span', { class: 'account-name' }, demo ? `${name} (демо)` : name)),
+    h('div', { class: 'account-menu card' },
+      !demo && h('span', { class: 'account-email muted' }, user.email),
+      !demo && h('a', { href: '#/profile', onclick: (e) => e.target.closest('details').open = false }, 'Профіль'),
+      h('button', { type: 'button', onclick: () => (demo ? location.reload() : session.service.signOut().catch(() => toast('Не вдалося вийти — перевірте інтернет'))) },
+        demo ? 'Вийти з демо-режиму' : 'Вийти')));
+}
 
 function renderHeader() {
   const { blackout } = store.getState();
@@ -32,7 +61,8 @@ function renderHeader() {
         h('label', { class: 'switch', title: 'Режим блекауту' },
           h('input', { type: 'checkbox', checked: blackout, onchange: (e) => store.setBlackout(e.target.checked) }),
           h('span', { class: 'switch-track' }, h('span', { class: 'switch-thumb' })),
-          h('span', { class: 'switch-label' }, '⚡ Блекаут')))));
+          h('span', { class: 'switch-label' }, '⚡ Блекаут')),
+        accountArea())));
 }
 
 function applyTheme() {
@@ -43,6 +73,8 @@ store.subscribe(() => {
   applyTheme();
   renderHeader();
 });
+session.subscribe(renderHeader);
+session.onNeedAuth((reason) => openAuthModal(session, { reason }));
 
 document.getElementById('reset-demo').addEventListener('click', () => {
   store.reset();
@@ -57,6 +89,7 @@ startRouter({
   '/spot/:id': view(spot),
   '/host': view(host),
   '/calc': view(calculator),
+  '/profile': view(profile),
 }, document.getElementById('app'), {
   onChange(path) {
     const role = path.startsWith('/host') ? 'host' : (path.startsWith('/map') || path.startsWith('/spot')) ? 'guest' : null;

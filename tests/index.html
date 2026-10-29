@@ -20,10 +20,10 @@
       document.getElementById('summary').textContent = `FAIL load: ${e.message}`;
     });
     try {
-      for (const file of ['pricing', 'data', 'filters', 'validate', 'store', 'stats', 'ui']) {
+      for (const file of ['pricing', 'data', 'filters', 'validate', 'store', 'stats', 'ui', 'auth', 'supabase']) {
         await import(`./${file}.test.js`);
       }
-      run();
+      await run();
     } catch (err) {
       document.title = 'FAIL load';
       document.getElementById('summary').textContent = `FAIL load: ${err.message}`;

@@ -22,7 +22,7 @@ function row(label, value, cls = '') {
   return h('div', { class: `sum-row ${cls}` }, h('span', {}, label), h('b', {}, value));
 }
 
-export function openBooking(spot, store, { now = new Date() } = {}) {
+export function openBooking(spot, store, { now = new Date(), session } = {}) {
   const todayStarts = availableStarts(spot.schedule, 'today', now);
   const sel = {
     device: spot.devices[0],
@@ -30,7 +30,8 @@ export function openBooking(spot, store, { now = new Date() } = {}) {
     start: null,
     hours: 2,
   };
-  const hostName = store.getState().hosts.find((x) => x.id === spot.hostId)?.name ?? 'господар';
+  const hostName = spot.hostName ?? store.getState().hosts.find((x) => x.id === spot.hostId)?.name ?? 'господар';
+  const userName = session?.currentName();
   let booking = null;
   let step = 0;
   let rafId = null;
@@ -119,7 +120,7 @@ export function openBooking(spot, store, { now = new Date() } = {}) {
       h('div', { class: 'wizard-actions' },
         h('button', { type: 'button', class: 'btn btn-ghost', onclick: stepTime }, '← Назад'),
         h('button', { type: 'button', class: 'btn btn-primary btn-lg', onclick: () => {
-          booking = store.createBooking({ spotId: spot.id, ...sel });
+          booking = store.createBooking({ spotId: spot.id, ...sel, guestName: userName });
           stepCharging();
         } }, `Підтвердити і заморозити ${formatUAH(hold)}`))));
   }
@@ -208,7 +209,7 @@ export function openBooking(spot, store, { now = new Date() } = {}) {
       h('div', { class: 'wizard-actions' },
         h('button', { type: 'button', class: 'btn btn-ghost', onclick: () => modal.close() }, 'Пропустити'),
         h('button', { type: 'button', class: 'btn btn-primary btn-lg', onclick: () => {
-          store.addReview(booking.id, { stars: rating, text: text.value.trim() || 'Все пройшло чудово!' });
+          store.addReview(booking.id, { stars: rating, text: text.value.trim() || 'Все пройшло чудово!', author: userName });
           modal.close();
           toast('Дякуємо за відгук!');
         } }, 'Надіслати відгук'))));

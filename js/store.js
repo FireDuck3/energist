@@ -83,11 +83,11 @@ export function createStore(storage) {
       return spot;
     },
 
-    createBooking({ spotId, device, day, start, hours }) {
+    createBooking({ spotId, device, day, start, hours, guestName = DEMO_GUEST_NAME }) {
       const spot = findSpot(spotId);
       const estimatedKwh = estimateKwh(spot.powerKw, hours, device);
       const booking = {
-        id: newId('b'), spotId, guestName: DEMO_GUEST_NAME, device,
+        id: newId('b'), spotId, guestName, device,
         date: isoDay(day === 'tomorrow' ? 1 : 0), start, hours, estimatedKwh,
         heldAmount: holdAmount(estimatedKwh, spot.pricePerKwh), status: 'held',
         actualKwh: null, total: null, fee: null, hostPayout: null, createdAt: isoDay(0),
@@ -100,9 +100,9 @@ export function createStore(storage) {
       const spot = findSpot(findBooking(id).spotId);
       updateBooking(id, { status: 'paid', actualKwh, ...sessionCost(actualKwh, spot.pricePerKwh) });
     },
-    addReview(bookingId, { stars, text }) {
+    addReview(bookingId, { stars, text, author = DEMO_GUEST_NAME }) {
       const booking = findBooking(bookingId);
-      const review = { author: DEMO_GUEST_NAME, stars, text, date: isoDay(0) };
+      const review = { author, stars, text, date: isoDay(0) };
       state = {
         ...state,
         spots: state.spots.map((s) => (s.id === booking.spotId ? { ...s, reviews: [review, ...s.reviews] } : s)),

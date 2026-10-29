@@ -94,6 +94,23 @@ test('стара форма стану без spots — засіяний ста�
   eq(createStore(storage).getState().spots.length, 15);
 });
 
+test('бронювання і відгук від імені увійденого користувача', () => {
+  const store = createStore(memoryStorage());
+  const named = store.createBooking({ spotId: 'oleh-ses', device: 'ev', day: 'today', start: '10:00', hours: 1, guestName: 'Ірина' });
+  const plain = store.createBooking({ spotId: 'oleh-ses', device: 'ev', day: 'today', start: '11:00', hours: 1 });
+  eq([named.guestName, plain.guestName], ['Ірина', 'Саша']);
+  store.finishCharging(named.id, 5);
+  store.addReview(named.id, { stars: 5, text: 'ок', author: 'Ірина' });
+  eq(spot(store.getState(), 'oleh-ses').reviews[0].author, 'Ірина');
+});
+
+test('нова розетка пам\'ятає ім\'я господаря', () => {
+  const store = createStore(memoryStorage());
+  const s = store.addSpot({ title: 'Моя', lat: 49.22, lng: 28.41, pricePerKwh: 11, powerKw: 3.6, source: 'solar',
+    connector: 'socket220', devices: ['ecoflow'], schedule: { from: '08:00', to: '20:00' }, hostName: 'Ірина' });
+  eq(s.hostName, 'Ірина');
+});
+
 test('стан іншої версії даних — засіяний стан', () => {
   const storage = memoryStorage();
   const store = createStore(storage);
