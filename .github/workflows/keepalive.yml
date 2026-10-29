@@ -15,4 +15,5 @@ jobs:
         env:
           URL: https://yxbpobiipcdazwnshime.supabase.co
           KEY: sb_publishable_JD-Im8Jx4D6SZypWwMX7JQ_EIoP7uCH
-        run: curl -fsS "$URL/rest/v1/profiles?select=id&limit=1" -H "apikey: $KEY"
+        run: |
+          curl -fsS "$URL/rest/v1/profiles?select=id&limit=1" -H "apikey: $KEY"
