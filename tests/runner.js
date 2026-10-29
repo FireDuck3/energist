@@ -11,13 +11,13 @@ export function eq(actual, expected, msg = '') {
   if (a !== e) throw new Error(`${msg ? msg + ': ' : ''}очікувалось ${e}, отримано ${a}`);
 }
 
-export function run() {
+export async function run() {
   const list = document.getElementById('results');
   let failed = 0;
   for (const { name, fn } of cases) {
     const li = document.createElement('li');
     try {
-      fn();
+      await fn();
       li.textContent = `✓ ${name}`;
       li.className = 'pass';
     } catch (err) {
