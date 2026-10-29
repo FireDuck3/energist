@@ -5,7 +5,7 @@ P2P-маркетплейс електрики («енергетичний Airbnb
 
 Це клікабельне демо: точки, бронювання й оплата вигадані і зберігаються лише у вашому браузері. Справжні тільки акаунти (Supabase): реєстрація, вхід і профіль з ім'ям та роллю.
 
-Сайт: https://energist.onrender.com
+Сайт: https://wattway.onrender.com
 
 ## Запуск локально
 
@@ -58,7 +58,9 @@ py tests/serve.py 8420
 
 ## Хостинг (Render)
 
-Static Site на Render з публічного репозиторію `FireDuck3/energist`, гілка `main`, без збірки, папка — корінь. Автодеплою немає: після пушу натисніть у Render **Manual Deploy → Deploy latest commit**. Власний домен — Settings → Custom Domains.
+Static Site `wattway` на Render з публічного репозиторію `FireDuck3/energist`, гілка `main`, без збірки, папка — корінь. Автодеплою немає: після пушу натисніть у Render **Manual Deploy → Deploy latest commit**. Власний домен — Settings → Custom Domains.
+
+Стара адреса https://energist.onrender.com (сервіс `energist`) лишилась лише для старих посилань: `index.html` одразу перекидає з неї на wattway.onrender.com. Щоб перекидання працювало й після змін у `index.html`, деплойте й цей сервіс. У Supabase → Authentication → URL Configuration адреса сайту — https://wattway.onrender.com.
 
 Карта — тайли OpenStreetMap, тож на пітчі потрібен інтернет. Без нього список точок і всі сценарії працюють, замість карти буде підказка.
 

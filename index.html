@@ -3,6 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script>
+    // Сайт переїхав: стара адреса веде на нову з тією ж сторінкою (#/map, #/spot/… тощо).
+    if (location.hostname === 'energist.onrender.com') location.replace('https://wattway.onrender.com/' + location.hash);
+  </script>
   <title>WattWay — енергетичний Airbnb</title>
   <meta name="description" content="P2P-маркетплейс електрики: знайди розетку поруч або заробляй на надлишку своєї сонячної станції.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='48' fill='%234950BC'/><text x='50' y='68' font-size='56' text-anchor='middle'>⚡</text></svg>">
