@@ -4,7 +4,7 @@ import { createSession } from './auth.js';
 import { loadSupabase } from './supabase.js';
 import { createUserHistory } from './user-history.js';
 import { startRouter, currentPath } from './router.js';
-import { h, toast } from './ui.js';
+import { h, toast, installRipple } from './ui.js';
 import * as landing from './views/landing.js';
 import * as map from './views/map.js';
 import * as spot from './views/spot.js';
@@ -99,6 +99,9 @@ function renderTabbar() {
 }
 
 applyTheme();
+installRipple();
+const appRoot = document.getElementById('app');
+const calm = window.matchMedia('(prefers-reduced-motion: reduce)');
 startRouter({
   '/': view(landing),
   '/map': view(map),
@@ -106,8 +109,10 @@ startRouter({
   '/host': view(host),
   '/calc': view(calculator),
   '/profile': view(profile),
-}, document.getElementById('app'), {
+}, appRoot, {
   onChange(path) {
+    // Нова сторінка плавно проявляється. Лише прозорість: transform зсунув би fixed-панелі всередині.
+    if (!calm.matches) appRoot.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 280, easing: 'ease-out' });
     renderTabbar();
     const role = path.startsWith('/host') ? 'host' : (path.startsWith('/map') || path.startsWith('/spot')) ? 'guest' : null;
     if (role && role !== store.getState().role) store.setRole(role);

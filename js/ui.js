@@ -62,6 +62,40 @@ export function openModal(content, { onClose, className = '' } = {}) {
   return { close, body, setContent: (node) => body.replaceChildren(node) };
 }
 
+const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+
+// Блоки плавно випливають, коли доходять до поля зору. З «менше руху» або без IntersectionObserver — видно одразу.
+export function revealOnScroll(els, { reduce = prefersReducedMotion() } = {}) {
+  if (reduce || !('IntersectionObserver' in window)) return () => {};
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      e.target.classList.add('in');
+      io.unobserve(e.target);
+    }
+  }, { rootMargin: '0px 0px -8% 0px' });
+  els.forEach((el) => { el.classList.add('reveal'); io.observe(el); });
+  return () => io.disconnect();
+}
+
+// «Хвиля» від місця натискання на кнопках, чипах і вкладках.
+export function installRipple(root = document, { reduce = prefersReducedMotion() } = {}) {
+  if (reduce) return () => {};
+  const onDown = (e) => {
+    const btn = e.target.closest?.('.btn, .chip, .tab');
+    if (!btn || btn.disabled || !root.contains(btn)) return;
+    const r = btn.getBoundingClientRect();
+    const size = Math.max(r.width, r.height) * 2;
+    const x = (e.clientX || r.left + r.width / 2) - r.left - size / 2;
+    const y = (e.clientY || r.top + r.height / 2) - r.top - size / 2;
+    const dot = h('span', { class: 'ripple', 'aria-hidden': 'true', style: `width:${size}px;height:${size}px;left:${x}px;top:${y}px` });
+    btn.append(dot);
+    setTimeout(() => dot.remove(), 700);
+  };
+  root.addEventListener('pointerdown', onDown);
+  return () => root.removeEventListener('pointerdown', onDown);
+}
+
 export function toast(text) {
   const el = h('div', { class: 'toast' }, text);
   document.getElementById('toast-root').append(el);
