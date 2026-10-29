@@ -111,7 +111,13 @@ export function openAuthModal(session, { reason = '', mode } = {}) {
     if (!st.error) return null;
     return h('div', { class: 'auth-error', role: 'alert' },
       h('span', {}, st.error),
-      SUGGEST_PASSWORD.has(st.errorCode) && h('button', { type: 'button', class: 'link-btn', onclick: () => switchTo('signin') }, 'Увійти паролем'));
+      SUGGEST_PASSWORD.has(st.errorCode) && h('button', { type: 'button', class: 'link-btn', onclick: () => switchTo('signin') }, 'Увійти паролем'),
+      st.errorCode === 'auth/network-request-failed' && h('button', { type: 'button', class: 'link-btn', onclick: () => session.enterDemo() }, 'Продовжити в демо-режимі'));
+  }
+
+  // Запит входу вже успішний — тримаємо «Зачекайте…», доки сесія не зміниться (профіль ще читається).
+  async function settled() {
+    if (!(await session.waitForSignIn(10000))) throw invalid('Не вдалося завершити вхід — перевірте інтернет і спробуйте ще раз');
   }
 
   const checkEmail = () => {
@@ -155,14 +161,14 @@ export function openAuthModal(session, { reason = '', mode } = {}) {
   const codesOn = () => session.service?.emailCodes !== false;
   const views = {
     signin: () => [tabs('signin'),
-      form(async () => { checkEmail(); checkPassword(st.password); await svc().signInWithPassword(st.email, st.password); },
+      form(async () => { checkEmail(); checkPassword(st.password); await svc().signInWithPassword(st.email, st.password); await settled(); },
         emailField(),
         field('Пароль', input('password', { type: 'password', autocomplete: 'current-password' })),
         errorBlock(), primary('Увійти')),
       codesOn() && h('div', { class: 'auth-links' }, linkBtn('Забули пароль?', 'reset'), linkBtn('Увійти без пароля', 'code'))],
 
     signup: () => [tabs('signup'),
-      form(async () => { checkEmail(); checkPassword(st.password); await svc().signUpWithPassword(st.email, st.password); },
+      form(async () => { checkEmail(); checkPassword(st.password); await svc().signUpWithPassword(st.email, st.password); await settled(); },
         emailField(),
         field('Пароль', input('password', { type: 'password', autocomplete: 'new-password' }), 'Щонайменше 6 символів'),
         errorBlock(), primary('Створити акаунт')),
@@ -176,7 +182,7 @@ export function openAuthModal(session, { reason = '', mode } = {}) {
 
     codeSent: () => [h('h2', {}, 'Введіть код'),
       h('p', { class: 'muted' }, `Ми надіслали код на ${st.email}. Він діє 1 годину.`),
-      form(async () => { checkCode(); await svc().verifyLoginCode(st.email, st.code); },
+      form(async () => { checkCode(); await svc().verifyLoginCode(st.email, st.code); await settled(); },
         field('Код з листа', input('code', { inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: 6, placeholder: '000000', class: 'input code-input' })),
         errorBlock(), primary('Увійти')),
       h('div', { class: 'auth-links' }, resendButton(() => svc().sendLoginCode(st.email)), linkBtn('Змінити email', 'code'))],
@@ -189,7 +195,7 @@ export function openAuthModal(session, { reason = '', mode } = {}) {
 
     resetSent: () => [h('h2', {}, 'Новий пароль'),
       h('p', { class: 'muted' }, `Ми надіслали код на ${st.email}. Він діє 1 годину.`),
-      form(async () => { checkCode(); checkPassword(st.newPassword); await svc().resetPassword(st.email, st.code, st.newPassword); },
+      form(async () => { checkCode(); checkPassword(st.newPassword); await svc().resetPassword(st.email, st.code, st.newPassword); await settled(); },
         field('Код з листа', input('code', { inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: 6, placeholder: '000000', class: 'input code-input' })),
         field('Новий пароль', input('newPassword', { type: 'password', autocomplete: 'new-password' }), 'Щонайменше 6 символів'),
         errorBlock(), primary('Змінити пароль')),

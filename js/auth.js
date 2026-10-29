@@ -37,7 +37,11 @@ export function validateProfile({ name, role } = {}) {
   return { ok: Object.keys(errors).length === 0, errors, value };
 }
 
-export function createSession(loadService) {
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const SIGNED = ['needsProfile', 'signedIn', 'demo'];
+
+// timeoutMs — скільки чекати бібліотеку (поганий Wi-Fi), retryMs — пауза перед повторним читанням профілю.
+export function createSession(loadService, { timeoutMs = 8000, retryMs = 1000 } = {}) {
   let state = { status: 'loading', user: null, profile: null };
   let service = null;
   let pending = null; // { action, reason, waiting } — одна відкладена дія, нова замінює стару
@@ -59,7 +63,8 @@ export function createSession(loadService) {
       pending = null;
     }
     listeners.forEach((fn) => fn(state));
-    if (run) run();
+    // Дію запускаємо наступним кроком — коли вікно входу вже закрилось, а не поверх нього.
+    if (run) setTimeout(run, 0);
     else if (pending?.waiting && state.status !== 'loading') {
       pending.waiting = false;
       ask(pending.reason);
@@ -67,7 +72,11 @@ export function createSession(loadService) {
   }
 
   (async () => {
-    try { service = await loadService(); } catch { service = null; }
+    try {
+      service = await Promise.race([loadService(), delay(timeoutMs).then(() => null)]);
+    } catch {
+      service = null;
+    }
     if (!service) {
       set({ status: 'unavailable' });
       resolveReady();
@@ -80,8 +89,20 @@ export function createSession(loadService) {
         resolveReady();
         return;
       }
+      // supabase-js повторює подію входу (напр., коли вкладка знову видима) — профіль уже є, не перечитуємо.
+      if (state.user?.uid === user.uid && state.profile) {
+        resolveReady();
+        return;
+      }
       let profile = null;
-      try { profile = await service.loadProfile(user.uid); } catch { profile = null; }
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          profile = await service.loadProfile(user.uid);
+          break;
+        } catch {
+          if (attempt === 0) await delay(retryMs); // один збій мережі — ще не «профілю немає»
+        }
+      }
       if (seq !== userSeq) return; // поки читали профіль, користувач змінився
       set({ status: profile ? 'signedIn' : 'needsProfile', user, profile });
       resolveReady();
@@ -118,8 +139,23 @@ export function createSession(loadService) {
       await service.saveProfile(state.user.uid, value, { create: state.status === 'needsProfile' });
       set({ status: 'signedIn', profile: value });
     },
+    // Демо-режим — коли сервер акаунтів недосяжний: не завантажився або мережа впала пізніше.
     enterDemo() {
-      if (state.status === 'unavailable') set({ status: 'demo' });
+      if (['unavailable', 'signedOut', 'needsProfile'].includes(state.status)) set({ status: 'demo' });
+    },
+    // Після успішного запиту входу чекаємо, поки сесія справді зміниться; false — не дочекались.
+    waitForSignIn(ms = 10000) {
+      if (SIGNED.includes(state.status)) return Promise.resolve(true);
+      return new Promise((resolve) => {
+        const check = () => {
+          if (!SIGNED.includes(state.status)) return;
+          clearTimeout(timer);
+          listeners.delete(check);
+          resolve(true);
+        };
+        const timer = setTimeout(() => { listeners.delete(check); resolve(false); }, ms);
+        listeners.add(check);
+      });
     },
     currentName: () => state.profile?.name ?? DEMO_GUEST_NAME,
   };

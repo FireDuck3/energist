@@ -25,6 +25,9 @@ function append(el, children) {
   }
 }
 
+// Скільки модалок відкрито: прокрутку сторінки повертаємо, лише коли закрилась остання.
+let openModals = 0;
+
 // Модалка з фоном, кнопкою ×, Esc і кліком повз вікно. body — куди класти вміст.
 export function openModal(content, { onClose, className = '' } = {}) {
   const body = h('div', { class: 'modal-body' }, content);
@@ -46,12 +49,14 @@ export function openModal(content, { onClose, className = '' } = {}) {
     if (closed) return;
     closed = true;
     document.removeEventListener('keydown', onKey);
-    document.body.classList.remove('modal-open');
+    openModals = Math.max(0, openModals - 1);
+    if (!openModals) document.body.classList.remove('modal-open');
     overlay.remove();
     onClose?.();
   }
 
   document.addEventListener('keydown', onKey);
+  openModals++;
   document.body.classList.add('modal-open');
   document.body.append(overlay);
   return { close, body, setContent: (node) => body.replaceChildren(node) };

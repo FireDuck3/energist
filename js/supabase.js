@@ -24,12 +24,18 @@ export function toAuthCode(error) {
   return CODES[error.code] ?? 'auth/unknown';
 }
 
-const fail = (error) => Object.assign(new Error(error?.message ?? 'auth error'), { code: toAuthCode(error) });
+// Відповідь бази (PostgREST) без мережі має status 0 і порожній code — це теж «немає з'єднання».
+export function responseCode(res) {
+  if (res?.status === 0) return 'auth/network-request-failed';
+  return toAuthCode(res?.error);
+}
+
+const fail = (error, code = toAuthCode(error)) => Object.assign(new Error(error?.message ?? 'auth error'), { code });
 
 async function call(request) {
   let res;
   try { res = await request; } catch (e) { throw fail(e); }
-  if (res.error) throw fail(res.error);
+  if (res.error) throw fail(res.error, responseCode(res));
   return res.data;
 }
 
@@ -73,3 +79,4 @@ export async function loadSupabase() {
     return null;
   }
 }
+

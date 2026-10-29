@@ -19,3 +19,12 @@ test('модалка не закривається, якщо натиснули 
     modal.close();
   }
 });
+
+test('дві модалки: закриття першої не знімає блокування прокрутки з другої', () => {
+  const a = openModal(document.createElement('div'));
+  const b = openModal(document.createElement('div'));
+  a.close();
+  const locked = document.body.classList.contains('modal-open');
+  b.close();
+  eq([locked, document.body.classList.contains('modal-open')], [true, false]);
+});

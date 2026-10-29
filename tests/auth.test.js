@@ -5,23 +5,28 @@ const user = { uid: 'u1', email: 'a@b.ua', name: 'Ірина', photoURL: null, p
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
 // Підроблений AuthService: emit(user) імітує onAuthStateChanged.
-function fake({ profile = null, saveError = null } = {}) {
+function fake({ profile = null, saveError = null, loadFailures = 0 } = {}) {
   let cb = null;
   const saved = [];
+  const stats = { loads: 0, failNext: loadFailures };
   const svc = {
     onUser(fn) { cb = fn; },
-    async loadProfile() { return profile; },
+    async loadProfile() {
+      stats.loads++;
+      if (stats.failNext > 0) { stats.failNext--; throw { code: 'auth/network-request-failed' }; }
+      return profile;
+    },
     async saveProfile(uid, p, opts) {
       if (saveError) throw saveError;
       saved.push({ uid, p, opts });
       profile = p;
     },
   };
-  return { svc, saved, emit: async (u) => { cb(u); await tick(); await tick(); } };
+  return { svc, saved, stats, emit: async (u) => { cb(u); await tick(); await tick(); } };
 }
 
 async function started(f) {
-  const s = createSession(async () => f.svc);
+  const s = createSession(async () => f.svc, { retryMs: 5 });
   await tick();
   return s;
 }
@@ -75,9 +80,69 @@ test('після входу і профілю дія виконується рі
   await f.emit(user);
   eq([s.getState().status, calls], ['needsProfile', 0]);
   await s.saveProfile({ name: 'Ірина', role: 'guest' });
-  eq([s.getState().status, calls, f.saved[0].opts], ['signedIn', 1, { create: true }]);
+  // Дія — після того, як вікно входу встигне закритися (не поверх нього).
+  eq([s.getState().status, calls, f.saved[0].opts], ['signedIn', 0, { create: true }]);
+  await tick();
+  eq(calls, 1);
   await f.emit(user);
   eq(calls, 1);
+});
+
+test('бібліотека зависла — через таймаут unavailable і вікно входу', async () => {
+  const s = createSession(() => new Promise(() => {}), { timeoutMs: 20 });
+  const reasons = [];
+  s.onNeedAuth((r) => reasons.push(r));
+  s.requireAuth(() => {}, 'x');
+  eq(s.getState().status, 'loading');
+  await new Promise((r) => setTimeout(r, 40));
+  eq([s.getState().status, reasons], ['unavailable', ['x']]);
+});
+
+test('мережа впала після завантаження: демо-режим доступний і з signedOut', async () => {
+  const f = fake();
+  const s = await started(f);
+  await f.emit(null);
+  s.enterDemo();
+  eq(s.getState().status, 'demo');
+});
+
+test('enterDemo не чіпає увійденого користувача', async () => {
+  const f = fake({ profile: { name: 'Ірина', role: 'guest' } });
+  const s = await started(f);
+  await f.emit(user);
+  s.enterDemo();
+  eq(s.getState().status, 'signedIn');
+});
+
+test('профіль не прочитався з першого разу — повторюємо, а не просимо заповнити знову', async () => {
+  const f = fake({ profile: { name: 'Ірина', role: 'host' }, loadFailures: 1 });
+  const s = await started(f);
+  await f.emit(user);
+  await new Promise((r) => setTimeout(r, 20));
+  eq([s.getState().status, s.currentName()], ['signedIn', 'Ірина']);
+});
+
+test('повторна подія входу того ж користувача не перечитує профіль і не стирає його', async () => {
+  const f = fake({ profile: { name: 'Ірина', role: 'host' } });
+  const s = await started(f);
+  await f.emit(user);
+  f.stats.failNext = 5;
+  await f.emit(user);
+  await new Promise((r) => setTimeout(r, 20));
+  eq([s.getState().status, s.currentName(), f.stats.loads], ['signedIn', 'Ірина', 1]);
+});
+
+test('waitForSignIn: true, коли сесія змінилась; false по таймауту', async () => {
+  const f = fake();
+  const s = await started(f);
+  await f.emit(null);
+  const waiting = s.waitForSignIn(1000);
+  await f.emit(user);
+  eq([await waiting, await s.waitForSignIn(1000)], [true, true]);
+  const g = fake();
+  const t = await started(g);
+  await g.emit(null);
+  eq(await t.waitForSignIn(20), false);
 });
 
 test('requireAuth у signedIn і demo — одразу', async () => {

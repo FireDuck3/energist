@@ -1,5 +1,5 @@
 import { test, eq } from './runner.js';
-import { toAuthCode } from '../js/supabase.js';
+import { toAuthCode, responseCode } from '../js/supabase.js';
 
 test('коди Supabase → коди сесії', () => {
   eq(toAuthCode({ code: 'invalid_credentials' }), 'auth/invalid-credential');
@@ -17,4 +17,10 @@ test('коди Supabase → коди сесії', () => {
   eq(toAuthCode(new TypeError('Failed to fetch')), 'auth/network-request-failed');
   eq(toAuthCode({ code: 'щось_нове' }), 'auth/unknown');
   eq(toAuthCode(undefined), 'auth/unknown');
+});
+
+test("відповідь без мережі (status 0, порожній code) → немає з'єднання", () => {
+  eq(responseCode({ status: 0, error: { code: '', message: 'TypeError: Failed to fetch' } }), 'auth/network-request-failed');
+  eq(responseCode({ status: 400, error: { code: 'invalid_credentials' } }), 'auth/invalid-credential');
+  eq(responseCode({ status: 401, error: { code: '42501', message: 'RLS' } }), 'auth/unknown');
 });
