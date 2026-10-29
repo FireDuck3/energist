@@ -1,5 +1,6 @@
 import { test, eq } from './runner.js';
 import { render } from '../js/views/landing.js';
+import { mountCalculator } from '../js/views/calculator.js';
 
 test('головна: без блоку історій Саші й Олега, секції по порядку', () => {
   const root = document.createElement('div');
@@ -10,4 +11,12 @@ test('головна: без блоку історій Саші й Олега, �
     eq(root.querySelectorAll('.story, .stories').length, 0);
     eq(typeof cleanup, 'function');
   } finally { cleanup?.(); }
+});
+
+test('калькулятор називає сервіс WattWay, старої назви ніде немає', () => {
+  for (const compact of [true, false]) {
+    const box = document.createElement('div');
+    mountCalculator(box, { compact });
+    eq([box.textContent.includes('WattWay'), /ЕнерГ/.test(box.textContent)], [true, false]);
+  }
 });

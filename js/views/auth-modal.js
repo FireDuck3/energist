@@ -209,7 +209,7 @@ export function openAuthModal(session, { reason = '', mode } = {}) {
       field('Як вас звати?', input('name', { type: 'text', autocomplete: 'given-name', maxlength: 60, placeholder: 'Ім\'я' })),
       st.fieldErrors.name && h('span', { class: 'field-error' }, st.fieldErrors.name),
       h('div', { class: 'form-field' },
-        h('span', { class: 'field-label' }, 'Для чого вам ЕнерГість?'),
+        h('span', { class: 'field-label' }, 'Для чого вам WattWay?'),
         h('div', { class: 'role-choice' }, ROLES.map(([value, label]) =>
           h('button', { type: 'button', class: `chip${st.role === value ? ' active' : ''}`, disabled: st.busy,
             onclick: () => { st.role = value; render(); } }, label)))),
@@ -223,7 +223,7 @@ export function openAuthModal(session, { reason = '', mode } = {}) {
 
   function render() {
     modal.setContent(h('div', { class: 'auth' },
-      h('div', { class: 'auth-brand' }, h('span', { class: 'logo-mark' }, '⚡'), h('b', {}, 'ЕнерГість')),
+      h('div', { class: 'auth-brand' }, h('span', { class: 'logo-mark' }, '⚡'), h('b', {}, 'WattWay')),
       reason && st.mode !== 'profile' && h('p', { class: 'auth-reason' }, reason),
       views[st.mode]()));
     if (st.mode === 'codeSent' || st.mode === 'resetSent') startCountdown();

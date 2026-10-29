@@ -38,7 +38,7 @@ function renderSpot(spot, host, { blackout }, store, session, userHistory) {
           h('div', {},
             h('b', {}, `Господар — ${hostName}`),
             h('div', { class: 'muted' },
-              `${host.chargesCount} ${plural(host.chargesCount, ['зарядка', 'зарядки', 'зарядок'])} · на ЕнерГості з ${host.sinceYear} року`))),
+              `${host.chargesCount} ${plural(host.chargesCount, ['зарядка', 'зарядки', 'зарядок'])} · на WattWay з ${host.sinceYear} року`))),
 
         h('div', { class: 'facts' },
           fact('Джерело енергії', `${SOURCES[spot.source].icon} ${SOURCES[spot.source].label}`),

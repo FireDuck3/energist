@@ -1,4 +1,4 @@
-// Головна: що таке ЕнерГість, як працює, скільки дає.
+// Головна: що таке WattWay, як працює, скільки дає.
 import { h, revealOnScroll } from '../ui.js';
 import { COMMERCIAL_RANGE } from '../data.js';
 import { mountCalculator } from './calculator.js';

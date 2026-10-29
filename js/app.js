@@ -56,7 +56,7 @@ function renderHeader() {
   document.getElementById('site-header').replaceChildren(
     h('div', { class: 'container header-inner' },
       h('a', { class: 'logo', href: '#/' },
-        h('span', { class: 'logo-mark' }, '⚡'), h('span', {}, 'Енер', h('b', {}, 'Гість'))),
+        h('span', { class: 'logo-mark' }, '⚡'), h('span', {}, 'Watt', h('b', {}, 'Way'))),
       h('nav', { class: 'segmented', 'aria-label': 'Роль' },
         roleBtn('Я шукаю зарядку', isGuest, '#/map'),
         roleBtn('Я ділюсь енергією', isHost, '#/host')),

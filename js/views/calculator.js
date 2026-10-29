@@ -21,9 +21,9 @@ function priceScale(price) {
     h('div', { class: 'scale-track' },
       h('div', { class: 'scale-band', style: { left: pct(lo), width: pct(hi - lo) } }),
       h('div', { class: 'scale-mark mark-home', style: { left: pct(HOME_TARIFF) } }, h('span', {}, `${num(HOME_TARIFF)} грн`), h('small', {}, 'домашній тариф')),
-      h('div', { class: 'scale-mark mark-us', style: { left: pct(price) } }, h('span', {}, `${price} грн`), h('small', {}, 'ЕнерГість')),
+      h('div', { class: 'scale-mark mark-us', style: { left: pct(price) } }, h('span', {}, `${price} грн`), h('small', {}, 'WattWay')),
       h('div', { class: 'scale-mark mark-commercial', style: { left: pct((lo + hi) / 2) } }, h('span', {}, `${lo}–${hi} грн`), h('small', {}, 'комерційні зарядки'))),
-    h('p', { class: 'hint scale-caption' }, 'Ціна за кВт·год. ЕнерГість — посередині: дешевше для гостя, вигідніше для господаря.'));
+    h('p', { class: 'hint scale-caption' }, 'Ціна за кВт·год. WattWay — посередині: дешевше для гостя, вигідніше для господаря.'));
 }
 
 export function mountCalculator(el, { compact = false } = {}) {
@@ -48,7 +48,7 @@ export function mountCalculator(el, { compact = false } = {}) {
         h('b', { class: 'result-value' }, `${formatUAH(earned)}/міс`),
         h('span', { class: 'hint' }, `За домашнім тарифом ця енергія коштує лише ${formatUAH(gridValue(hostVolume))}, а без зеленого тарифу мережа не платить за надлишок нічого`)),
       h('div', { class: 'result result-us' },
-        h('span', { class: 'result-who' }, `⚡ ЕнерГість (${Math.round(COMMISSION * 100)}%)`),
+        h('span', { class: 'result-who' }, `⚡ WattWay (${Math.round(COMMISSION * 100)}%)`),
         h('b', { class: 'result-value' }, `${formatUAH(fee)}/міс`),
         h('span', { class: 'hint' }, compact ? 'з цієї пари гість — господар' : 'з одного господаря')));
     scaleBox.replaceChildren(priceScale(st.price));
@@ -59,7 +59,7 @@ export function mountCalculator(el, { compact = false } = {}) {
     h('div', { class: 'calc-controls' },
       slider({ label: 'Скільки кВт·год на тиждень потрібно Саші', min: 5, max: 150, step: 5, value: st.kwhWeek, unit: 'кВт·год', onInput: set('kwhWeek') }),
       !compact && slider({ label: 'Скільки надлишку на місяць в Олега', min: 50, max: 800, step: 10, value: st.kwhMonth, unit: 'кВт·год', onInput: set('kwhMonth') }),
-      slider({ label: 'Ціна в ЕнерГості', min: 8, max: 15, step: 1, value: st.price, unit: 'грн/кВт·год', onInput: set('price') })),
+      slider({ label: 'Ціна в WattWay', min: 8, max: 15, step: 1, value: st.price, unit: 'грн/кВт·год', onInput: set('price') })),
     results,
     scaleBox));
   draw();
