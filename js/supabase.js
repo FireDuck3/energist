@@ -48,6 +48,7 @@ export async function loadSupabase() {
     const auth = client.auth;
 
     return {
+      emailCodes: supabaseConfig.emailCodes !== false,
       onUser(cb) {
         auth.onAuthStateChange((event, session) => {
           if (event === 'TOKEN_REFRESHED') return;
