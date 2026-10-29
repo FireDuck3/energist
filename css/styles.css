@@ -702,7 +702,11 @@ body.blackout .mark-us span { color: #141833; }
 /* ---------- Телефон (≤ 768 px) ---------- */
 @media (max-width: 768px) {
   /* Шапка в один рядок */
-  .header-inner { flex-wrap: nowrap; gap: 10px; padding: 8px 0; min-height: 56px; }
+  .header-inner { flex-wrap: nowrap; gap: 10px; padding-block: 8px; min-height: 56px; }
+  .label-long { display: none; }
+  .label-short { display: inline; }
+  .search-clear, .search-remove { width: 40px; height: 40px; }
+  .search { scroll-margin-top: 72px; } /* під липкою шапкою, коли поле піднімаємо над клавіатурою */
   .segmented, .nav-link, .switch-label, .account-name { display: none; }
   .header-right { margin-left: auto; gap: 10px; }
   .logo { font-size: 1.1rem; }
@@ -752,3 +756,7 @@ body.blackout .mark-us span { color: #141833; }
   /* Більші цілі для пальця */
   .chip, .btn-sm { min-height: 40px; }
 }
+
+/* Короткий підпис кнопки в шапці — лише на телефоні */
+@media (min-width: 769px) { .label-short { display: none; } }
+.switch-icon { font-size: 1rem; }

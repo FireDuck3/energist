@@ -154,3 +154,30 @@ test('записане під час завантаження не губить�
   await tick();
   eq(h.getState().searches.map((r) => r.value), ['Нове', 'Старе']);
 });
+
+test('історія зависла — через таймаут error, retry перезавантажує', async () => {
+  const svc = fakeService();
+  let hang = true;
+  const real = svc.loadHistory;
+  svc.loadHistory = (uid) => (hang ? new Promise(() => {}) : real(uid));
+  const h = createUserHistory(fakeSession(signedIn(), svc), { now, timeoutMs: 20 });
+  await new Promise((r) => setTimeout(r, 40));
+  eq(h.getState().status, 'error');
+  hang = false;
+  h.retry();
+  await tick();
+  eq(h.getState().status, 'ready');
+});
+
+test('вихід з акаунта кличе onReset (очистити запит у полі пошуку), старт без входу — ні', async () => {
+  let resets = 0;
+  const svc = fakeService();
+  const out = fakeSession(signedOut, svc);
+  createUserHistory(out, { now, onReset: () => resets++ });
+  eq(resets, 0);
+  const s = fakeSession(signedIn(), svc);
+  createUserHistory(s, { now, onReset: () => resets++ });
+  await tick();
+  s.emit(signedOut);
+  eq(resets, 1);
+});

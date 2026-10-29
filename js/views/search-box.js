@@ -15,7 +15,8 @@ export function searchBox(store, userHistory) {
 
   const apply = (q) => store.setFilters({ query: q });
   const save = (q) => { if (q.trim()) userHistory.recordQuery(q); };
-  const close = () => { panel.hidden = true; };
+  const close = () => { focused = false; panel.hidden = true; };
+  const isPhone = () => window.matchMedia('(max-width: 768px)').matches;
 
   function choose(q) {
     input.value = q;
@@ -56,7 +57,12 @@ export function searchBox(store, userHistory) {
     panel.hidden = sections.length === 0;
   }
 
-  input.addEventListener('focus', () => { focused = true; draw(); });
+  input.addEventListener('focus', () => {
+    focused = true;
+    draw();
+    // На телефоні клавіатура закриває низ екрана — піднімаємо поле нагору, щоб підказки були видні.
+    if (isPhone()) setTimeout(() => el.scrollIntoView({ block: 'start' }), 300);
+  });
   input.addEventListener('input', () => { clear.hidden = !input.value; apply(input.value); draw(); });
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); save(input.value); close(); input.blur(); }
@@ -65,7 +71,7 @@ export function searchBox(store, userHistory) {
   clear.addEventListener('click', () => { input.value = ''; clear.hidden = true; apply(''); input.focus(); });
 
   // Закриваємо підказки кліком поза полем.
-  const onOutside = (e) => { if (!el.contains(e.target)) { focused = false; close(); } };
+  const onOutside = (e) => { if (!el.contains(e.target)) close(); };
   document.addEventListener('pointerdown', onOutside);
   const unsubscribe = userHistory.subscribe(draw);
 

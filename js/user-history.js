@@ -6,7 +6,8 @@ import { normalizeQuery } from './filters.js';
 const MAX_VALUE = 80;
 const EMPTY = { searches: [], charges: [] };
 
-export function createUserHistory(session, { now = () => new Date().toISOString() } = {}) {
+// timeoutMs — скільки чекати історію на поганому Wi-Fi; onReset — що зробити, коли людина вийшла з акаунта.
+export function createUserHistory(session, { now = () => new Date().toISOString(), timeoutMs = 8000, onReset } = {}) {
   let state = { status: 'off', ...EMPTY };
   let uid = null;
   let loadSeq = 0;
@@ -32,7 +33,10 @@ export function createUserHistory(session, { now = () => new Date().toISOString(
     pending = { searches: [], charges: [] };
     set({ status: 'loading', ...EMPTY });
     try {
-      const data = await session.service.loadHistory(forUid);
+      const data = await Promise.race([
+        session.service.loadHistory(forUid),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), timeoutMs)),
+      ]);
       if (seq !== loadSeq) return; // поки вантажили, користувач змінився
       set({
         status: 'ready',
@@ -60,7 +64,9 @@ export function createUserHistory(session, { now = () => new Date().toISOString(
     } else if (status === 'demo') {
       if (state.status !== 'local') reset('local');
     } else if (state.status !== 'off') {
+      const wasSignedIn = uid !== null;
       reset('off');
+      if (wasSignedIn) onReset?.();
     }
   }
 

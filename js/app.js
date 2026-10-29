@@ -15,7 +15,8 @@ import { openAuthModal } from './views/auth-modal.js';
 
 export const store = createStore(safeLocalStorage() ?? memoryStorage());
 export const session = createSession(loadSupabase);
-export const userHistory = createUserHistory(session);
+// Вийшли з акаунта (напр., на спільному ноутбуці пітчу) — прибираємо і запит у полі пошуку.
+export const userHistory = createUserHistory(session, { onReset: () => store.setFilters({ query: '' }) });
 
 const view = (mod) => (params, root) => mod.render(params, root, store, session, userHistory);
 
@@ -28,7 +29,8 @@ function accountArea() {
     return h('button', { type: 'button', class: 'btn btn-primary btn-sm', onclick: signIn }, 'Увійти');
   }
   if (status === 'needsProfile') {
-    return h('button', { type: 'button', class: 'btn btn-secondary btn-sm', onclick: signIn }, 'Завершити профіль');
+    return h('button', { type: 'button', class: 'btn btn-secondary btn-sm', onclick: signIn },
+      h('span', { class: 'label-long' }, 'Завершити профіль'), h('span', { class: 'label-short' }, 'Профіль'));
   }
   const demo = status === 'demo';
   const name = session.currentName();
@@ -38,7 +40,7 @@ function accountArea() {
       h('span', { class: 'account-name' }, demo ? `${name} (демо)` : name)),
     h('div', { class: 'account-menu card' },
       !demo && h('span', { class: 'account-email muted' }, user.email),
-      !demo && h('a', { href: '#/profile', onclick: (e) => e.target.closest('details').open = false }, 'Профіль і зарядки'),
+      h('a', { href: '#/profile', onclick: (e) => e.target.closest('details').open = false }, demo ? 'Профіль' : 'Профіль і зарядки'),
       h('button', { type: 'button', onclick: () => (demo ? location.reload() : session.service.signOut().catch(() => toast('Не вдалося вийти — перевірте інтернет'))) },
         demo ? 'Вийти з демо-режиму' : 'Вийти')));
 }
@@ -61,9 +63,10 @@ function renderHeader() {
       h('div', { class: 'header-right' },
         h('a', { class: `nav-link${path === '/calc' ? ' active' : ''}`, href: '#/calc' }, 'Калькулятор'),
         h('label', { class: 'switch', title: 'Режим блекауту' },
-          h('input', { type: 'checkbox', checked: blackout, onchange: (e) => store.setBlackout(e.target.checked) }),
+          h('input', { type: 'checkbox', checked: blackout, 'aria-label': 'Режим блекауту', onchange: (e) => store.setBlackout(e.target.checked) }),
           h('span', { class: 'switch-track' }, h('span', { class: 'switch-thumb' })),
-          h('span', { class: 'switch-label' }, '⚡ Блекаут')),
+          h('span', { class: 'switch-icon', 'aria-hidden': 'true' }, '⚡'),
+          h('span', { class: 'switch-label' }, 'Блекаут')),
         accountArea())));
 }
 
