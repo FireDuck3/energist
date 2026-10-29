@@ -38,7 +38,7 @@ function accountArea() {
       h('span', { class: 'account-name' }, demo ? `${name} (демо)` : name)),
     h('div', { class: 'account-menu card' },
       !demo && h('span', { class: 'account-email muted' }, user.email),
-      !demo && h('a', { href: '#/profile', onclick: (e) => e.target.closest('details').open = false }, 'Профіль'),
+      !demo && h('a', { href: '#/profile', onclick: (e) => e.target.closest('details').open = false }, 'Профіль і зарядки'),
       h('button', { type: 'button', onclick: () => (demo ? location.reload() : session.service.signOut().catch(() => toast('Не вдалося вийти — перевірте інтернет'))) },
         demo ? 'Вийти з демо-режиму' : 'Вийти')));
 }
@@ -78,11 +78,6 @@ store.subscribe(() => {
 session.subscribe(renderHeader);
 session.onNeedAuth((reason) => openAuthModal(session, { reason }));
 
-document.getElementById('reset-demo').addEventListener('click', () => {
-  store.reset();
-  location.hash = '#/';
-  toast('Демо скинуто до початкового стану');
-});
 
 applyTheme();
 startRouter({

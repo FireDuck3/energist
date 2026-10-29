@@ -675,3 +675,20 @@ body.blackout .mark-us span { color: #141833; }
 .search-remove { width: 36px; height: 36px; border: 0; border-radius: 50%; background: none; color: var(--muted); font-size: 1.1rem; cursor: pointer; }
 .search-remove:hover { background: var(--surface-2); color: var(--text); }
 .search-hint { padding: 8px 10px; margin: 0; font-size: .9rem; }
+
+/* ---------- Мої зарядки ---------- */
+.profile-page { gap: 20px; }
+.charges { gap: 14px; }
+.charges-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.charge { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.charge:last-child { border-bottom: 0; }
+.charge-main { display: grid; gap: 2px; min-width: 0; }
+.charge-main .muted { font-size: .88rem; }
+.charges-empty { display: grid; justify-items: start; gap: 10px; }
+.charges-empty p { margin: 0; }
+.clear-searches { justify-self: start; }
+.reset-demo { text-align: center; margin: 4px 0 0; }
+.reset-demo .link-btn { color: var(--muted); font-weight: 500; font-size: .85rem; }
+@media (max-width: 560px) {
+  .charge { flex-direction: column; align-items: flex-start; }
+}
