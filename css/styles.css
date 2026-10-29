@@ -692,3 +692,63 @@ body.blackout .mark-us span { color: #141833; }
 @media (max-width: 560px) {
   .charge { flex-direction: column; align-items: flex-start; }
 }
+
+/* ---------- Leaflet не перекриває шапку й панелі ---------- */
+.map-pane, .mini-map { isolation: isolate; }
+
+/* ---------- Елементи, видимі лише на телефоні ---------- */
+.tabbar, .book-bar, .filters-toggle { display: none; }
+
+/* ---------- Телефон (≤ 768 px) ---------- */
+@media (max-width: 768px) {
+  /* Шапка в один рядок */
+  .header-inner { flex-wrap: nowrap; gap: 10px; padding: 8px 0; min-height: 56px; }
+  .segmented, .nav-link, .switch-label, .account-name { display: none; }
+  .header-right { margin-left: auto; gap: 10px; }
+  .logo { font-size: 1.1rem; }
+  .logo-mark { width: 32px; height: 32px; }
+  .account-button { padding: 3px; }
+
+  /* Нижня панель вкладок */
+  body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+  .tabbar {
+    display: grid; grid-template-columns: repeat(4, 1fr); position: fixed; left: 0; right: 0; bottom: 0; z-index: 1000;
+    height: calc(64px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom);
+    background: color-mix(in srgb, var(--surface) 96%, transparent); backdrop-filter: blur(10px);
+    border-top: 1px solid var(--line);
+  }
+  .tab {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    text-decoration: none; color: var(--muted); font-size: .72rem; font-weight: 600;
+  }
+  .tab-icon { font-size: 1.3rem; line-height: 1; filter: grayscale(.6); }
+  .tab.active { color: var(--indigo); }
+  .tab.active .tab-icon { filter: none; }
+  #toast-root { bottom: calc(80px + env(safe-area-inset-bottom)); }
+
+  /* Головна: спершу текст, ілюстрація нижче й менша */
+  .hero-art { order: 1; }
+  .hero-art img { max-height: 220px; }
+
+  /* Карта: фільтри під кнопкою */
+  .filters-toggle { display: inline-flex; margin-bottom: 10px; }
+  .filters { display: none; }
+  .filters.open { display: grid; }
+  .search-panel { max-height: 50vh; }
+
+  /* Картка точки: смужка бронювання над вкладками */
+  .book-card { display: none; }
+  .spot-page { padding-bottom: 96px; }
+  .book-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    position: fixed; left: 0; right: 0; bottom: calc(64px + env(safe-area-inset-bottom)); z-index: 999;
+    padding: 10px 16px; background: var(--surface); border-top: 1px solid var(--line); box-shadow: 0 -6px 20px rgba(20, 24, 51, .08);
+  }
+  .book-bar-price { display: grid; gap: 2px; }
+  .book-bar-price b { font-size: 1.2rem; }
+  .book-bar-note { color: var(--danger); font-size: .82rem; font-weight: 600; }
+  .book-bar .btn { min-height: 46px; }
+
+  /* Більші цілі для пальця */
+  .chip, .btn-sm { min-height: 40px; }
+}

@@ -16,6 +16,7 @@ function renderSpot(spot, host, { blackout }, store, session, userHistory) {
   const now = new Date();
   const rating = spotRating(spot);
   const dark = blackout && !isLiveInBlackout(spot);
+  const book = () => session.requireAuth(() => openBooking(spot, store, { session, userHistory }), 'Увійдіть, щоб забронювати зарядку');
   const here = sessionCost(EXAMPLE_KWH, spot.pricePerKwh).total;
   const commercial = EXAMPLE_KWH * COMMERCIAL_PRICE;
   const deviceLabels = DEVICES.filter((d) => spot.devices.includes(d.id)).map((d) => d.label).join(', ');
@@ -68,9 +69,15 @@ function renderSpot(spot, host, { blackout }, store, session, userHistory) {
           : h('p', { class: isOpenAt(spot, now) ? 'open-now' : 'muted' },
             isOpenAt(spot, now) ? `Відчинено до ${spot.schedule.to}` : `Зачинено · відкриється о ${spot.schedule.from}`),
         h('button', { type: 'button', class: 'btn btn-primary btn-lg btn-block', disabled: dark,
-          onclick: () => session.requireAuth(() => openBooking(spot, store, { session, userHistory }), 'Увійдіть, щоб забронювати зарядку') },
-        'Забронювати'),
-        h('p', { class: 'book-note muted' }, '🔒 Гроші заморожуються і списуються лише за фактично отриману енергію'))));
+          onclick: book }, 'Забронювати'),
+        h('p', { class: 'book-note muted' }, '🔒 Гроші заморожуються і списуються лише за фактично отриману енергію'))),
+
+    // На телефоні — закріплена над вкладками смужка замість картки бронювання.
+    h('div', { class: 'book-bar' },
+      h('div', { class: 'book-bar-price' },
+        h('span', {}, h('b', {}, formatUAH(spot.pricePerKwh)), ' / кВт·год'),
+        dark && h('span', { class: 'book-bar-note' }, '⚡ Немає світла')),
+      h('button', { type: 'button', class: 'btn btn-primary', disabled: dark, onclick: book }, 'Забронювати')));
 }
 
 export function render({ id }, root, store, session, userHistory) {

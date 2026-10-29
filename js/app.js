@@ -78,6 +78,22 @@ store.subscribe(() => {
 session.subscribe(renderHeader);
 session.onNeedAuth((reason) => openAuthModal(session, { reason }));
 
+// Нижня панель вкладок — лише на телефоні (CSS ховає її на ширших екранах).
+const TABS = [
+  ['#/map', '🔌', 'Зарядка', (p) => p.startsWith('/map') || p.startsWith('/spot')],
+  ['#/host', '☀️', 'Господар', (p) => p.startsWith('/host')],
+  ['#/calc', '🧮', 'Калькулятор', (p) => p === '/calc'],
+  ['#/profile', '👤', 'Профіль', (p) => p.startsWith('/profile')],
+];
+const tabbar = h('nav', { class: 'tabbar', 'aria-label': 'Розділи' });
+document.body.append(tabbar);
+function renderTabbar() {
+  const path = currentPath();
+  tabbar.replaceChildren(...TABS.map(([href, icon, label, isActive]) =>
+    h('a', { class: `tab${isActive(path) ? ' active' : ''}`, href, 'aria-current': isActive(path) ? 'page' : null },
+      h('span', { class: 'tab-icon', 'aria-hidden': 'true' }, icon),
+      h('span', { class: 'tab-label' }, label))));
+}
 
 applyTheme();
 startRouter({
@@ -89,6 +105,7 @@ startRouter({
   '/profile': view(profile),
 }, document.getElementById('app'), {
   onChange(path) {
+    renderTabbar();
     const role = path.startsWith('/host') ? 'host' : (path.startsWith('/map') || path.startsWith('/spot')) ? 'guest' : null;
     if (role && role !== store.getState().role) store.setRole(role);
     else renderHeader();

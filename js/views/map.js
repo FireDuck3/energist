@@ -65,6 +65,9 @@ export function render(_params, root, store, _session, userHistory) {
   const banner = h('div', { class: 'blackout-banner', hidden: true },
     h('b', {}, '⚡ У вашому районі немає світла з 14:00'), h('span', {}, ' (демо). Показуємо точки з СЕС і батареями — вони працюють і зараз.'));
   const filtersBox = h('div', { class: 'filters' });
+  // На телефоні фільтри згорнуті під цією кнопкою (на десктопі її не видно).
+  const filtersToggle = h('button', { type: 'button', class: 'btn btn-secondary btn-sm filters-toggle', 'aria-expanded': 'false',
+    onclick: () => { const open = filtersBox.classList.toggle('open'); filtersToggle.setAttribute('aria-expanded', String(open)); } });
   const mapEl = h('div', { class: 'map', id: 'map' });
   const fallback = h('div', { class: 'map-fallback', hidden: true },
     h('span', { class: 'map-fallback-icon' }, '🗺️'),
@@ -74,7 +77,7 @@ export function render(_params, root, store, _session, userHistory) {
   root.append(h('div', { class: 'map-layout' },
     h('aside', { class: 'map-sidebar' },
       h('h1', { class: 'map-title' }, 'Розетки у Вінниці'),
-      search.el, banner, filtersBox, count, list),
+      search.el, banner, filtersToggle, filtersBox, count, list),
     h('div', { class: 'map-pane' }, mapEl, fallback)));
 
   // ---- Фільтри: будуються один раз, щоб повзунок не губив фокус ----
@@ -99,6 +102,8 @@ export function render(_params, root, store, _session, userHistory) {
     nowChip.replaceChildren(chip('🕒 Відчинено зараз', f.availableNow, () => store.setFilters({ availableNow: !f.availableNow })));
     if (Number(priceInput.value) !== f.maxPrice) priceInput.value = f.maxPrice;
     priceLabel.textContent = `до ${f.maxPrice} грн`;
+    const active = [f.device, f.maxPrice < 15, f.minRating > 0, f.availableNow].filter(Boolean).length;
+    filtersToggle.textContent = active ? `⚙️ Фільтри · ${active}` : '⚙️ Фільтри';
   }
 
   // ---- Карта ----
@@ -113,7 +118,8 @@ export function render(_params, root, store, _session, userHistory) {
     tiles.on('load', () => { tilesLoaded = true; fallback.hidden = true; });
     tiles.on('tileerror', () => { if (!tilesLoaded) fallback.hidden = false; });
     const all = store.getState().spots;
-    const fitAll = () => map.fitBounds(L.latLngBounds(all.map((s) => [s.lat, s.lng])), { padding: [28, 28] });
+    // Без анімації: якщо піти з карти посеред анімації масштабу, Leaflet падає на вже прибраній карті.
+    const fitAll = () => map.fitBounds(L.latLngBounds(all.map((s) => [s.lat, s.lng])), { padding: [28, 28], animate: false });
     fitAll();
     // Контейнер змінює розмір після верстки й при повороті телефону — Leaflet треба про це сказати.
     // Перший виклик приходить, коли розмір уже справжній, — тоді й підганяємо масштаб.
