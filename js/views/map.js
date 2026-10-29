@@ -101,6 +101,7 @@ export function render(_params, root, store) {
 
   // ---- Карта ----
   let map = null;
+  let resizeObserver = null;
   let markers = [];
   let tilesLoaded = false;
 
@@ -110,8 +111,16 @@ export function render(_params, root, store) {
     tiles.on('load', () => { tilesLoaded = true; fallback.hidden = true; });
     tiles.on('tileerror', () => { if (!tilesLoaded) fallback.hidden = false; });
     const all = store.getState().spots;
-    map.fitBounds(L.latLngBounds(all.map((s) => [s.lat, s.lng])), { padding: [40, 40] });
-    setTimeout(() => map.invalidateSize(), 0);
+    const fitAll = () => map.fitBounds(L.latLngBounds(all.map((s) => [s.lat, s.lng])), { padding: [28, 28] });
+    fitAll();
+    // Контейнер змінює розмір після верстки й при повороті телефону — Leaflet треба про це сказати.
+    // Перший виклик приходить, коли розмір уже справжній, — тоді й підганяємо масштаб.
+    let fitted = false;
+    resizeObserver = new ResizeObserver(() => {
+      map.invalidateSize();
+      if (!fitted) { fitted = true; fitAll(); }
+    });
+    resizeObserver.observe(mapEl);
   } else {
     fallback.hidden = false;
     mapEl.hidden = true;
@@ -175,6 +184,7 @@ export function render(_params, root, store) {
   const unsubscribe = store.subscribe(update);
   return () => {
     unsubscribe();
+    resizeObserver?.disconnect();
     map?.remove();
   };
 }
