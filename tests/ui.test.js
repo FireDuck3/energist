@@ -1,5 +1,5 @@
 import { test, eq } from './runner.js';
-import { openModal } from '../js/ui.js';
+import { h, openModal, revealOnScroll, installRipple } from '../js/ui.js';
 
 test('модалка не закривається, якщо натиснули всередині, а відпустили на фоні', () => {
   let closed = 0;
@@ -27,4 +27,44 @@ test('дві модалки: закриття першої не знімає б�
   const locked = document.body.classList.contains('modal-open');
   b.close();
   eq([locked, document.body.classList.contains('modal-open')], [true, false]);
+});
+
+test('revealOnScroll: з «менше руху» нічого не ховає', () => {
+  const el = document.createElement('div');
+  const stop = revealOnScroll([el], { reduce: true });
+  eq(el.classList.contains('reveal'), false);
+  stop();
+});
+
+test("revealOnScroll: блок у полі зору з'являється", async () => {
+  const el = h('div', { style: 'height: 20px' });
+  document.body.prepend(el);
+  const stop = revealOnScroll([el], { reduce: false });
+  try {
+    await new Promise((r) => setTimeout(r, 300));
+    eq([el.classList.contains('reveal'), el.classList.contains('in')], [true, true]);
+  } finally { stop(); el.remove(); }
+});
+
+test('installRipple: натискання на кнопку пускає хвилю, на вимкнену — ні', () => {
+  const on = h('button', { class: 'btn' }, 'Так');
+  const off = h('button', { class: 'btn', disabled: true }, 'Ні');
+  const box = h('div', {}, on, off);
+  document.body.append(box);
+  const stop = installRipple(box, { reduce: false });
+  try {
+    on.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 5, clientY: 5 }));
+    off.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+    eq([on.querySelectorAll('.ripple').length, off.querySelectorAll('.ripple').length, on.textContent], [1, 0, 'Так']);
+  } finally { stop(); box.remove(); }
+});
+
+test('installRipple: з «менше руху» хвилі немає', () => {
+  const btn = h('button', { class: 'btn' }, 'Так');
+  document.body.append(btn);
+  const stop = installRipple(btn.parentNode, { reduce: true });
+  try {
+    btn.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+    eq(btn.querySelectorAll('.ripple').length, 0);
+  } finally { stop(); btn.remove(); }
 });

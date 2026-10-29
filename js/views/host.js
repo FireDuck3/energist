@@ -165,6 +165,7 @@ function openAddSpot(store, hostName) {
 }
 
 export function render(_params, root, store, session) {
+  let grown = false; // стовпчики «виростають» лише при першому показі, не після кожної дії
   function update() {
     const { status } = session.getState();
     if (status === 'loading') {
@@ -188,7 +189,9 @@ export function render(_params, root, store, session) {
     const spotById = Object.fromEntries(state.spots.map((sp) => [sp.id, sp]));
     const pending = s.bookings.filter((b) => b.status === 'pending').length;
 
-    root.replaceChildren(h('div', { class: 'container host-page' },
+    const enter = !grown;
+    grown = true;
+    root.replaceChildren(h('div', { class: `container host-page${enter ? ' host-enter' : ''}` },
       h('div', { class: 'host-head' },
         h('div', {},
           h('h1', {}, `Вітаємо, ${signedIn ? session.currentName() : host.vocative ?? host.name}! 👋`),

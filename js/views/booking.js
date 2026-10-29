@@ -34,6 +34,7 @@ export function openBooking(spot, store, { now = new Date(), session, userHistor
   const userName = session?.currentName();
   let booking = null;
   let step = 0;
+  let shownStep = -1;
   let rafId = null;
   let currentKwh = 0;
 
@@ -49,7 +50,10 @@ export function openBooking(spot, store, { now = new Date(), session, userHistor
   const maxHours = () => Math.max(1, Math.min(MAX_HOURS, hourOf(spot.schedule.to) - hourOf(sel.start)));
 
   function show(content) {
-    modal.setContent(h('div', { class: 'wizard' },
+    // Анімуємо лише перехід на новий крок, а не кожен клік усередині кроку.
+    const entering = step !== shownStep;
+    shownStep = step;
+    modal.setContent(h('div', { class: `wizard${entering ? ' wizard-enter' : ''}` },
       h('p', { class: 'eyebrow' }, spot.title),
       progress(step),
       content));
