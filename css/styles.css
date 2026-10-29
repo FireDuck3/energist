@@ -483,6 +483,7 @@ body.blackout .leaflet-control-zoom a, body.blackout .leaflet-control-attributio
 
 .bars { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; height: 220px; align-items: end; margin: 12px 0 20px; }
 .bar-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 6px; }
+.bar-track { flex: 1; min-height: 0; width: 100%; display: flex; align-items: flex-end; justify-content: center; }
 .bar { width: 100%; max-width: 52px; background: var(--sky); border-radius: 8px 8px 4px 4px; transition: height .4s ease; }
 .bar-col.current .bar { background: var(--indigo); }
 .bar-value { font-size: .75rem; font-weight: 700; color: var(--muted); white-space: nowrap; }

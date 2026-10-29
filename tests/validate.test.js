@@ -29,5 +29,8 @@ test('потужність поза 0,5–22', () =>
 
 test('жодного пристрою', () => eq(typeof validateSpotInput({ ...good, devices: [] }).errors.devices, 'string'));
 
+test('порожній час відкриття', () =>
+  eq(typeof validateSpotInput({ ...good, schedule: { from: '', to: '20:00' } }).errors.schedule, 'string'));
+
 test('графік навиворіт', () =>
   eq(typeof validateSpotInput({ ...good, schedule: { from: '20:00', to: '08:00' } }).errors.schedule, 'string'));

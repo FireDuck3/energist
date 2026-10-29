@@ -1,6 +1,6 @@
 // Кабінет господаря — шлях Олега.
 import { h, openModal, toast, formatDate, stars, spotCover, plural } from '../ui.js';
-import { hostSummary } from '../stats.js';
+import { hostSummary, bookingHostAmount } from '../stats.js';
 import { validateSpotInput } from '../validate.js';
 import { formatUAH, formatKwh } from '../pricing.js';
 import { DEMO_HOST_ID, DEVICES, SOURCES, CONNECTORS, VINNYTSIA_CENTER, SPOTS } from '../data.js';
@@ -30,7 +30,8 @@ function chart(months) {
   return h('div', { class: 'bars' }, months.map((m, i) =>
     h('div', { class: `bar-col${i === months.length - 1 ? ' current' : ''}` },
       h('span', { class: 'bar-value' }, formatUAH(Math.round(m.earned))),
-      h('div', { class: 'bar', style: { height: `${Math.max(4, (m.earned / max) * 100)}%` } }),
+      h('div', { class: 'bar-track' },
+        h('div', { class: 'bar', style: { height: `${Math.max(2, (m.earned / max) * 100)}%` } })),
       h('span', { class: 'bar-label' }, m.label))));
 }
 
@@ -38,6 +39,7 @@ function bookingRow(b, spot, store) {
   const [label, cls] = STATUS[b.status];
   const device = DEVICES.find((d) => d.id === b.device)?.label;
   const done = b.status === 'paid' || b.status === 'reviewed';
+  const amount = bookingHostAmount(b, spot);
   return h('li', { class: 'booking' },
     h('span', { class: 'avatar avatar-sm' }, b.guestName[0]),
     h('div', { class: 'booking-main' },
@@ -45,10 +47,13 @@ function bookingRow(b, spot, store) {
       h('div', { class: 'muted booking-meta' }, `${spot.title} · ${formatDate(b.date)}, ${b.start} · ${b.hours} год`),
       h('span', { class: `badge ${cls}` }, label)),
     h('div', { class: 'booking-side' },
-      h('b', {}, done ? `+${formatUAH(b.hostPayout)}` : `≈ ${formatUAH(b.heldAmount * 0.9)}`),
+      h('b', {}, amount == null ? '—' : done ? `+${formatUAH(amount)}` : `≈ ${formatUAH(amount)}`),
       h('span', { class: 'muted' }, formatKwh(done ? b.actualKwh : b.estimatedKwh)),
       b.status === 'pending' && h('div', { class: 'booking-actions' },
-        h('button', { type: 'button', class: 'btn btn-ok btn-sm', onclick: () => { store.confirmBooking(b.id); toast(`Бронювання ${b.guestName} підтверджено`); } }, 'Підтвердити'),
+        h('button', { type: 'button', class: 'btn btn-ok btn-sm', onclick: () => {
+          store.confirmBooking(b.id);
+          toast(`Бронювання підтверджено — ${b.guestName}, ${formatDate(b.date)} о ${b.start}`);
+        } }, 'Підтвердити'),
         h('button', { type: 'button', class: 'btn btn-danger-ghost btn-sm', onclick: () => store.declineBooking(b.id) }, 'Відхилити'))));
 }
 

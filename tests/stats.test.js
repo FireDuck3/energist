@@ -1,5 +1,6 @@
 import { test, eq } from './runner.js';
-import { hostSummary } from '../js/stats.js';
+import { hostSummary, bookingHostAmount } from '../js/stats.js';
+import { sessionCost } from '../js/pricing.js';
 
 const now = new Date(2026, 9, 29, 12);
 const state = {
@@ -33,6 +34,19 @@ test('6 місяців для графіка: 5 засіяних + поточн�
 });
 
 test('окупність СЕС у відсотках', () => eq(hostSummary(state, 'oleh', now).paybackPct, 16.5)); // 1653 / 10000
+
+test('поточний місяць і кВт·год мають засіяну базу', () => {
+  const withBase = { ...state, hosts: [{ ...state.hosts[0], monthBase: 1000, kwhBase: 100 }] };
+  const s = hostSummary(withBase, 'oleh', now);
+  eq([s.monthEarned, s.kwhSold, s.months[5].earned], [1153, 122, 1153]);
+});
+
+test('сума господарю в списку бронювань', () => {
+  const spot = { pricePerKwh: 12 };
+  eq(bookingHostAmount({ status: 'paid', hostPayout: 324 }, spot), 324);
+  eq(bookingHostAmount({ status: 'pending', estimatedKwh: 14.8 }, spot), sessionCost(14.8, 12).hostPayout);
+  eq(bookingHostAmount({ status: 'declined', estimatedKwh: 14.8 }, spot), null);
+});
 
 test('бронювання господаря — новіші зверху, чужих немає', () =>
   eq(hostSummary(state, 'oleh', now).bookings.map((b) => b.id), ['4', '3', '2', '1']));

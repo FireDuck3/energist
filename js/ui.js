@@ -31,7 +31,14 @@ export function openModal(content, { onClose, className = '' } = {}) {
   const dialog = h('div', { class: `modal ${className}`, role: 'dialog', 'aria-modal': 'true' },
     h('button', { class: 'modal-close', type: 'button', 'aria-label': 'Закрити', onclick: () => close() }, '×'),
     body);
-  const overlay = h('div', { class: 'modal-overlay', onclick: (e) => { if (e.target === overlay) close(); } }, dialog);
+  // Закриваємо лише справжній клік по фону: якщо натиснули у вікні (напр., тягнули карту) і відпустили
+  // на фоні, браузер шле click на фон — такий «клік» ігноруємо.
+  let downOnOverlay = false;
+  const overlay = h('div', {
+    class: 'modal-overlay',
+    onpointerdown: (e) => { downOnOverlay = e.target === overlay; },
+    onclick: (e) => { if (e.target === overlay && downOnOverlay) close(); },
+  }, dialog);
   const onKey = (e) => { if (e.key === 'Escape') close(); };
   let closed = false;
 

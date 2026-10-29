@@ -1,5 +1,5 @@
-// Зведення для кабінету господаря. Чиста функція над станом store.
-import { round2 } from './pricing.js';
+// Зведення для кабінету господаря. Чисті функції над станом store.
+import { round2, sessionCost } from './pricing.js';
 import { monthLabel } from './ui.js';
 
 const PAID = new Set(['paid', 'reviewed']);
@@ -12,7 +12,8 @@ export function hostSummary(state, hostId, now = new Date()) {
   const bookings = state.bookings.filter((b) => own.has(b.spotId)).reverse(); // новіші — останні в store
   const paid = bookings.filter((b) => PAID.has(b.status));
 
-  const monthEarned = round2(paid
+  // monthBase / kwhBase — засіяна історія поза бронюваннями в store, щоб цифри не «обвалювались» на початку місяця.
+  const monthEarned = round2((host.monthBase ?? 0) + paid
     .filter((b) => b.date.startsWith(monthKey(now)))
     .reduce((sum, b) => sum + b.hostPayout, 0));
   const reviews = spots.flatMap((s) => s.reviews);
@@ -32,9 +33,16 @@ export function hostSummary(state, hostId, now = new Date()) {
     bookings,
     monthEarned,
     charges: host.chargesCount + paid.length,
-    kwhSold: round2(paid.reduce((sum, b) => sum + b.actualKwh, 0)),
+    kwhSold: round2((host.kwhBase ?? 0) + paid.reduce((sum, b) => sum + b.actualKwh, 0)),
     rating,
     months,
     paybackPct: host.sesCost ? Math.round((earnedTotal / host.sesCost) * 1000) / 10 : 0,
   };
+}
+
+// Скільки отримає господар з бронювання: фактично (оплачені) або очікувано; null — для відхилених.
+export function bookingHostAmount(booking, spot) {
+  if (booking.status === 'declined') return null;
+  if (PAID.has(booking.status)) return booking.hostPayout;
+  return sessionCost(booking.estimatedKwh, spot.pricePerKwh).hostPayout;
 }

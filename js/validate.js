@@ -18,7 +18,9 @@ export function validateSpotInput(input) {
   if (!(input.source in SOURCES)) errors.source = 'Оберіть джерело енергії';
   if (!(input.connector in CONNECTORS)) errors.connector = 'Оберіть тип підключення';
   if (!input.devices || !input.devices.length) errors.devices = 'Оберіть хоча б один пристрій';
-  if (!input.schedule || !(input.schedule.from < input.schedule.to)) {
+  const isTime = (t) => /^\d{2}:\d{2}$/.test(t ?? '');
+  if (!input.schedule || !isTime(input.schedule.from) || !isTime(input.schedule.to) ||
+      !(input.schedule.from < input.schedule.to)) {
     errors.schedule = 'Час відкриття має бути раніше за закриття';
   }
 

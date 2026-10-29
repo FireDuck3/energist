@@ -1,7 +1,7 @@
 import { test, eq } from './runner.js';
 import {
   sessionCost, savingsVsCommercial, gridValue, estimateKwh,
-  monthlyGuestSavings, monthlyHostEarnings, formatUAH, formatKwh,
+  monthlyGuestSavings, monthlyHostEarnings, formatUAH, formatKwh, round2,
 } from '../js/pricing.js';
 
 test('еталон 30 кВт·год × 12 грн', () => {
@@ -21,6 +21,20 @@ test('estimateKwh обрізає за ємністю', () => {
 });
 
 test('копійки округлюються', () => eq(sessionCost(1.333, 9), { total: 12, fee: 1.2, hostPayout: 10.8 }));
+
+test('розбивка сходиться до копійки: 1,25 кВт·год × 9 грн', () =>
+  eq(sessionCost(1.25, 9), { total: 11.25, fee: 1.13, hostPayout: 10.12 }));
+
+test('господар + комісія = сума для будь-яких кВт·год і цін', () => {
+  const bad = [];
+  for (const price of [8, 9, 10, 11, 11.5, 12, 13, 14, 15]) {
+    for (let k = 0; k <= 4000; k++) {
+      const c = sessionCost(k / 100, price);
+      if (round2(c.fee + c.hostPayout) !== c.total) bad.push(`${k / 100}×${price}`);
+    }
+  }
+  eq(bad.slice(0, 3), []);
+});
 
 test('місячні розрахунки', () => {
   eq(monthlyGuestSavings(10, 12), 995.9); // 43.3 × (35 − 12)

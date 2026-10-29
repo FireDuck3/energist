@@ -13,10 +13,11 @@ export function holdAmount(kwh, price) {
   return round2(kwh * price);
 }
 
+// Округлюємо крок за кроком, щоб «господарю + комісія» завжди давало суму до копійки.
 export function sessionCost(kwh, price) {
-  const total = kwh * price;
-  const fee = total * COMMISSION;
-  return { total: round2(total), fee: round2(fee), hostPayout: round2(total - fee) };
+  const total = round2(kwh * price);
+  const fee = round2(total * COMMISSION);
+  return { total, fee, hostPayout: round2(total - fee) };
 }
 
 export function savingsVsCommercial(kwh, price) {
