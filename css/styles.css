@@ -898,3 +898,25 @@ body.blackout .mark-us span { color: #141833; }
     transition-duration: .01ms !important; scroll-behavior: auto !important;
   }
 }
+
+/* ---------- Сторінки входу й реєстрації ---------- */
+.auth-buttons { display: inline-flex; gap: 8px; }
+.hero-auth { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: -8px 0 22px; }
+.auth-page { padding: 40px 16px 56px; display: grid; justify-items: center; }
+.auth-card { width: 100%; max-width: 460px; padding: 32px; display: grid; gap: 14px; justify-items: stretch; }
+.auth-card h1 { font-size: 1.6rem; margin: 0; }
+.auth-card .auth-lead { margin: -8px 0 4px; }
+.auth-card > .gate-icon { justify-self: center; }
+.auth-card > .btn { justify-self: stretch; text-align: center; }
+.auth-card .auth-brand { display: flex; align-items: center; gap: 10px; font-size: 1.15rem; }
+.auth-card .auth-brand .logo-mark { width: 32px; height: 32px; font-size: .95rem; }
+.auth-card .auth-error a.link-btn { text-decoration: none; }
+.auth-switch { margin: 0; text-align: center; color: var(--muted); }
+.auth-switch a { font-weight: 600; }
+.input[aria-invalid="true"] { border-color: var(--danger); }
+@media (max-width: 768px) {
+  .auth-buttons { gap: 6px; }
+  .auth-card { padding: 24px 18px; }
+}
+/* Вузький телефон: у шапці лише «Реєстрація»; «Увійти» є на головній і на сторінці реєстрації. */
+@media (max-width: 480px) { .auth-buttons .btn-secondary { display: none; } }

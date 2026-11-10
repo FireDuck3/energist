@@ -12,6 +12,7 @@ import * as host from './views/host.js';
 import * as calculator from './views/calculator.js';
 import * as profile from './views/profile.js';
 import { openAuthModal } from './views/auth-modal.js';
+import { loginPage, signupPage, logOut } from './views/auth-page.js';
 
 export const store = createStore(safeLocalStorage() ?? memoryStorage());
 export const session = createSession(loadSupabase);
@@ -26,7 +27,9 @@ function accountArea() {
   const { status, user } = session.getState();
   if (status === 'loading') return h('span', { class: 'account-placeholder', 'aria-hidden': 'true' });
   if (status === 'signedOut' || status === 'unavailable') {
-    return h('button', { type: 'button', class: 'btn btn-primary btn-sm', onclick: signIn }, 'Увійти');
+    return h('span', { class: 'auth-buttons' },
+      h('a', { class: 'btn btn-secondary btn-sm', href: '#/login' }, 'Увійти'),
+      h('a', { class: 'btn btn-primary btn-sm', href: '#/signup' }, 'Реєстрація'));
   }
   if (status === 'needsProfile') {
     return h('button', { type: 'button', class: 'btn btn-secondary btn-sm', onclick: signIn },
@@ -41,7 +44,7 @@ function accountArea() {
     h('div', { class: 'account-menu card' },
       !demo && h('span', { class: 'account-email muted' }, user.email),
       h('a', { href: '#/profile', onclick: (e) => e.target.closest('details').open = false }, demo ? 'Профіль' : 'Профіль і зарядки'),
-      h('button', { type: 'button', onclick: () => (demo ? location.reload() : session.service.signOut().catch(() => toast('Не вдалося вийти — перевірте інтернет'))) },
+      h('button', { type: 'button', onclick: () => (demo ? location.reload() : logOut(session)) },
         demo ? 'Вийти з демо-режиму' : 'Вийти')));
 }
 
@@ -109,6 +112,8 @@ startRouter({
   '/host': view(host),
   '/calc': view(calculator),
   '/profile': view(profile),
+  '/login': view({ render: loginPage }),
+  '/signup': view({ render: signupPage }),
 }, appRoot, {
   onChange(path) {
     // Нова сторінка плавно проявляється. Лише прозорість: transform зсунув би fixed-панелі всередині.

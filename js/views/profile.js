@@ -3,6 +3,7 @@ import { h, toast, formatDate } from '../ui.js';
 import { formatUAH, formatKwh } from '../pricing.js';
 import { isoDay } from '../data.js';
 import { signInPrompt } from './auth-modal.js';
+import { logOut } from './auth-page.js';
 
 const ROLES = [['guest', '🔌 Шукаю зарядку'], ['host', '☀️ Маю енергію для продажу']];
 
@@ -99,9 +100,7 @@ export function render(_params, root, store, session, userHistory) {
               onclick: () => { draft.role = value; draw(); } }, label))),
           errors.role && h('span', { class: 'field-error' }, errors.role)),
         h('div', { class: 'profile-actions' },
-          h('button', { type: 'button', class: 'btn btn-ghost', disabled: busy, onclick: () => {
-            session.service.signOut().catch(() => toast('Не вдалося вийти — перевірте інтернет'));
-          } }, 'Вийти'),
+          h('button', { type: 'button', class: 'btn btn-ghost', disabled: busy, onclick: () => logOut(session) }, 'Вийти'),
           h('button', { type: 'button', class: 'btn btn-primary', disabled: busy, onclick: save }, busy ? 'Зачекайте…' : 'Зберегти')));
     }
 

@@ -10,8 +10,29 @@ const STEPS = [
   { icon: '💳', title: 'Оплата', text: 'Платиш лише за фактично використані кВт·год' },
 ];
 
-export function render(_params, root) {
+// Рядок під головними кнопками: гостю — «Увійти» й «Реєстрація», тому, хто вже увійшов, — вітання.
+function authRow(session) {
+  const row = h('div', { class: 'hero-auth' });
+  const draw = () => {
+    const { status } = session.getState();
+    if (status === 'signedIn' || status === 'demo') {
+      row.replaceChildren(h('span', { class: 'muted' }, `Привіт, ${session.currentName()}!`),
+        h('a', { class: 'btn btn-secondary btn-sm', href: '#/profile' }, 'Мій профіль'));
+    } else if (status === 'loading') {
+      row.replaceChildren();
+    } else {
+      row.replaceChildren(h('span', { class: 'muted' }, 'Вже з нами?'),
+        h('a', { class: 'btn btn-secondary btn-sm', href: '#/login' }, 'Увійти'),
+        h('a', { class: 'btn btn-primary btn-sm', href: '#/signup' }, 'Реєстрація'));
+    }
+  };
+  draw();
+  return { row, stop: session.subscribe(draw) };
+}
+
+export function render(_params, root, _store, session) {
   const [lo, hi] = COMMERCIAL_RANGE;
+  const auth = session ? authRow(session) : null;
   const calcBox = h('div', { id: 'calc-compact' });
   mountCalculator(calcBox, { compact: true });
   root.append(
@@ -26,6 +47,7 @@ export function render(_params, root) {
           h('div', { class: 'hero-cta' },
             h('a', { class: 'btn btn-primary btn-lg', href: '#/map' }, '🔌 Знайти розетку'),
             h('a', { class: 'btn btn-secondary btn-lg', href: '#/host' }, '☀️ Здати свою енергію')),
+          auth?.row,
           h('ul', { class: 'hero-chips' },
             h('li', {}, h('b', {}, '8–15 грн'), ` замість ${lo}–${hi} грн за кВт·год`),
             h('li', {}, h('b', {}, 'Працює в блекаут'), ' — СЕС і батареї'),
@@ -57,5 +79,6 @@ export function render(_params, root) {
             h('p', {}, 'Додай свою розетку за хвилину — і енергія, яка пропадала, почне заробляти.')),
           h('a', { class: 'btn btn-sun btn-lg', href: '#/host' }, 'Стати господарем')))),
   );
-  return revealOnScroll(root.querySelectorAll('.section'));
+  const stopReveal = revealOnScroll(root.querySelectorAll('.section'));
+  return () => { stopReveal(); auth?.stop(); };
 }
