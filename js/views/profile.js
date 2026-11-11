@@ -14,6 +14,7 @@ function when(iso) {
 
 export function render(_params, root, store, session, userHistory, pilot) {
   let draft = null; // незбережені зміни переживають перемальовування від сесії
+  let activeSection = 'account';
 
   // Для репетицій пітчу: скидає демо-дані, але не виходить з акаунта.
   const resetLink = () => h('p', { class: 'reset-demo' },
@@ -73,6 +74,7 @@ export function render(_params, root, store, session, userHistory, pilot) {
     }
     if (status !== 'signedIn') {
       draft = null;
+      activeSection = 'account';
       const gate = signInPrompt({
         title: 'Профіль доступний після входу',
         text: 'Увійдіть або зареєструйтесь — це займе хвилину.',
@@ -127,15 +129,43 @@ export function render(_params, root, store, session, userHistory, pilot) {
     draw();
     drawCharges();
     drawPilot();
-    root.replaceChildren(h('div', { class: 'container profile-page' },
+    const account = h('div', {},
       h('div', { class: 'card profile-card' },
         h('div', { class: 'profile-head' },
           h('span', { class: 'avatar' }, (draft.name || user.email)[0].toUpperCase()),
-          h('div', {}, h('h1', {}, 'Профіль'), h('p', { class: 'muted' }, 'Ці дані бачите лише ви.'))),
+          h('div', {}, h('h2', { class: 'panel-title' }, 'Дані профілю'), h('p', { class: 'muted' }, 'Ці дані бачите лише ви.'))),
         box),
-      pilotBox,
-      chargesBox,
-      resetLink()));
+      resetLink());
+    const sections = [
+      ['account', 'Профіль', account],
+      ['bookings', 'Бронювання', pilotBox],
+      ['charges', 'Історія зарядок', chargesBox],
+    ];
+    const menu = h('nav', { class: 'cabinet-menu card', 'aria-label': 'Меню особистого кабінету' });
+    const content = h('div', { class: 'cabinet-content' });
+    const items = sections.map(([id, label, body]) => {
+      const panel = h('div', { id: `cabinet-${id}` }, body);
+      const button = h('button', {
+        type: 'button',
+        class: 'cabinet-menu-item',
+        'aria-controls': panel.id,
+        onclick: () => { activeSection = id; showSection(); },
+      }, label);
+      menu.append(button);
+      content.append(panel);
+      return { id, panel, button };
+    });
+    function showSection() {
+      for (const { id, panel, button } of items) {
+        const selected = id === activeSection;
+        panel.hidden = !selected;
+        button.setAttribute('aria-pressed', String(selected));
+      }
+    }
+    showSection();
+    root.replaceChildren(h('div', { class: 'container cabinet-page' },
+      h('h1', {}, 'Особистий кабінет'),
+      h('div', { class: 'cabinet-layout' }, menu, content)));
   }
 
   update();
