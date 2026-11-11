@@ -764,7 +764,38 @@ body.blackout .mark-us span { color: #141833; }
 .gate-icon { font-size: 2.4rem; animation: float 4s ease-in-out infinite; }
 .demo-note { background: var(--surface-2); border-radius: 12px; padding: 10px 14px; color: var(--muted); font-size: .92rem; margin: -8px 0 20px; }
 
-.profile-page { padding: 40px 16px 56px; display: grid; justify-items: center; }
+.cabinet-page { padding: 40px 16px 56px; }
+.cabinet-page > h1 { margin: 0 0 24px; }
+.cabinet-layout {
+  display: grid;
+  grid-template-columns: minmax(180px, 230px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.cabinet-menu { display: grid; gap: 4px; padding: 8px; }
+.cabinet-menu-item {
+  padding: 10px 12px;
+  min-height: 44px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.cabinet-menu-item:hover,
+.cabinet-menu-item[aria-pressed="true"] { border-color: currentColor; }
+.cabinet-menu-item[aria-pressed="true"] { font-weight: 700; }
+.cabinet-content { min-width: 0; overflow-wrap: anywhere; }
+.cabinet-content .profile-card { max-width: none; }
+@media (max-width: 640px) {
+  .cabinet-page { padding-top: 24px; }
+  .cabinet-layout { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .cabinet-menu { display: flex; flex-wrap: wrap; }
+  .cabinet-menu-item { flex: 1 1 auto; text-align: center; }
+  .cabinet-content .profile-card { padding: 16px; }
+}
 .profile-card { width: 100%; max-width: 520px; padding: 28px; display: grid; gap: 18px; }
 .profile-card > div:last-child { display: grid; gap: 16px; }
 .profile-head { display: flex; align-items: center; gap: 14px; }
@@ -800,7 +831,6 @@ body.blackout .mark-us span { color: #141833; }
 .search-hint { padding: 8px 10px; margin: 0; font-size: .9rem; }
 
 /* ---------- Мої зарядки ---------- */
-.profile-page { gap: 20px; }
 .charges { gap: 14px; }
 .charges-list { list-style: none; margin: 0; padding: 0; display: grid; }
 .charge { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
