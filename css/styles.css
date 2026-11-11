@@ -899,9 +899,5 @@ body.blackout .mark-us span { color: #141833; }
   }
 }
 
-.header-auth { display: flex; align-items: center; gap: 6px; }
-.header-auth .auth-other { min-width: 32px; padding-inline: 8px; }
-@media (max-width: 768px) {
-  .header-auth .btn { padding-inline: 10px; }
-  .header-auth .auth-other { padding-inline: 6px; }
-}
+.auth-divider { display: flex; align-items: center; gap: 12px; color: var(--muted); }
+.auth-divider::before, .auth-divider::after { content: ""; flex: 1; border-top: 1px solid var(--line); }

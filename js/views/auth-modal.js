@@ -165,17 +165,17 @@ export function openAuthModal(session, { reason = '', mode, error = null } = {})
   const svc = () => session.service;
   // Без листів із кодом (немає власного SMTP) кнопки входу кодом і скидання пароля ховаємо.
   const codesOn = () => session.service?.emailCodes !== false;
-  const googleButton = () => h('button', { type: 'button', class: 'btn btn-secondary btn-lg btn-block', disabled: st.busy,
-    onclick: () => run(() => svc().signInWithGoogle()) }, 'Продовжити з Google');
+  const googleOption = () => [h('div', { class: 'auth-divider' }, 'або'), h('button', { type: 'button', class: 'btn btn-secondary btn-lg btn-block', disabled: st.busy,
+    onclick: () => run(() => svc().signInWithGoogle()) }, 'Увійти через Google')];
   const views = {
-    signin: () => [tabs('signin'), googleButton(),
+    signin: () => [tabs('signin'),
       form(async () => { checkEmail(); checkPassword(st.password); await svc().signInWithPassword(st.email, st.password); await settled(); },
         emailField(),
         field('Пароль', input('password', { type: 'password', autocomplete: 'current-password' })),
         errorBlock(), primary('Увійти')),
-      codesOn() && h('div', { class: 'auth-links' }, linkBtn('Забули пароль?', 'reset'), linkBtn('Увійти без пароля', 'code'))],
+      codesOn() && h('div', { class: 'auth-links' }, linkBtn('Забули пароль?', 'reset'), linkBtn('Увійти без пароля', 'code')), googleOption()],
 
-    signup: () => [tabs('signup'), googleButton(),
+    signup: () => [tabs('signup'),
       form(async () => {
         const v = checkedCredentials(st, { signup: true });
         await svc().signUpWithPassword(v.email, v.password, { firstName: v.firstName, lastName: v.lastName });
@@ -187,7 +187,7 @@ export function openAuthModal(session, { reason = '', mode, error = null } = {})
         emailField(),
         field('Пароль', input('password', { type: 'password', autocomplete: 'new-password' }), 'Від 8 до 128 символів'),
         errorBlock(), primary('Створити акаунт')),
-      codesOn() && h('div', { class: 'auth-links' }, linkBtn('Увійти без пароля', 'code'))],
+      codesOn() && h('div', { class: 'auth-links' }, linkBtn('Увійти без пароля', 'code')), googleOption()],
 
     code: () => [h('h2', {}, 'Вхід без пароля'),
       h('p', { class: 'muted' }, 'Надішлемо 6-значний код на вашу пошту.'),
