@@ -1,6 +1,7 @@
 // Вікно входу: вхід і реєстрація паролем, вхід кодом з пошти, скидання пароля кодом,
 // перший крок профілю і демо-режим без інтернету. Одне вікно за раз.
 import { h, openModal } from '../ui.js';
+import { checkedCredentials } from '../credentials.js';
 import { authErrorMessage } from '../auth.js';
 
 const RESEND_SECONDS = 60;
@@ -29,7 +30,7 @@ export function signInPrompt({ title, text, reason }, session) {
       h('button', { type: 'button', class: 'btn btn-primary btn-lg', onclick: () => session.requireAuth(() => {}, reason) }, 'Увійти')));
 }
 
-export function openAuthModal(session, { reason = '', mode } = {}) {
+export function openAuthModal(session, { reason = '', mode, error = null } = {}) {
   if (current) {
     current.switchTo(mode ?? defaultMode(session.getState().status));
     return;
@@ -37,8 +38,8 @@ export function openAuthModal(session, { reason = '', mode } = {}) {
 
   const st = {
     mode: mode ?? defaultMode(session.getState().status),
-    email: '', password: '', code: '', newPassword: '', name: '', role: null,
-    error: '', errorCode: '', fieldErrors: {}, busy: false, sentAt: 0,
+    firstName: '', lastName: '', email: '', password: '', code: '', newPassword: '', name: '', role: null,
+    error: error ? authErrorMessage(error) : '', errorCode: error ?? '', fieldErrors: {}, busy: false, sentAt: 0,
   };
   let timer = null;
   let closedByLogin = false;
@@ -67,6 +68,7 @@ export function openAuthModal(session, { reason = '', mode } = {}) {
   const unsubscribe = session.subscribe(() => { if (!st.busy) sync(); });
 
   function switchTo(mode) {
+    if (mode === 'profile' && !st.name) st.name = String(session.getState().user?.name ?? '').slice(0, 60);
     Object.assign(st, { mode, error: '', errorCode: '', fieldErrors: {} });
     render();
   }
@@ -117,7 +119,11 @@ export function openAuthModal(session, { reason = '', mode } = {}) {
 
   // Запит входу вже успішний — тримаємо «Зачекайте…», доки сесія не зміниться (профіль ще читається).
   async function settled() {
-    if (!(await session.waitForSignIn(10000))) throw invalid('Не вдалося завершити вхід — перевірте інтернет і спробуйте ще раз');
+    if (!(await session.waitForSignIn(10000))) {
+      const code = session.getState().error;
+      if (code) throw Object.assign(new Error(code), { code });
+      throw invalid('Не вдалося завершити вхід — перевірте інтернет і спробуйте ще раз');
+    }
   }
 
   const checkEmail = () => {
@@ -159,18 +165,27 @@ export function openAuthModal(session, { reason = '', mode } = {}) {
   const svc = () => session.service;
   // Без листів із кодом (немає власного SMTP) кнопки входу кодом і скидання пароля ховаємо.
   const codesOn = () => session.service?.emailCodes !== false;
+  const googleButton = () => h('button', { type: 'button', class: 'btn btn-secondary btn-lg btn-block', disabled: st.busy,
+    onclick: () => run(() => svc().signInWithGoogle()) }, 'Продовжити з Google');
   const views = {
-    signin: () => [tabs('signin'),
+    signin: () => [tabs('signin'), googleButton(),
       form(async () => { checkEmail(); checkPassword(st.password); await svc().signInWithPassword(st.email, st.password); await settled(); },
         emailField(),
         field('Пароль', input('password', { type: 'password', autocomplete: 'current-password' })),
         errorBlock(), primary('Увійти')),
       codesOn() && h('div', { class: 'auth-links' }, linkBtn('Забули пароль?', 'reset'), linkBtn('Увійти без пароля', 'code'))],
 
-    signup: () => [tabs('signup'),
-      form(async () => { checkEmail(); checkPassword(st.password); await svc().signUpWithPassword(st.email, st.password); await settled(); },
+    signup: () => [tabs('signup'), googleButton(),
+      form(async () => {
+        const v = checkedCredentials(st, { signup: true });
+        await svc().signUpWithPassword(v.email, v.password, { firstName: v.firstName, lastName: v.lastName });
+        st.name = `${v.firstName} ${v.lastName}`.slice(0, 60);
+        await settled();
+      },
+        field('Ім’я', input('firstName', { type: 'text', autocomplete: 'given-name', maxlength: 60 })),
+        field('Прізвище', input('lastName', { type: 'text', autocomplete: 'family-name', maxlength: 60 })),
         emailField(),
-        field('Пароль', input('password', { type: 'password', autocomplete: 'new-password' }), 'Щонайменше 6 символів'),
+        field('Пароль', input('password', { type: 'password', autocomplete: 'new-password' }), 'Від 8 до 128 символів'),
         errorBlock(), primary('Створити акаунт')),
       codesOn() && h('div', { class: 'auth-links' }, linkBtn('Увійти без пароля', 'code'))],
 
@@ -230,6 +245,7 @@ export function openAuthModal(session, { reason = '', mode } = {}) {
     modal.body.querySelector('input:not([disabled])')?.focus();
   }
 
+  if (st.mode === 'profile' && !st.name) st.name = String(session.getState().user?.name ?? '').slice(0, 60);
   current = { switchTo };
   render();
 }

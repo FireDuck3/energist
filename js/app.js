@@ -21,12 +21,27 @@ export const userHistory = createUserHistory(session, { onReset: () => store.set
 const view = (mod) => (params, root) => mod.render(params, root, store, session, userHistory);
 
 const signIn = () => session.requireAuth(() => {}, '');
+let googleBusy = false;
+async function googleSignIn() {
+  if (googleBusy) return;
+  if (!session.service) return signIn();
+  googleBusy = true;
+  renderHeader();
+  try { await session.service.signInWithGoogle(); }
+  catch (error) { openAuthModal(session, { error: error.code ?? 'auth/oauth-failed' }); }
+  finally { googleBusy = false; renderHeader(); }
+}
 
 function accountArea() {
   const { status, user } = session.getState();
   if (status === 'loading') return h('span', { class: 'account-placeholder', 'aria-hidden': 'true' });
   if (status === 'signedOut' || status === 'unavailable') {
-    return h('button', { type: 'button', class: 'btn btn-primary btn-sm', onclick: signIn }, 'Увійти');
+    return h('div', { class: 'header-auth' },
+      h('button', { type: 'button', class: 'btn btn-primary btn-sm', disabled: googleBusy, onclick: googleSignIn,
+        'aria-label': 'Увійти через Google' },
+        h('span', { class: 'label-long' }, 'Увійти через Google'), h('span', { class: 'label-short' }, 'Google')),
+      h('button', { type: 'button', class: 'btn btn-secondary btn-sm auth-other', onclick: signIn, 'aria-label': 'Інші способи входу', title: 'Інші способи входу' }, '⋯'));
+
   }
   if (status === 'needsProfile') {
     return h('button', { type: 'button', class: 'btn btn-secondary btn-sm', onclick: signIn },
@@ -118,4 +133,13 @@ startRouter({
     if (role && role !== store.getState().role) store.setRole(role);
     else renderHeader();
   },
+});
+
+// OAuth reloads the document, so resume at the saved route and finish a new profile.
+session.ready.then(() => {
+  const result = session.service?.oauthResult;
+  if (!result?.returned) return;
+  const state = session.getState();
+  if (result.error || state.error) openAuthModal(session, { error: result.error ?? state.error });
+  else if (state.status === 'needsProfile') openAuthModal(session, { mode: 'profile' });
 });

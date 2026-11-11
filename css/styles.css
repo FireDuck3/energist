@@ -898,3 +898,10 @@ body.blackout .mark-us span { color: #141833; }
     transition-duration: .01ms !important; scroll-behavior: auto !important;
   }
 }
+
+.header-auth { display: flex; align-items: center; gap: 6px; }
+.header-auth .auth-other { min-width: 32px; padding-inline: 8px; }
+@media (max-width: 768px) {
+  .header-auth .btn { padding-inline: 10px; }
+  .header-auth .auth-other { padding-inline: 6px; }
+}
