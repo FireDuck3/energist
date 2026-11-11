@@ -68,7 +68,7 @@ function ownSpotCard(spot) {
 }
 
 // ---- Форма «Додати розетку» ----
-function openAddSpot(store, hostName) {
+function openAddSpot(store, hostName, publish) {
   const input = {
     title: '', district: 'Вишенька', lat: null, lng: null, source: 'solar', connector: 'type2',
     powerKw: 7.4, pricePerKwh: 11, devices: ['ev', 'ecoflow', 'gadget'], schedule: { from: '08:00', to: '20:00' },
@@ -97,9 +97,10 @@ function openAddSpot(store, hostName) {
   const form = h('form', { class: 'wizard add-form', novalidate: true, onsubmit: submit },
     h('p', { class: 'eyebrow' }, 'Кабінет господаря'),
     h('h2', {}, 'Додати розетку'),
+    publish && h('p', {}, 'Назва й координати точки будуть видимі на карті всім відвідувачам.'),
     h('div', { class: 'form-field' }, h('span', { class: 'field-label' }, 'Де вона?'), mapEl, coordsNote, err('location')),
     h('div', { class: 'form-grid' },
-      field('Назва', h('input', { class: 'input', type: 'text', placeholder: 'Напр.: Гараж з розеткою 220 В',
+      field('Назва', h('input', { class: 'input', type: 'text', maxlength: 100, placeholder: 'Напр.: Гараж з розеткою 220 В',
         oninput: (e) => { input.title = e.target.value; } }), 'title'),
       field('Район', h('select', { class: 'input', onchange: (e) => { input.district = e.target.value; } },
         DISTRICTS.map((d) => h('option', { value: d, selected: d === input.district }, d)))),
@@ -147,7 +148,7 @@ function openAddSpot(store, hostName) {
       h('button', { type: 'button', class: 'btn btn-secondary btn-sm', onclick: () => setPoint(...VINNYTSIA_CENTER) }, 'Поставити в центр Вінниці')));
   }
 
-  function submit(e) {
+  async function submit(e) {
     e.preventDefault();
     const { ok, errors } = validateSpotInput(input);
     for (const [key, el] of Object.entries(errorEls)) {
@@ -158,13 +159,21 @@ function openAddSpot(store, hostName) {
       form.querySelector('.field-error:not([hidden])')?.closest('.form-field')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
-    store.addSpot({ ...input, title: input.title.trim(), hostName });
+    const data = { ...input, title: input.title.trim(), hostName };
+    if (publish) {
+      const button = form.querySelector('[type=submit]');
+      if (button.disabled) return;
+      button.disabled = true;
+      try { await publish(data); }
+      catch { toast('Не вдалося опублікувати точку. Спробуйте ще раз.'); return; }
+      finally { button.disabled = false; }
+    } else store.addSpot(data);
     modal.close();
     toast('Розетку додано — її вже видно на карті гостей');
   }
 }
 
-export function render(_params, root, store, session) {
+export function render(_params, root, store, session, _history, pilot) {
   let grown = false; // стовпчики «виростають» лише при першому показі, не після кожної дії
   function update() {
     const { status } = session.getState();
@@ -181,7 +190,17 @@ export function render(_params, root, store, session) {
       return;
     }
     const signedIn = status === 'signedIn';
-    const addSpot = () => openAddSpot(store, signedIn ? session.currentName() : undefined);
+    const addSpot = () => openAddSpot(store, undefined, signedIn ? pilot.publish : undefined);
+    if (signedIn) {
+      root.replaceChildren(h('div', { class: 'container host-page' },
+        h('div', { class: 'host-head' },
+          h('h1', {}, 'Кабінет господаря'),
+          h('button', { type: 'button', class: 'btn btn-primary', onclick: addSpot }, '+ Додати розетку')),
+        pilot.panel(true),
+        h('h2', { class: 'own-title' }, 'Мої точки'),
+        h('div', { class: 'own-spots' }, pilot.ownSpots().map(ownSpotCard))));
+      return;
+    }
     const state = store.getState();
     const host = state.hosts.find((x) => x.id === DEMO_HOST_ID);
     const now = new Date();
@@ -228,5 +247,6 @@ export function render(_params, root, store, session) {
   update();
   const offStore = store.subscribe(update);
   const offSession = session.subscribe(update);
-  return () => { offStore(); offSession(); };
+  const offPilot = pilot.subscribe(update);
+  return () => { offStore(); offSession(); offPilot(); };
 }

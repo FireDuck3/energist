@@ -12,7 +12,7 @@ function when(iso) {
   return `${formatDate(isoDay(0, d))}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export function render(_params, root, store, session, userHistory) {
+export function render(_params, root, store, session, userHistory, pilot) {
   let draft = null; // незбережені зміни переживають перемальовування від сесії
 
   // Для репетицій пітчу: скидає демо-дані, але не виходить з акаунта.
@@ -56,6 +56,8 @@ export function render(_params, root, store, session, userHistory) {
     ].filter(Boolean));
   }
 
+  const pilotBox = h('div');
+  const drawPilot = () => pilotBox.replaceChildren(pilot.panel());
   function update() {
     const { status, user, profile } = session.getState();
     if (status === 'loading') {
@@ -124,18 +126,21 @@ export function render(_params, root, store, session, userHistory) {
 
     draw();
     drawCharges();
+    drawPilot();
     root.replaceChildren(h('div', { class: 'container profile-page' },
       h('div', { class: 'card profile-card' },
         h('div', { class: 'profile-head' },
           h('span', { class: 'avatar' }, (draft.name || user.email)[0].toUpperCase()),
           h('div', {}, h('h1', {}, 'Профіль'), h('p', { class: 'muted' }, 'Ці дані бачите лише ви.'))),
         box),
+      pilotBox,
       chargesBox,
       resetLink()));
   }
 
   update();
   const offSession = session.subscribe(update);
+  const offPilot = pilot.subscribe(drawPilot);
   const offHistory = userHistory.subscribe(drawCharges);
-  return () => { offSession(); offHistory(); };
+  return () => { offSession(); offHistory(); offPilot(); };
 }

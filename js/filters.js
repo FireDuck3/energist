@@ -1,6 +1,6 @@
 // Чисті функції відбору точок і слотів. Без DOM і стану.
 
-export const DEFAULT_FILTERS = { device: null, maxPrice: 15, minRating: 0, availableNow: false, query: '' };
+export const DEFAULT_FILTERS = { device: null, maxPrice: 25, minRating: 0, availableNow: false, query: '' };
 
 // «  П’ЯТНИЧАНИ » → «п'ятничани»: регістр, різні апострофи й зайві пробіли не важать.
 export function normalizeQuery(s) {

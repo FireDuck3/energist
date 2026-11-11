@@ -1,3 +1,4 @@
+import { createPilot } from './pilot.js';
 // Точка входу: store, сесія, шапка, маршрути.
 import { createStore, safeLocalStorage, memoryStorage } from './store.js';
 import { createSession } from './auth.js';
@@ -18,7 +19,8 @@ export const session = createSession(loadSupabase);
 // Вийшли з акаунта (напр., на спільному ноутбуці пітчу) — прибираємо і запит у полі пошуку.
 export const userHistory = createUserHistory(session, { onReset: () => store.setFilters({ query: '' }) });
 
-const view = (mod) => (params, root) => mod.render(params, root, store, session, userHistory);
+const pilot = createPilot(session, store);
+const view = (mod) => (params, root) => mod.render(params, root, store, session, userHistory, pilot);
 
 const signIn = () => session.requireAuth(() => {}, '');
 

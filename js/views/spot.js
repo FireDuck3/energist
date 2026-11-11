@@ -11,12 +11,15 @@ function fact(label, value) {
   return h('div', { class: 'fact' }, h('span', { class: 'fact-label' }, label), h('span', { class: 'fact-value' }, value));
 }
 
-function renderSpot(spot, host, { blackout }, store, session, userHistory) {
+function renderSpot(spot, host, { blackout }, store, session, userHistory, pilot) {
   const hostName = spot.hostName ?? host.name;
-  const now = new Date();
+  const now = spot.pilot
+    ? new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Kyiv' }))
+    : new Date();
+  const own = spot.pilot && spot.ownerId === session.getState().user?.uid;
   const rating = spotRating(spot);
   const dark = blackout && !isLiveInBlackout(spot);
-  const book = () => session.requireAuth(() => openBooking(spot, store, { session, userHistory }), 'Увійдіть, щоб забронювати зарядку');
+  const book = () => session.requireAuth(() => openBooking(spot, store, { session, userHistory, pilot, now }), 'Увійдіть, щоб забронювати зарядку');
   const here = sessionCost(EXAMPLE_KWH, spot.pricePerKwh).total;
   const commercial = EXAMPLE_KWH * COMMERCIAL_PRICE;
   const deviceLabels = DEVICES.filter((d) => spot.devices.includes(d.id)).map((d) => d.label).join(', ');
@@ -37,7 +40,7 @@ function renderSpot(spot, host, { blackout }, store, session, userHistory) {
           h('span', { class: 'avatar' }, hostName[0].toUpperCase()),
           h('div', {},
             h('b', {}, `Господар — ${hostName}`),
-            h('div', { class: 'muted' },
+            host && h('div', { class: 'muted' },
               `${host.chargesCount} ${plural(host.chargesCount, ['зарядка', 'зарядки', 'зарядок'])} · на WattWay з ${host.sinceYear} року`))),
 
         h('div', { class: 'facts' },
@@ -46,7 +49,7 @@ function renderSpot(spot, host, { blackout }, store, session, userHistory) {
           fact('Підключення', CONNECTORS[spot.connector]),
           fact('Пристрої', deviceLabels),
           fact('Графік', `щодня ${spot.schedule.from}–${spot.schedule.to}`),
-          fact('Під час блекауту', isLiveInBlackout(spot) ? `працює ще ~${spot.blackoutHours} год` : 'не працює без світла')),
+          fact('Під час блекауту', spot.pilot ? 'Уточніть у господаря' : isLiveInBlackout(spot) ? `працює ще ~${spot.blackoutHours} год` : 'не працює без світла')),
 
         h('h2', { class: 'reviews-title' }, 'Відгуки'),
         h('div', { class: 'reviews' }, spot.reviews.map((r) =>
@@ -68,30 +71,36 @@ function renderSpot(spot, host, { blackout }, store, session, userHistory) {
           ? h('div', { class: 'alert alert-dark' }, h('b', {}, '⚡ Немає світла'), h('span', {}, 'Ця точка живиться від мережі — бронювання недоступне під час блекауту.'))
           : h('p', { class: isOpenAt(spot, now) ? 'open-now' : 'muted' },
             isOpenAt(spot, now) ? `Відчинено до ${spot.schedule.to}` : `Зачинено · відкриється о ${spot.schedule.from}`),
-        h('button', { type: 'button', class: 'btn btn-primary btn-lg btn-block', disabled: dark,
-          onclick: book }, 'Забронювати'),
-        h('p', { class: 'book-note muted' }, '🔒 Гроші заморожуються і списуються лише за фактично отриману енергію'))),
+        h('button', { type: 'button', class: 'btn btn-primary btn-lg btn-block', disabled: dark || own,
+          onclick: book }, own ? 'Ваша точка' : 'Забронювати'),
+        h('p', { class: 'book-note muted' }, spot.pilot ? 'Пілот: запит підтверджує господар. Онлайн-оплати немає.' : '🔒 Гроші заморожуються і списуються лише за фактично отриману енергію'))),
 
     // На телефоні — закріплена над вкладками смужка замість картки бронювання.
     h('div', { class: 'book-bar' },
       h('div', { class: 'book-bar-price' },
         h('span', {}, h('b', {}, formatUAH(spot.pricePerKwh)), ' / кВт·год'),
         dark && h('span', { class: 'book-bar-note' }, '⚡ Немає світла')),
-      h('button', { type: 'button', class: 'btn btn-primary', disabled: dark, onclick: book }, 'Забронювати')));
+      h('button', { type: 'button', class: 'btn btn-primary', disabled: dark || own, onclick: book }, own ? 'Ваша точка' : 'Забронювати')));
 }
 
-export function render({ id }, root, store, session, userHistory) {
+export function render({ id }, root, store, session, userHistory, pilot) {
   function update() {
     const state = store.getState();
     const spot = state.spots.find((s) => s.id === id);
     if (!spot) {
+      if (/^[0-9a-f-]{36}$/i.test(id) && !state.pilotReady) {
+        root.replaceChildren(h('p', { class: 'container muted' }, 'Завантаження точки…'));
+        return;
+      }
       location.replace('#/map');
       return;
     }
     const host = state.hosts.find((x) => x.id === spot.hostId);
-    root.replaceChildren(renderSpot(spot, host, state, store, session, userHistory));
+    root.replaceChildren(renderSpot(spot, host, state, store, session, userHistory, pilot));
   }
   update();
   if (store.getState().spots.some((s) => s.id === id)) userHistory?.recordSpot(id);
-  return store.subscribe(update);
+  const offStore = store.subscribe(update);
+  const offSession = session.subscribe(update);
+  return () => { offStore(); offSession(); };
 }

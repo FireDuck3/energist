@@ -36,12 +36,12 @@ function spotCard(spot, { blackout, now }) {
       h('div', { class: 'spot-top' },
         h('span', { class: `source-badge source-${spot.source}` }, `${SOURCES[spot.source].icon} ${SOURCES[spot.source].label}`),
         stars(spotRating(spot), spot.reviews.length)),
-      h('h3', { class: 'spot-title' }, spot.title),
+      h('h3', { class: 'spot-title' }, spot.title, spot.pilot ? ' · Пілот' : ''),
       h('p', { class: 'spot-meta' }, `${spot.district} · ${String(spot.powerKw).replace('.', ',')} кВт · ${CONNECTORS[spot.connector]}`),
       h('div', { class: 'spot-bottom' },
         h('span', { class: 'spot-price' }, h('b', {}, formatUAH(spot.pricePerKwh)), ' / кВт·год'),
         blackout && isLiveInBlackout(spot)
-          ? h('span', { class: 'live-badge' }, `🔋 ще ~${spot.blackoutHours} год`)
+          ? h('span', { class: 'live-badge' }, spot.pilot ? 'Уточніть у господаря' : `🔋 ще ~${spot.blackoutHours} год`)
           : openingLine(spot, now))));
 }
 
@@ -49,7 +49,7 @@ function popupContent(spot) {
   return h('div', { class: 'popup' },
     h('img', { src: spotCover(spot), alt: '' }),
     h('div', { class: 'popup-body' },
-      h('b', {}, spot.title),
+      h('b', {}, spot.title, spot.pilot ? ' · Пілот' : ''),
       h('div', { class: 'muted' }, `${spot.district} · `, stars(spotRating(spot))),
       h('div', {}, h('b', {}, formatUAH(spot.pricePerKwh)), ' / кВт·год'),
       h('a', { class: 'btn btn-primary btn-sm', href: `#/spot/${spot.id}` }, 'Детальніше')));
@@ -82,7 +82,7 @@ export function render(_params, root, store, _session, userHistory) {
 
   // ---- Фільтри: будуються один раз, щоб повзунок не губив фокус ----
   const priceLabel = h('span', { class: 'filter-value' });
-  const priceInput = h('input', { type: 'range', min: 8, max: 15, step: 1, class: 'range',
+  const priceInput = h('input', { type: 'range', min: 8, max: 25, step: 1, class: 'range',
     'aria-label': 'Максимальна ціна', oninput: (e) => store.setFilters({ maxPrice: Number(e.target.value) }) });
   const deviceChips = h('div', { class: 'chips' });
   const ratingChips = h('div', { class: 'chips' });
@@ -102,7 +102,7 @@ export function render(_params, root, store, _session, userHistory) {
     nowChip.replaceChildren(chip('🕒 Відчинено зараз', f.availableNow, () => store.setFilters({ availableNow: !f.availableNow })));
     if (Number(priceInput.value) !== f.maxPrice) priceInput.value = f.maxPrice;
     priceLabel.textContent = `до ${f.maxPrice} грн`;
-    const active = [f.device, f.maxPrice < 15, f.minRating > 0, f.availableNow].filter(Boolean).length;
+    const active = [f.device, f.maxPrice < 25, f.minRating > 0, f.availableNow].filter(Boolean).length;
     filtersToggle.textContent = active ? `⚙️ Фільтри · ${active}` : '⚙️ Фільтри';
   }
 

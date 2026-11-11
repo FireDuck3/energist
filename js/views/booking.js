@@ -22,7 +22,7 @@ function row(label, value, cls = '') {
   return h('div', { class: `sum-row ${cls}` }, h('span', {}, label), h('b', {}, value));
 }
 
-export function openBooking(spot, store, { now = new Date(), session, userHistory } = {}) {
+export function openBooking(spot, store, { now = new Date(), session, userHistory, pilot } = {}) {
   const todayStarts = availableStarts(spot.schedule, 'today', now);
   const sel = {
     device: spot.devices[0],
@@ -55,7 +55,7 @@ export function openBooking(spot, store, { now = new Date(), session, userHistor
     shownStep = step;
     modal.setContent(h('div', { class: `wizard${entering ? ' wizard-enter' : ''}` },
       h('p', { class: 'eyebrow' }, spot.title),
-      progress(step),
+      !spot.pilot && progress(step),
       content));
   }
 
@@ -116,14 +116,25 @@ export function openBooking(spot, store, { now = new Date(), session, userHistor
         row('Коли', `${dayLabel(sel.day)}, ${sel.start}–${endTime(sel.start, sel.hours)}`),
         row('Очікувано', formatKwh(kwh)),
         row('Ціна', `${formatUAH(spot.pricePerKwh)} / кВт·год`)),
-      h('div', { class: 'secure' },
+      !spot.pilot && h('div', { class: 'secure' },
         h('span', { class: 'secure-icon' }, '🔒'),
         h('div', {},
           h('b', {}, 'Безпечна угода'),
           h('p', {}, `${formatUAH(hold)} буде заморожено на картці. Спишемо лише за фактично отриману енергію, різницю повернемо одразу після зарядки.`))),
       h('div', { class: 'wizard-actions' },
         h('button', { type: 'button', class: 'btn btn-ghost', onclick: stepTime }, '← Назад'),
-        h('button', { type: 'button', class: 'btn btn-primary btn-lg', onclick: () => {
+        spot.pilot && h('button', { type: 'button', class: 'btn btn-primary btn-lg', async onclick(e) {
+          const button = e.currentTarget;
+          button.disabled = true;
+          try {
+            await pilot.request(spot.id, { ...sel, date: isoDay(sel.day === 'tomorrow' ? 1 : 0, now) });
+            modal.close();
+            toast('Запит надіслано. Статус можна перевірити в профілі.');
+          } catch (error) {
+            toast(error.code === '23P01' ? 'Цей час уже зайнятий. Оберіть інший.' : 'Не вдалося надіслати запит. Перевірте час і спробуйте ще раз.');
+          } finally { button.disabled = false; }
+        } }, 'Надіслати запит'),
+        !spot.pilot && h('button', { type: 'button', class: 'btn btn-primary btn-lg', onclick: () => {
           booking = store.createBooking({ spotId: spot.id, ...sel, guestName: userName });
           stepCharging();
         } }, `Підтвердити і заморозити ${formatUAH(hold)}`))));

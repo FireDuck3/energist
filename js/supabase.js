@@ -39,7 +39,7 @@ const fail = (error, code = toAuthCode(error)) => Object.assign(new Error(error?
 async function call(request) {
   let res;
   try { res = await request; } catch (e) { throw fail(e); }
-  if (res.error) throw fail(res.error, responseCode(res));
+  if (res.error) throw fail(res.error, res.error.code === '23P01' ? '23P01' : responseCode(res));
   return res.data;
 }
 
@@ -60,6 +60,26 @@ export async function loadSupabase() {
 
     return {
       oauthResult,
+      async listPilotSpots() {
+        const rows = await call(client.from('pilot_spots').select('*').order('title'));
+        return rows.map(row => ({
+          id: row.id, ownerId: row.owner_id, pilot: true, hostName: 'Господар точки',
+          title: row.title, district: row.district, lat: Number(row.lat), lng: Number(row.lng),
+          source: row.source, connector: row.connector, powerKw: Number(row.power_kw),
+          pricePerKwh: Number(row.price_per_kwh), devices: row.devices, reviews: [],
+          schedule: { from: row.opens.slice(0, 5), to: row.closes.slice(0, 5) },
+        }));
+      },
+      publishPilotSpot: (input, uid) => call(client.from('pilot_spots').insert({
+        owner_id: uid, title: input.title, district: input.district, lat: input.lat, lng: input.lng,
+        source: input.source, connector: input.connector, power_kw: input.powerKw,
+        price_per_kwh: input.pricePerKwh, devices: input.devices, opens: input.schedule.from, closes: input.schedule.to,
+      })),
+      listPilotBookings: () => call(client.from('pilot_bookings').select('*').order('created_at', { ascending: false })),
+      requestPilotBooking: (id, { date, start, hours, device }) => call(client.rpc('request_pilot_booking', {
+        point_id: id, requested_day: date, starts: start, hours, requested_device: device,
+      })),
+      respondPilotBooking: (id, status) => call(client.rpc('respond_to_pilot_booking', { booking_id: id, decision: status })),
       signInWithGoogle: () => signInWithGoogle(auth),
       emailCodes: supabaseConfig.emailCodes !== false,
       onUser(cb) {
