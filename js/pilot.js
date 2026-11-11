@@ -21,7 +21,7 @@ export function createPilot(session, store) {
       spots = points;
       bookings = requests;
       error = false;
-      if (changed || !store.getState().pilotReady) store.setPilotSpots(spots);
+      if (changed || !store.getState().pilotReady) store.setPilotSpots(spots.filter(spot => !spot.archivedAt));
     } catch {
       if (request !== seq) return;
       error = true;
@@ -59,7 +59,11 @@ export function createPilot(session, store) {
       await session.service.requestPilotBooking(point, selection);
       await refresh();
     },
-    ownSpots: () => spots.filter(spot => spot.ownerId === uid()),
+    async archive(id) {
+      await session.service.archivePilotSpot(id);
+      await refresh();
+    },
+    ownSpots: () => spots.filter(spot => !spot.archivedAt && spot.ownerId === uid()),
     panel(host = false) {
       const names = { pending: 'Очікує підтвердження', confirmed: 'Підтверджено', declined: 'Відхилено', cancelled: 'Скасовано' };
       const byId = new Map(spots.map(spot => [spot.id, spot]));

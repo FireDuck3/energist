@@ -198,7 +198,19 @@ export function render(_params, root, store, session, _history, pilot) {
           h('button', { type: 'button', class: 'btn btn-primary', onclick: addSpot }, '+ Додати розетку')),
         pilot.panel(true),
         h('h2', { class: 'own-title' }, 'Мої точки'),
-        h('div', { class: 'own-spots' }, pilot.ownSpots().map(ownSpotCard))));
+        h('div', { class: 'own-spots' }, pilot.ownSpots().map(spot =>
+          h('div', {}, ownSpotCard(spot),
+            h('button', { type: 'button', class: 'btn btn-danger-ghost btn-sm',
+              'aria-label': `Видалити точку ${spot.title}`,
+              async onclick(e) {
+                if (!window.confirm(`Прибрати «${spot.title}» з карти? Активні бронювання буде скасовано.`)) return;
+                const button = e.currentTarget;
+                button.disabled = true;
+                try { await pilot.archive(spot.id); toast('Точку прибрано з карти'); }
+                catch { toast('Не вдалося видалити точку. Спробуйте ще раз.'); }
+                finally { button.disabled = false; }
+              },
+            }, 'Видалити точку'))))));
       return;
     }
     const state = store.getState();

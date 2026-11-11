@@ -63,13 +63,14 @@ export async function loadSupabase() {
       async listPilotSpots() {
         const rows = await call(client.from('pilot_spots').select('*').order('title'));
         return rows.map(row => ({
-          id: row.id, ownerId: row.owner_id, pilot: true, hostName: 'Господар точки',
+          id: row.id, archivedAt: row.archived_at, ownerId: row.owner_id, pilot: true, hostName: 'Господар точки',
           title: row.title, district: row.district, lat: Number(row.lat), lng: Number(row.lng),
           source: row.source, connector: row.connector, powerKw: Number(row.power_kw),
           pricePerKwh: Number(row.price_per_kwh), devices: row.devices, reviews: [],
           schedule: { from: row.opens.slice(0, 5), to: row.closes.slice(0, 5) },
         }));
       },
+      archivePilotSpot: id => call(client.rpc('archive_pilot_spot', { point_id: id })),
       publishPilotSpot: (input, uid) => call(client.from('pilot_spots').insert({
         owner_id: uid, title: input.title, district: input.district, lat: input.lat, lng: input.lng,
         source: input.source, connector: input.connector, power_kw: input.powerKw,
