@@ -106,9 +106,15 @@ export async function loadSupabase() {
       async verifyUser() {
         const { user } = await call(auth.getUser());
         if (!user) throw fail(null, 'auth/invalid-credential');
-        const account = await call(client.from('users').select('status').eq('id', user.id).single());
+        const account = await call(client.from('users')
+          .select('status, first_name, last_name, email').eq('id', user.id).single());
         if (account.status !== 'active') throw fail(null, 'auth/account-disabled');
-        return toUser(user);
+        return {
+          ...toUser(user),
+          firstName: account.first_name,
+          lastName: account.last_name,
+          email: account.email ?? user.email,
+        };
       },
       sendLoginCode: (email) => call(auth.signInWithOtp({ email, options: { shouldCreateUser: true } })),
       verifyLoginCode: (email, code) => call(auth.verifyOtp({ email, token: code, type: 'email' })),
