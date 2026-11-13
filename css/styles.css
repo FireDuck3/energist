@@ -766,6 +766,7 @@ body.blackout .mark-us span { color: #141833; }
 
 .cabinet-page { padding: 40px 16px 56px; }
 .cabinet-page > h1 { margin: 0 0 24px; }
+.cabinet-site-menu { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
 .cabinet-layout {
   display: grid;
   grid-template-columns: minmax(180px, 230px) minmax(0, 1fr);
