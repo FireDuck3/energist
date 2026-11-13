@@ -767,6 +767,13 @@ body.blackout .mark-us span { color: #141833; }
 .cabinet-page { padding: 40px 16px 56px; }
 .cabinet-page > h1 { margin: 0 0 24px; }
 .cabinet-site-menu { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+.conversation { display: grid; gap: 16px; min-width: 0; }
+.conversation form { display: grid; gap: 10px; }
+.conversation textarea { width: 100%; resize: vertical; }
+.conversation-messages { max-height: 40vh; overflow-y: auto; }
+.conversation-message, .booking-notice { padding: 12px 0; border-bottom: 1px solid currentColor; overflow-wrap: anywhere; }
+.conversation-message p { white-space: pre-wrap; }
+.booking-notice button { margin: 8px 8px 0 0; }
 .cabinet-layout {
   display: grid;
   grid-template-columns: minmax(180px, 230px) minmax(0, 1fr);
