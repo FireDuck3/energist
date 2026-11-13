@@ -18,7 +18,7 @@ export function render(_params, root) {
     h('section', { class: 'hero' },
       h('div', { class: 'container hero-inner' },
         h('div', { class: 'hero-text' },
-          h('p', { class: 'eyebrow' }, 'P2P-маркетплейс електрики · Вінниця'),
+          h('p', { class: 'eyebrow' }, 'P2P-маркетплейс електрики'),
           h('h1', {}, 'Енергетичний ', h('span', { class: 'accent' }, 'Airbnb'), ' для України'),
           h('p', { class: 'lead' },
             'Знаходь розетку поруч за кілька кліків — або заробляй на надлишку своєї сонячної станції. ',
