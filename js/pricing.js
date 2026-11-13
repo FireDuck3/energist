@@ -1,7 +1,5 @@
 // Уся грошова математика демо. Чисті функції: без DOM і стану.
-import {
-  COMMISSION, HOME_TARIFF, COMMERCIAL_PRICE, DEVICE_CAPACITY, WEEKS_PER_MONTH,
-} from './data.js';
+import { COMMISSION, COMMERCIAL_PRICE, DEVICE_CAPACITY } from './data.js';
 
 export const round2 = (x) => Math.round((x + Number.EPSILON) * 100) / 100;
 
@@ -22,18 +20,6 @@ export function sessionCost(kwh, price) {
 
 export function savingsVsCommercial(kwh, price) {
   return round2(kwh * COMMERCIAL_PRICE - kwh * price);
-}
-
-export function gridValue(kwh) {
-  return round2(kwh * HOME_TARIFF);
-}
-
-export function monthlyGuestSavings(kwhPerWeek, price) {
-  return savingsVsCommercial(kwhPerWeek * WEEKS_PER_MONTH, price);
-}
-
-export function monthlyHostEarnings(kwhPerMonth, price) {
-  return sessionCost(kwhPerMonth, price).hostPayout;
 }
 
 const NB = ' ';

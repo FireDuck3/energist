@@ -1,5 +1,6 @@
 // Профіль: ім'я, email, роль, вихід; «Мої зарядки»; очистка історії пошуку; скидання демо-даних.
-import { h, toast, formatDate } from '../ui.js';
+import { h, formatDate } from '../ui.js';
+import { notify } from '../notifications.js';
 import { formatUAH, formatKwh } from '../pricing.js';
 import { isoDay } from '../data.js';
 import { signInPrompt } from './auth-modal.js';
@@ -20,7 +21,7 @@ export function render(_params, root, store, session, userHistory, pilot) {
     h('button', { type: 'button', class: 'link-btn', onclick: () => {
       store.reset();
       location.hash = '#/';
-      toast('Демо скинуто до початкового стану');
+      notify('Демо скинуто до початкового стану');
     } }, 'Скинути демо-дані'));
 
   const chargesBox = h('section', { class: 'card profile-card charges' });
@@ -51,7 +52,7 @@ export function render(_params, root, store, session, userHistory, pilot) {
       body,
       hasQueries && h('button', { type: 'button', class: 'link-btn clear-searches', onclick: () => {
         userHistory.clearQueries();
-        toast('Історію пошуку очищено');
+        notify('Історію пошуку очищено');
       } }, 'Очистити історію пошуку'),
     ].filter(Boolean));
   }
@@ -102,7 +103,7 @@ export function render(_params, root, store, session, userHistory, pilot) {
           errors.role && h('span', { class: 'field-error' }, errors.role)),
         h('div', { class: 'profile-actions' },
           h('button', { type: 'button', class: 'btn btn-ghost', disabled: busy, onclick: () => {
-            session.service.signOut().catch(() => toast('Не вдалося вийти — перевірте інтернет'));
+            session.service.signOut().catch(() => notify('Не вдалося вийти — перевірте інтернет', { kind: 'error' }));
           } }, 'Вийти'),
           h('button', { type: 'button', class: 'btn btn-primary', disabled: busy, onclick: save }, busy ? 'Зачекайте…' : 'Зберегти')));
     }
@@ -114,10 +115,10 @@ export function render(_params, root, store, session, userHistory, pilot) {
       try {
         await session.saveProfile(draft);
         draft = null;
-        toast('Профіль збережено');
+        notify('Профіль збережено');
       } catch (e) {
         if (e.code === 'invalid-profile') errors = e.errors;
-        else toast('Не вдалося зберегти — перевірте інтернет');
+        else notify('Не вдалося зберегти профіль — перевірте інтернет', { kind: 'error' });
       } finally {
         busy = false;
         if (draft) draw();

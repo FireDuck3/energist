@@ -1,13 +1,11 @@
 import { test, eq } from './runner.js';
 import {
-  sessionCost, savingsVsCommercial, gridValue, estimateKwh,
-  monthlyGuestSavings, monthlyHostEarnings, formatUAH, formatKwh, round2,
+  sessionCost, savingsVsCommercial, estimateKwh, formatUAH, formatKwh, round2,
 } from '../js/pricing.js';
 
 test('еталон 30 кВт·год × 12 грн', () => {
   eq(sessionCost(30, 12), { total: 360, fee: 36, hostPayout: 324 });
   eq(savingsVsCommercial(30, 12), 690);
-  eq(gridValue(30), 129.6);
 });
 
 test('нуль кВт·год — нуль грошей', () => eq(sessionCost(0, 12), { total: 0, fee: 0, hostPayout: 0 }));
@@ -34,11 +32,6 @@ test('господар + комісія = сума для будь-яких кВ
     }
   }
   eq(bad.slice(0, 3), []);
-});
-
-test('місячні розрахунки', () => {
-  eq(monthlyGuestSavings(10, 12), 995.9); // 43.3 × (35 − 12)
-  eq(monthlyHostEarnings(100, 12), 1080);
 });
 
 // Нерозривні пробіли: число не відривається від одиниці при переносі рядка.

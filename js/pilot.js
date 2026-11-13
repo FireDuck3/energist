@@ -1,7 +1,44 @@
-import { h, toast } from './ui.js';
+import { h, formatDate } from './ui.js';
+import { notify } from './notifications.js';
+
+const GUEST_NEWS = {
+  confirmed: 'Господар підтвердив бронювання',
+  declined: 'Господар відхилив бронювання',
+  cancelled: 'Бронювання скасовано',
+};
+
+// '["2026-11-13 10:00:00","2026-11-13 12:00:00")' → '13 лис, 10:00–12:00'
+export function slotLabel(slot) {
+  const m = String(slot).match(/(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}).*?[ T](\d{2}:\d{2})/);
+  return m ? `${formatDate(m[1])}, ${m[2]}–${m[3]}` : '';
+}
+
+// Що змінилось у бронюваннях з минулого завантаження → сповіщення для дзвіночка.
+// before — Map id → статус (null — перше завантаження акаунта: старе не сповіщаємо);
+// own — `${id}:${status}` змін, які зробив сам користувач (про них він уже знає).
+export function bookingNews(before, rows, spots, uid, own = new Set()) {
+  if (!before || !uid) return [];
+  const byId = new Map(spots.map((s) => [s.id, s]));
+  const news = [];
+  for (const b of rows) {
+    const was = before.get(b.id);
+    if (was === b.status || own.has(`${b.id}:${b.status}`)) continue;
+    const spot = byId.get(b.spot_id);
+    const where = `«${spot?.title ?? 'Точка зарядки'}», ${slotLabel(b.slot)}`;
+    if (spot?.ownerId === uid) {
+      if (!was && b.status === 'pending') news.push({ text: `Новий запит на бронювання: ${where}`, href: '#/host' });
+      else if (was && b.status === 'cancelled') news.push({ text: `Гість скасував бронювання: ${where}`, href: '#/host' });
+    } else if (b.guest_id === uid && was && GUEST_NEWS[b.status]) {
+      news.push({ text: `${GUEST_NEWS[b.status]}: ${where}`, href: '#/profile' });
+    }
+  }
+  return news;
+}
 
 export function createPilot(session, store) {
   let spots = [], bookings = [], error = false, seq = 0;
+  let known = null; // id → статус бронювань поточного акаунта на момент минулого завантаження
+  const own = new Set();
   const listeners = new Set();
   const emit = () => listeners.forEach(fn => fn());
   const uid = () => session.getState().status === 'signedIn' ? session.getState().user.uid : null;
@@ -20,6 +57,10 @@ export function createPilot(session, store) {
       const changed = JSON.stringify(points) !== JSON.stringify(spots);
       spots = points;
       bookings = requests;
+      if (account) {
+        bookingNews(known, requests, points, account, own).forEach(({ text, href }) => notify(text, { href }));
+        known = new Map(requests.map((b) => [b.id, b.status]));
+      }
       error = false;
       if (changed || !store.getState().pilotReady) store.setPilotSpots(spots.filter(spot => !spot.archivedAt));
     } catch {
@@ -32,17 +73,18 @@ export function createPilot(session, store) {
 
   let account = null;
   session.subscribe(() => {
-    if (account !== uid()) { account = uid(); bookings = []; emit(); }
+    if (account !== uid()) { account = uid(); bookings = []; known = null; own.clear(); emit(); }
     void refresh();
   });
   void session.ready.then(refresh);
   setInterval(() => { if (document.visibilityState === 'visible') void refresh(); }, 20000);
 
   async function change(id, status) {
+    own.add(`${id}:${status}`);
     try {
       await session.service.respondPilotBooking(id, status);
-      toast('Статус бронювання оновлено');
-    } catch { toast('Не вдалося змінити статус. Оновіть список і спробуйте ще раз.'); }
+      notify('Статус бронювання оновлено');
+    } catch { notify('Не вдалося змінити статус. Оновіть список і спробуйте ще раз.', { kind: 'error' }); }
     await refresh();
   }
 
@@ -60,6 +102,8 @@ export function createPilot(session, store) {
       await refresh();
     },
     async archive(id) {
+      // Прибрана точка скасовує свої бронювання — господар це зробив сам, тож без сповіщень.
+      bookings.filter((b) => b.spot_id === id).forEach((b) => own.add(`${b.id}:cancelled`));
       await session.service.archivePilotSpot(id);
       await refresh();
     },

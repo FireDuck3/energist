@@ -1,7 +1,6 @@
-// Головна: що таке WattWay, як працює, скільки дає.
+// Головна: що таке WattWay і як це працює.
 import { h, revealOnScroll } from '../ui.js';
 import { COMMERCIAL_RANGE } from '../data.js';
-import { mountCalculator } from './calculator.js';
 
 const STEPS = [
   { icon: '🔍', title: 'Пошук', text: 'Знаходиш розетку на карті за кілька кліків' },
@@ -12,8 +11,6 @@ const STEPS = [
 
 export function render(_params, root) {
   const [lo, hi] = COMMERCIAL_RANGE;
-  const calcBox = h('div', { id: 'calc-compact' });
-  mountCalculator(calcBox, { compact: true });
   root.append(
     h('section', { class: 'hero' },
       h('div', { class: 'container hero-inner' },
@@ -42,12 +39,6 @@ export function render(_params, root) {
             h('span', { class: 'step-num' }, `Крок ${i + 1}`),
             h('h3', {}, s.title),
             h('p', {}, s.text)))))),
-
-    h('section', { class: 'section' },
-      h('div', { class: 'container' },
-        h('h2', { class: 'section-title' }, 'Скільки це дає'),
-        calcBox,
-        h('p', { class: 'calc-more' }, h('a', { href: '#/calc' }, 'Детальний калькулятор →')))),
 
     h('section', { class: 'section section-cta' },
       h('div', { class: 'container' },

@@ -1,5 +1,6 @@
 // Модалка бронювання: час → підтвердження → зарядка (симуляція) → оплата → відгук.
-import { h, openModal, toast, formatDate } from '../ui.js';
+import { h, openModal, formatDate } from '../ui.js';
+import { notify } from '../notifications.js';
 import { availableStarts } from '../filters.js';
 import { estimateKwh, holdAmount, sessionCost, savingsVsCommercial, formatUAH, formatKwh, round2 } from '../pricing.js';
 import { DEVICES, SIM_DURATION_MS, COMMERCIAL_PRICE, COMMISSION, isoDay } from '../data.js';
@@ -108,6 +109,8 @@ export function openBooking(spot, store, { now = new Date(), session, userHistor
     step = 1;
     const kwh = estimateKwh(spot.powerKw, sel.hours, sel.device);
     const hold = holdAmount(kwh, spot.pricePerKwh);
+    // Помилка запиту — у самому вікні: дзвіночок у шапці закритий модалкою.
+    const requestError = h('p', { class: 'field-error form-error', role: 'alert', hidden: true });
     show(h('div', { class: 'wizard-body' },
       h('h2', {}, 'Перевірте бронювання'),
       h('div', { class: 'summary' },
@@ -121,17 +124,20 @@ export function openBooking(spot, store, { now = new Date(), session, userHistor
         h('div', {},
           h('b', {}, 'Безпечна угода'),
           h('p', {}, `${formatUAH(hold)} буде заморожено на картці. Спишемо лише за фактично отриману енергію, різницю повернемо одразу після зарядки.`))),
+      requestError,
       h('div', { class: 'wizard-actions' },
         h('button', { type: 'button', class: 'btn btn-ghost', onclick: stepTime }, '← Назад'),
         spot.pilot && h('button', { type: 'button', class: 'btn btn-primary btn-lg', async onclick(e) {
           const button = e.currentTarget;
           button.disabled = true;
+          requestError.hidden = true;
           try {
             await pilot.request(spot.id, { ...sel, date: isoDay(sel.day === 'tomorrow' ? 1 : 0, now) });
             modal.close();
-            toast('Запит надіслано. Статус можна перевірити в профілі.');
+            notify('Запит надіслано. Статус можна перевірити в профілі.', { href: '#/profile' });
           } catch (error) {
-            toast(error.code === '23P01' ? 'Цей час уже зайнятий. Оберіть інший.' : 'Не вдалося надіслати запит. Перевірте час і спробуйте ще раз.');
+            requestError.textContent = error.code === '23P01' ? 'Цей час уже зайнятий. Оберіть інший.' : 'Не вдалося надіслати запит. Перевірте час і спробуйте ще раз.';
+            requestError.hidden = false;
           } finally { button.disabled = false; }
         } }, 'Надіслати запит'),
         !spot.pilot && h('button', { type: 'button', class: 'btn btn-primary btn-lg', onclick: () => {
@@ -230,7 +236,7 @@ export function openBooking(spot, store, { now = new Date(), session, userHistor
         h('button', { type: 'button', class: 'btn btn-primary btn-lg', onclick: () => {
           store.addReview(booking.id, { stars: rating, text: text.value.trim() || 'Все пройшло чудово!', author: userName });
           modal.close();
-          toast('Дякуємо за відгук!');
+          notify('Дякуємо за відгук!');
         } }, 'Надіслати відгук'))));
   }
 

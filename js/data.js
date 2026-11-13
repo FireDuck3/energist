@@ -4,10 +4,8 @@
 export const DATA_VERSION = 2;
 
 export const COMMISSION = 0.10;          // комісія WattWay
-export const HOME_TARIFF = 4.32;         // домашній тариф, грн/кВт·год
 export const COMMERCIAL_PRICE = 35;      // типова комерційна зарядка, грн/кВт·год
 export const COMMERCIAL_RANGE = [30, 40];
-export const WEEKS_PER_MONTH = 4.33;
 export const SIM_DURATION_MS = 20000;    // скільки триває симуляція зарядки в реальному часі
 
 // Скільки кВт·год пристрій може взяти за одну сесію.

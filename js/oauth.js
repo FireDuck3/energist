@@ -1,6 +1,6 @@
 // PKCE keeps provider tokens out of the hash router. Only an internal route is saved.
 const RETURN_KEY = 'wattway-oauth-return';
-export const safeReturnHash = (hash) => /^#\/(?:|map|host|calc|profile|spot\/[a-zA-Z0-9_-]+)$/.test(hash ?? '') ? hash : '#/map';
+export const safeReturnHash = (hash) => /^#\/(?:|map|host|profile|spot\/[a-zA-Z0-9_-]+)$/.test(hash ?? '') ? hash : '#/map';
 
 export async function signInWithGoogle(auth, env = window) {
   try { env.sessionStorage.setItem(RETURN_KEY, safeReturnHash(env.location.hash)); }

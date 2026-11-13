@@ -1,5 +1,6 @@
 // Кабінет господаря — шлях Олега.
-import { h, openModal, toast, formatDate, stars, spotCover, plural } from '../ui.js';
+import { h, openModal, formatDate, stars, spotCover, plural } from '../ui.js';
+import { notify } from '../notifications.js';
 import { hostSummary, bookingHostAmount } from '../stats.js';
 import { validateSpotInput } from '../validate.js';
 import { formatUAH, formatKwh } from '../pricing.js';
@@ -53,7 +54,7 @@ function bookingRow(b, spot, store) {
       b.status === 'pending' && h('div', { class: 'booking-actions' },
         h('button', { type: 'button', class: 'btn btn-ok btn-sm', onclick: () => {
           store.confirmBooking(b.id);
-          toast(`Бронювання підтверджено — ${b.guestName}, ${formatDate(b.date)} о ${b.start}`);
+          notify(`Бронювання підтверджено — ${b.guestName}, ${formatDate(b.date)} о ${b.start}`);
         } }, 'Підтвердити'),
         h('button', { type: 'button', class: 'btn btn-danger-ghost btn-sm', onclick: () => store.declineBooking(b.id) }, 'Відхилити'))));
 }
@@ -93,6 +94,8 @@ function openAddSpot(store, hostName, publish) {
     oninput: (e) => { input[key] = e.target.value === '' ? NaN : Number(e.target.value); } });
   const time = (key) => h('input', { class: 'input', type: 'time', step: 3600, value: input.schedule[key],
     oninput: (e) => { input.schedule = { ...input.schedule, [key]: e.target.value }; } });
+  // Помилка відправки — у самій формі: дзвіночок у шапці закритий модалкою.
+  const submitError = h('p', { class: 'field-error form-error', role: 'alert', hidden: true });
 
   const form = h('form', { class: 'wizard add-form', novalidate: true, onsubmit: submit },
     h('p', { class: 'eyebrow' }, 'Кабінет господаря'),
@@ -118,6 +121,7 @@ function openAddSpot(store, hostName, publish) {
         input.devices = input.devices.includes(v) ? input.devices.filter((x) => x !== v) : [...input.devices, v];
       }),
       err('devices')),
+    submitError,
     h('div', { class: 'wizard-actions' },
       h('button', { type: 'button', class: 'btn btn-ghost', onclick: () => modal.close() }, 'Скасувати'),
       h('button', { type: 'submit', class: 'btn btn-primary btn-lg' }, 'Додати на карту')));
@@ -150,6 +154,7 @@ function openAddSpot(store, hostName, publish) {
 
   async function submit(e) {
     e.preventDefault();
+    submitError.hidden = true;
     const { ok, errors } = validateSpotInput(input);
     for (const [key, el] of Object.entries(errorEls)) {
       el.hidden = !errors[key];
@@ -165,11 +170,15 @@ function openAddSpot(store, hostName, publish) {
       if (button.disabled) return;
       button.disabled = true;
       try { await publish(data); }
-      catch { toast('Не вдалося опублікувати точку. Спробуйте ще раз.'); return; }
+      catch {
+        submitError.textContent = 'Не вдалося опублікувати точку. Спробуйте ще раз.';
+        submitError.hidden = false;
+        return;
+      }
       finally { button.disabled = false; }
     } else store.addSpot(data);
     modal.close();
-    toast('Розетку додано — її вже видно на карті гостей');
+    notify('Розетку додано — її вже видно на карті гостей');
   }
 }
 
@@ -206,8 +215,8 @@ export function render(_params, root, store, session, _history, pilot) {
                 if (!window.confirm(`Прибрати «${spot.title}» з карти? Активні бронювання буде скасовано.`)) return;
                 const button = e.currentTarget;
                 button.disabled = true;
-                try { await pilot.archive(spot.id); toast('Точку прибрано з карти'); }
-                catch { toast('Не вдалося видалити точку. Спробуйте ще раз.'); }
+                try { await pilot.archive(spot.id); notify('Точку прибрано з карти'); }
+                catch { notify('Не вдалося видалити точку. Спробуйте ще раз.', { kind: 'error' }); }
                 finally { button.disabled = false; }
               },
             }, 'Видалити точку'))))));
