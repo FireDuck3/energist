@@ -76,7 +76,7 @@ export async function loadSupabase() {
         source: input.source, connector: input.connector, power_kw: input.powerKw,
         price_per_kwh: input.pricePerKwh, devices: input.devices, opens: input.schedule.from, closes: input.schedule.to,
       })),
-      listPilotBookings: () => call(client.from('pilot_bookings').select('*').order('created_at', { ascending: false })),
+      listPilotBookings: () => call(client.rpc('list_my_pilot_bookings')),
       requestPilotBooking: (id, { date, start, hours, device }) => call(client.rpc('request_pilot_booking', {
         point_id: id, requested_day: date, starts: start, hours, requested_device: device,
       })),
