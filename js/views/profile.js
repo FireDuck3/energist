@@ -167,8 +167,12 @@ export function render(_params, root, store, session, userHistory, pilot) {
       }
     }
     showSection();
+    const siteMenu = h('nav', { class: 'cabinet-site-menu', 'aria-label': 'Основні розділи WattWay' },
+      [['#/', 'Головна'], ['#/map', 'Карта зарядок'], ['#/host', 'Господар'], ['#/calc', 'Калькулятор']]
+        .map(([href, label]) => h('a', { class: 'btn btn-secondary btn-sm', href }, label)));
     root.replaceChildren(h('div', { class: 'container cabinet-page' },
       h('h1', {}, 'Особистий кабінет'),
+      siteMenu,
       h('div', { class: 'cabinet-layout' }, menu, content)));
   }
 
