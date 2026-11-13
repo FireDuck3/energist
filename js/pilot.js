@@ -12,16 +12,19 @@ export function createPilot(session, store) {
     const request = ++seq;
     const account = uid();
     try {
-      const [points, requests] = await Promise.all([
+      const [points, requests] = await Promise.allSettled([
         service.listPilotSpots(),
         account ? service.listPilotBookings() : [],
       ]);
       if (request !== seq) return;
-      const changed = JSON.stringify(points) !== JSON.stringify(spots);
-      spots = points;
-      bookings = requests;
-      error = false;
-      if (changed || !store.getState().pilotReady) store.setPilotSpots(spots.filter(spot => !spot.archivedAt));
+      if (account !== uid()) return;
+      if (points.status === 'fulfilled') {
+        const changed = JSON.stringify(points.value) !== JSON.stringify(spots);
+        spots = points.value;
+        if (changed || !store.getState().pilotReady) store.setPilotSpots(spots.filter(spot => !spot.archivedAt));
+      }
+      if (requests.status === 'fulfilled') bookings = requests.value;
+      error = requests.status === 'rejected';
     } catch {
       if (request !== seq) return;
       error = true;
@@ -67,7 +70,7 @@ export function createPilot(session, store) {
     panel(host = false) {
       const names = { pending: 'Очікує підтвердження', confirmed: 'Підтверджено', declined: 'Відхилено', cancelled: 'Скасовано' };
       const byId = new Map(spots.map(spot => [spot.id, spot]));
-      const rows = bookings.filter(b => host ? byId.get(b.spot_id)?.ownerId === uid() : b.guest_id === uid());
+      const rows = bookings.filter(b => host ? b.owner_id === uid() : b.guest_id === uid());
       const button = (b, status, label) => h('button', {
         type: 'button', class: 'btn btn-secondary btn-sm',
         async onclick(e) { e.currentTarget.disabled = true; await change(b.id, status); },
@@ -80,6 +83,7 @@ export function createPilot(session, store) {
         h('ul', { class: 'bookings' }, rows.map(b => h('li', { class: 'booking' },
           h('div', { class: 'booking-main' },
             h('a', { href: '#/spot/' + b.spot_id }, byId.get(b.spot_id)?.title ?? 'Точка зарядки'),
+            h('span', {}, host ? 'Гість — ' : 'Господар — ', b.counterpart_name || 'Нік не вказано'),
             h('span', {}, b.slot.replace(/["\[\]()]/g, '').replaceAll('T', ' ').split(',').map(s => s.slice(0, 16)).join(' — ') + ' (Київ)'),
             h('b', {}, names[b.status])),
           h('div', { class: 'booking-actions' },
