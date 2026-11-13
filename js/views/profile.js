@@ -15,6 +15,7 @@ function when(iso) {
 
 export function render(_params, root, store, session, userHistory, pilot) {
   let draft = null; // незбережені зміни переживають перемальовування від сесії
+  let activeSection = 'account';
 
   // Для репетицій пітчу: скидає демо-дані, але не виходить з акаунта.
   const resetLink = () => h('p', { class: 'reset-demo' },
@@ -74,6 +75,7 @@ export function render(_params, root, store, session, userHistory, pilot) {
     }
     if (status !== 'signedIn') {
       draft = null;
+      activeSection = 'account';
       const gate = signInPrompt({
         title: 'Профіль доступний після входу',
         text: 'Увійдіть або зареєструйтесь — це займе хвилину.',
@@ -91,11 +93,15 @@ export function render(_params, root, store, session, userHistory, pilot) {
 
     function draw() {
       box.replaceChildren(
-        h('label', { class: 'form-field' }, h('span', { class: 'field-label' }, 'Ім\'я'),
+        h('dl', { class: 'account-details' },
+          [['Ім’я', user.firstName], ['Прізвище', user.lastName], ['Електронна пошта', user.email]]
+            .map(([label, value]) => h('div', {},
+              h('dt', { class: 'field-label' }, label),
+              h('dd', {}, value || 'Не вказано')))),
+        h('label', { class: 'form-field' }, h('span', { class: 'field-label' }, 'Ім’я в WattWay'),
           h('input', { class: 'input', type: 'text', maxlength: 60, value: draft.name, disabled: busy,
             oninput: (e) => { draft.name = e.target.value; } }),
           errors.name && h('span', { class: 'field-error' }, errors.name)),
-        h('div', { class: 'form-field' }, h('span', { class: 'field-label' }, 'Email'), h('span', {}, user.email)),
         h('div', { class: 'form-field' }, h('span', { class: 'field-label' }, 'Для чого вам WattWay?'),
           h('div', { class: 'role-choice' }, ROLES.map(([value, label]) =>
             h('button', { type: 'button', class: `chip${draft.role === value ? ' active' : ''}`, disabled: busy,
@@ -128,15 +134,47 @@ export function render(_params, root, store, session, userHistory, pilot) {
     draw();
     drawCharges();
     drawPilot();
-    root.replaceChildren(h('div', { class: 'container profile-page' },
+    const account = h('div', {},
       h('div', { class: 'card profile-card' },
         h('div', { class: 'profile-head' },
           h('span', { class: 'avatar' }, (draft.name || user.email)[0].toUpperCase()),
-          h('div', {}, h('h1', {}, 'Профіль'), h('p', { class: 'muted' }, 'Ці дані бачите лише ви.'))),
+          h('div', {}, h('h2', { class: 'panel-title' }, 'Дані профілю'), h('p', { class: 'muted' }, 'Ці дані бачите лише ви.'))),
         box),
-      pilotBox,
-      chargesBox,
-      resetLink()));
+      resetLink());
+    const sections = [
+      ['account', 'Профіль', account],
+      ['bookings', 'Бронювання', pilotBox],
+      ['charges', 'Історія зарядок', chargesBox],
+    ];
+    const menu = h('nav', { class: 'cabinet-menu card', 'aria-label': 'Меню особистого кабінету' });
+    const content = h('div', { class: 'cabinet-content' });
+    const items = sections.map(([id, label, body]) => {
+      const panel = h('div', { id: `cabinet-${id}` }, body);
+      const button = h('button', {
+        type: 'button',
+        class: 'cabinet-menu-item',
+        'aria-controls': panel.id,
+        onclick: () => { activeSection = id; showSection(); },
+      }, label);
+      menu.append(button);
+      content.append(panel);
+      return { id, panel, button };
+    });
+    function showSection() {
+      for (const { id, panel, button } of items) {
+        const selected = id === activeSection;
+        panel.hidden = !selected;
+        button.setAttribute('aria-pressed', String(selected));
+      }
+    }
+    showSection();
+    const siteMenu = h('nav', { class: 'cabinet-site-menu', 'aria-label': 'Основні розділи WattWay' },
+      [['#/', 'Головна'], ['#/map', 'Карта зарядок'], ['#/host', 'Господар']]
+        .map(([href, label]) => h('a', { class: 'btn btn-secondary btn-sm', href }, label)));
+    root.replaceChildren(h('div', { class: 'container cabinet-page' },
+      h('h1', {}, 'Особистий кабінет'),
+      siteMenu,
+      h('div', { class: 'cabinet-layout' }, menu, content)));
   }
 
   update();

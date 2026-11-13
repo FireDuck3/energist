@@ -46,9 +46,11 @@ export function createBell(notifications, { doc = document } = {}) {
       ? items.map((n) => {
         const body = [h('span', { class: 'bell-text' }, n.text), h('span', { class: 'bell-time' }, timeAgo(n.at, now))];
         const cls = ['bell-item', n.kind === 'error' && 'bell-item-error', fresh.has(n.id) && 'bell-item-new'].filter(Boolean).join(' ');
-        return h('li', { class: cls }, n.href
-          ? h('a', { class: 'bell-link', href: n.href, onclick: () => setOpen(false) }, body)
-          : h('div', { class: 'bell-link' }, body));
+        let link;
+        if (n.open) link = h('button', { type: 'button', class: 'bell-link', onclick: () => { setOpen(false); n.open(); } }, body);
+        else if (n.href) link = h('a', { class: 'bell-link', href: n.href, onclick: () => setOpen(false) }, body);
+        else link = h('div', { class: 'bell-link' }, body);
+        return h('li', { class: cls }, link);
       })
       : [h('li', { class: 'bell-empty muted' }, 'Сповіщень немає')]));
   }

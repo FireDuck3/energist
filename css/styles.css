@@ -153,6 +153,12 @@ body.blackout .btn-primary { color: #141833; }
 .segment:hover { color: var(--text); }
 .segment.active { background: var(--surface); color: var(--indigo); box-shadow: var(--shadow); }
 .header-right { display: flex; align-items: center; gap: 18px; }
+.nav-link {
+  color: var(--muted); text-decoration: none; font-weight: 600; font-size: .95rem; padding-bottom: 2px;
+  background: linear-gradient(currentColor, currentColor) 0 100% / 0 2px no-repeat;
+  transition: color .2s, background-size .3s var(--ease);
+}
+.nav-link.active, .nav-link:hover { background-size: 100% 2px; color: var(--indigo); }
 
 /* Перемикач */
 .switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
@@ -315,7 +321,8 @@ body.blackout .cta-band { background: var(--surface-2); }
 .bell-head .link-btn[hidden] { display: none; }
 .bell-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; max-height: min(60vh, 420px); overflow-y: auto; }
 .bell-link { position: relative; display: grid; gap: 2px; padding: 10px 12px 10px 28px; border-radius: 10px; color: var(--text); text-decoration: none; }
-a.bell-link:hover { background: var(--surface-2); }
+button.bell-link { width: 100%; border: 0; font: inherit; text-align: left; cursor: pointer; background: none; }
+a.bell-link:hover, button.bell-link:hover { background: var(--surface-2); }
 .bell-link::before { content: ''; position: absolute; left: 12px; top: 18px; width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
 .bell-text { font-size: .92rem; line-height: 1.4; }
 .bell-time { font-size: .78rem; color: var(--muted); }
@@ -754,7 +761,52 @@ input.input { height: 44px; }
 .gate-icon { font-size: 2.4rem; animation: float 4s ease-in-out infinite; }
 .demo-note { background: var(--surface-2); border-radius: 12px; padding: 10px 14px; color: var(--muted); font-size: .92rem; margin: -8px 0 20px; }
 
-.profile-page { padding: 40px 16px 56px; display: grid; justify-items: center; }
+.cabinet-page { padding: 40px 16px 56px; }
+.cabinet-page > h1 { margin: 0 0 24px; }
+.cabinet-site-menu { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+.conversation { display: grid; gap: 16px; min-width: 0; }
+.conversation form { display: grid; gap: 10px; }
+.conversation textarea { width: 100%; resize: vertical; }
+.conversation-messages { max-height: 40vh; overflow-y: auto; }
+.conversation-message { padding: 12px 0; border-bottom: 1px solid currentColor; overflow-wrap: anywhere; }
+.conversation-message p { white-space: pre-wrap; }
+.cabinet-layout {
+  display: grid;
+  grid-template-columns: minmax(180px, 230px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.cabinet-menu { display: grid; gap: 4px; padding: 8px; }
+.cabinet-menu-item {
+  padding: 10px 12px;
+  min-height: 44px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.cabinet-menu-item:hover,
+.cabinet-menu-item[aria-pressed="true"] { border-color: currentColor; }
+.cabinet-menu-item[aria-pressed="true"] { font-weight: 700; }
+.cabinet-content { min-width: 0; overflow-wrap: anywhere; }
+.cabinet-content .profile-card { max-width: none; }
+.account-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
+  gap: 12px 20px;
+  margin: 0;
+}
+.account-details dd { margin: 4px 0 0; }
+@media (max-width: 640px) {
+  .cabinet-page { padding-top: 24px; }
+  .cabinet-layout { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .cabinet-menu { display: flex; flex-wrap: wrap; }
+  .cabinet-menu-item { flex: 1 1 auto; text-align: center; }
+  .cabinet-content .profile-card { padding: 16px; }
+}
 .profile-card { width: 100%; max-width: 520px; padding: 28px; display: grid; gap: 18px; }
 .profile-card > div:last-child { display: grid; gap: 16px; }
 .profile-head { display: flex; align-items: center; gap: 14px; }
@@ -790,7 +842,6 @@ input.input { height: 44px; }
 .search-hint { padding: 8px 10px; margin: 0; font-size: .9rem; }
 
 /* ---------- Мої зарядки ---------- */
-.profile-page { gap: 20px; }
 .charges { gap: 14px; }
 .charges-list { list-style: none; margin: 0; padding: 0; display: grid; }
 .charge { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
@@ -820,7 +871,7 @@ input.input { height: 44px; }
   .label-short { display: inline; }
   .search-clear, .search-remove { width: 40px; height: 40px; }
   .search { scroll-margin-top: 72px; } /* під липкою шапкою, коли поле піднімаємо над клавіатурою */
-  .segmented, .switch-label, .account-name { display: none; }
+  .segmented, .nav-link, .switch-label, .account-name { display: none; }
   .header-right { margin-left: auto; gap: 10px; }
   .logo { font-size: 1.1rem; }
   .logo-mark { width: 32px; height: 32px; }

@@ -1,47 +1,35 @@
-import { h, formatDate } from './ui.js';
-import { notify } from './notifications.js';
+import { h } from './ui.js';
+import { notifications as bellList, notify } from './notifications.js';
+import { openConversation } from './views/conversation.js';
 
-const GUEST_NEWS = {
-  confirmed: 'Господар підтвердив бронювання',
-  declined: 'Господар відхилив бронювання',
-  cancelled: 'Бронювання скасовано',
-};
+// Серверні сповіщення (нові запити, рішення господаря, повідомлення в чаті) показуються лише
+// під дзвіночком у шапці; клік відкриває чат бронювання.
+const NOTICE = 'booking-notice:';
 
-// '["2026-11-13 10:00:00","2026-11-13 12:00:00")' → '13 лис, 10:00–12:00'
-export function slotLabel(slot) {
-  const m = String(slot).match(/(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}).*?[ T](\d{2}:\d{2})/);
-  return m ? `${formatDate(m[1])}, ${m[2]}–${m[3]}` : '';
-}
-
-// Що змінилось у бронюваннях з минулого завантаження → сповіщення для дзвіночка.
-// before — Map id → статус (null — перше завантаження акаунта: старе не сповіщаємо);
-// own — `${id}:${status}` змін, які зробив сам користувач (про них він уже знає).
-export function bookingNews(before, rows, spots, uid, own = new Set()) {
-  if (!before || !uid) return [];
-  const byId = new Map(spots.map((s) => [s.id, s]));
-  const news = [];
-  for (const b of rows) {
-    const was = before.get(b.id);
-    if (was === b.status || own.has(`${b.id}:${b.status}`)) continue;
-    const spot = byId.get(b.spot_id);
-    const where = `«${spot?.title ?? 'Точка зарядки'}», ${slotLabel(b.slot)}`;
-    if (spot?.ownerId === uid) {
-      if (!was && b.status === 'pending') news.push({ text: `Новий запит на бронювання: ${where}`, href: '#/host' });
-      else if (was && b.status === 'cancelled') news.push({ text: `Гість скасував бронювання: ${where}`, href: '#/host' });
-    } else if (b.guest_id === uid && was && GUEST_NEWS[b.status]) {
-      news.push({ text: `${GUEST_NEWS[b.status]}: ${where}`, href: '#/profile' });
-    }
-  }
-  return news;
-}
-
-export function createPilot(session, store) {
+export function createPilot(session, store, { notifications = bellList } = {}) {
   let spots = [], bookings = [], error = false, seq = 0;
-  let known = null; // id → статус бронювань поточного акаунта на момент минулого завантаження
-  const own = new Set();
   const listeners = new Set();
   const emit = () => listeners.forEach(fn => fn());
   const uid = () => session.getState().status === 'signedIn' ? session.getState().user.uid : null;
+
+  function openBooking(id) {
+    const booking = bookings.find(b => b.id === id);
+    if (booking) openConversation(booking, session, refresh);
+    else location.hash = '#/profile';
+  }
+
+  function syncNotices(rows) {
+    for (const n of rows) {
+      notifications.notify(n.body, {
+        key: NOTICE + n.id,
+        at: new Date(n.created_at),
+        read: Boolean(n.read_at),
+        open: () => openBooking(n.booking_id),
+        // Не вдалося позначити на сервері — нічого страшного: сповіщення лишиться прочитаним тут.
+        onRead: () => { Promise.resolve(session.service?.readNotification?.(n.id)).catch(() => {}); },
+      });
+    }
+  }
 
   async function refresh() {
     const service = session.service;
@@ -49,20 +37,21 @@ export function createPilot(session, store) {
     const request = ++seq;
     const account = uid();
     try {
-      const [points, requests] = await Promise.all([
+      const [points, requests, notices] = await Promise.allSettled([
         service.listPilotSpots(),
         account ? service.listPilotBookings() : [],
+        account && service.listNotifications ? service.listNotifications() : [],
       ]);
       if (request !== seq) return;
-      const changed = JSON.stringify(points) !== JSON.stringify(spots);
-      spots = points;
-      bookings = requests;
-      if (account) {
-        bookingNews(known, requests, points, account, own).forEach(({ text, href }) => notify(text, { href }));
-        known = new Map(requests.map((b) => [b.id, b.status]));
+      if (account !== uid()) return;
+      if (points.status === 'fulfilled') {
+        const changed = JSON.stringify(points.value) !== JSON.stringify(spots);
+        spots = points.value;
+        if (changed || !store.getState().pilotReady) store.setPilotSpots(spots.filter(spot => !spot.archivedAt));
       }
-      error = false;
-      if (changed || !store.getState().pilotReady) store.setPilotSpots(spots.filter(spot => !spot.archivedAt));
+      if (requests.status === 'fulfilled') bookings = requests.value;
+      error = requests.status === 'rejected';
+      if (account && notices.status === 'fulfilled') syncNotices(notices.value);
     } catch {
       if (request !== seq) return;
       error = true;
@@ -71,20 +60,30 @@ export function createPilot(session, store) {
     emit();
   }
 
-  let account = null;
+  let account = uid();
   session.subscribe(() => {
-    if (account !== uid()) { account = uid(); bookings = []; known = null; own.clear(); emit(); }
+    if (account !== uid()) {
+      account = uid();
+      bookings = [];
+      // Сповіщення попереднього акаунта не лишаються під дзвіночком (спільний ноутбук на пітчі).
+      notifications.remove(n => String(n.key).startsWith(NOTICE));
+      emit();
+    }
     void refresh();
   });
   void session.ready.then(refresh);
   setInterval(() => { if (document.visibilityState === 'visible') void refresh(); }, 20000);
 
+  // Успіх видно одразу: статус у списку змінюється, а сервер надсилає сповіщення в дзвіночок.
   async function change(id, status) {
-    own.add(`${id}:${status}`);
     try {
-      await session.service.respondPilotBooking(id, status);
-      notify('Статус бронювання оновлено');
-    } catch { notify('Не вдалося змінити статус. Оновіть список і спробуйте ще раз.', { kind: 'error' }); }
+      if (status === 'completed') await session.service.completeBooking(id);
+      else await session.service.respondPilotBooking(id, status);
+    } catch {
+      notify(status === 'completed'
+        ? 'Завершення доступне після закінчення підтвердженого часу бронювання.'
+        : 'Не вдалося змінити статус. Оновіть список і спробуйте ще раз.', { kind: 'error' });
+    }
     await refresh();
   }
 
@@ -102,16 +101,14 @@ export function createPilot(session, store) {
       await refresh();
     },
     async archive(id) {
-      // Прибрана точка скасовує свої бронювання — господар це зробив сам, тож без сповіщень.
-      bookings.filter((b) => b.spot_id === id).forEach((b) => own.add(`${b.id}:cancelled`));
       await session.service.archivePilotSpot(id);
       await refresh();
     },
     ownSpots: () => spots.filter(spot => !spot.archivedAt && spot.ownerId === uid()),
     panel(host = false) {
-      const names = { pending: 'Очікує підтвердження', confirmed: 'Підтверджено', declined: 'Відхилено', cancelled: 'Скасовано' };
+      const names = { pending: 'Очікує підтвердження', confirmed: 'Підтверджено', declined: 'Відхилено', cancelled: 'Скасовано', completed: 'Завершено' };
       const byId = new Map(spots.map(spot => [spot.id, spot]));
-      const rows = bookings.filter(b => host ? byId.get(b.spot_id)?.ownerId === uid() : b.guest_id === uid());
+      const rows = bookings.filter(b => host ? b.owner_id === uid() : b.guest_id === uid());
       const button = (b, status, label) => h('button', {
         type: 'button', class: 'btn btn-secondary btn-sm',
         async onclick(e) { e.currentTarget.disabled = true; await change(b.id, status); },
@@ -124,9 +121,12 @@ export function createPilot(session, store) {
         h('ul', { class: 'bookings' }, rows.map(b => h('li', { class: 'booking' },
           h('div', { class: 'booking-main' },
             h('a', { href: '#/spot/' + b.spot_id }, byId.get(b.spot_id)?.title ?? 'Точка зарядки'),
+            h('span', {}, host ? 'Гість — ' : 'Господар — ', b.counterpart_name || 'Нік не вказано'),
             h('span', {}, b.slot.replace(/["\[\]()]/g, '').replaceAll('T', ' ').split(',').map(s => s.slice(0, 16)).join(' — ') + ' (Київ)'),
             h('b', {}, names[b.status])),
           h('div', { class: 'booking-actions' },
+            h('button', { type: 'button', class: 'btn btn-secondary btn-sm', onclick: () => openConversation(b, session, refresh) }, b.status === 'completed' ? 'Чат і відгук' : 'Чат'),
+            b.status === 'confirmed' && button(b, 'completed', 'Завершити співпрацю'),
             host && b.status === 'pending' && button(b, 'confirmed', 'Підтвердити'),
             host && b.status === 'pending' && button(b, 'declined', 'Відхилити'),
             !host && ['pending', 'confirmed'].includes(b.status) && button(b, 'cancelled', 'Скасувати'))))));

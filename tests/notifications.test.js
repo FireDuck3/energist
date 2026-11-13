@@ -1,7 +1,7 @@
 import { test, eq } from './runner.js';
 import { createNotifications } from '../js/notifications.js';
 import { createBell, timeAgo } from '../js/views/bell.js';
-import { bookingNews, slotLabel } from '../js/pilot.js';
+import { createPilot } from '../js/pilot.js';
 
 test('сповіщення: новіші першими, лічильник непрочитаних, прочитати й очистити', () => {
   const n = createNotifications();
@@ -80,31 +80,76 @@ test('дзвіночок: сповіщення з посиланням веде 
   } finally { bell.destroy(); }
 });
 
-const SPOTS = [{ id: 's1', title: 'Гараж Олега', ownerId: 'host' }, { id: 's2', title: 'Дах Ірини', ownerId: 'other' }];
-const row = (id, spot_id, guest_id, status) => ({ id, spot_id, guest_id, status, slot: '["2026-11-13 10:00:00","2026-11-13 12:00:00")' });
-
-test('slotLabel: інтервал бронювання по-людськи', () => {
-  eq([slotLabel('["2026-11-13 10:00:00","2026-11-13 12:00:00")'), slotLabel('2026-11-14T08:00:00,2026-11-14T09:00:00'), slotLabel('')],
-    ['13 лис, 10:00–12:00', '14 лис, 08:00–09:00', '']);
+test('сповіщення з ключем: без дублів, за часом, прочитане на сервері знімається з лічильника', () => {
+  const n = createNotifications({ now: () => new Date(2026, 10, 13, 12, 0) });
+  const rings = [];
+  n.subscribe((_items, added) => { if (added) rings.push(added.text); });
+  n.notify('Локальне');
+  n.notify('Старе прочитане', { key: 's:1', at: new Date(2026, 10, 12), read: true });
+  n.notify('Нове з сервера', { key: 's:2', at: new Date(2026, 10, 13, 11, 0) });
+  n.notify('Нове з сервера', { key: 's:2', at: new Date(2026, 10, 13, 11, 0) }); // наступне оновлення
+  eq([n.getItems().map((x) => x.text), n.unreadCount(), rings], [['Локальне', 'Нове з сервера', 'Старе прочитане'], 2, ['Локальне', 'Нове з сервера']]);
+  n.notify('Нове з сервера', { key: 's:2', read: true }); // прочитали на іншому пристрої
+  eq(n.unreadCount(), 1);
 });
 
-test('bookingNews: господарю — новий запит і скасування гостем', () => {
-  const before = new Map([['b1', 'pending']]);
-  const rows = [row('b1', 's1', 'guest', 'cancelled'), row('b2', 's1', 'guest', 'pending'), row('b3', 's1', 'guest', 'confirmed')];
-  eq(bookingNews(before, rows, SPOTS, 'host'), [
-    { text: 'Гість скасував бронювання: «Гараж Олега», 13 лис, 10:00–12:00', href: '#/host' },
-    { text: 'Новий запит на бронювання: «Гараж Олега», 13 лис, 10:00–12:00', href: '#/host' },
-  ]);
+test('сповіщення: «прочитано» й «очистити» кличуть onRead, очищені серверні не повертаються', () => {
+  const n = createNotifications();
+  const read = [];
+  n.notify('A', { key: 'a', onRead: () => read.push('a') });
+  n.notify('B', { key: 'b', read: true, onRead: () => read.push('b') });
+  n.markAllRead();
+  n.notify('C', { key: 'c', onRead: () => read.push('c') });
+  n.clear();
+  n.notify('A', { key: 'a' });
+  n.notify('C', { key: 'c' });
+  eq([read, n.getItems().length], [['a', 'c'], 0]);
+  n.notify('D', { key: 'x:1' });
+  n.notify('E');
+  n.remove((x) => String(x.key).startsWith('x:'));
+  eq(n.getItems().map((x) => x.text), ['E']);
 });
 
-test('bookingNews: гостю — рішення господаря; свої дії й перше завантаження без сповіщень', () => {
-  const before = new Map([['b1', 'pending'], ['b2', 'pending'], ['b3', 'confirmed']]);
-  const rows = [row('b1', 's2', 'guest', 'confirmed'), row('b2', 's2', 'guest', 'declined'), row('b3', 'gone', 'guest', 'cancelled'), row('b4', 's2', 'guest', 'pending')];
-  eq(bookingNews(before, rows, SPOTS, 'guest').map((x) => x.text), [
-    'Господар підтвердив бронювання: «Дах Ірини», 13 лис, 10:00–12:00',
-    'Господар відхилив бронювання: «Дах Ірини», 13 лис, 10:00–12:00',
-    'Бронювання скасовано: «Точка зарядки», 13 лис, 10:00–12:00',
-  ]);
-  eq(bookingNews(before, rows, SPOTS, 'guest', new Set(['b3:cancelled'])).length, 2);
-  eq([bookingNews(null, rows, SPOTS, 'guest'), bookingNews(before, rows, SPOTS, null)], [[], []]);
+function fakeAccount(rows) {
+  const listeners = new Set();
+  let state = { status: 'signedIn', user: { uid: 'u1' } };
+  const marked = [];
+  const service = {
+    listPilotSpots: async () => [],
+    listPilotBookings: async () => [],
+    listNotifications: async () => rows,
+    readNotification: async (id) => { marked.push(id); },
+  };
+  return {
+    marked,
+    session: {
+      service, ready: Promise.resolve(),
+      getState: () => state,
+      subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+      signOut() { state = { status: 'signedOut', user: null }; listeners.forEach((fn) => fn(state)); },
+    },
+    store: { getState: () => ({ pilotReady: true }), setPilotSpots() {} },
+  };
+}
+
+test('бронювання: серверні сповіщення йдуть у дзвіночок, без дублів; вихід з акаунта їх прибирає', async () => {
+  const rows = [
+    { id: 7, booking_id: 'b1', body: 'Новий запит на бронювання · Гараж', created_at: '2026-11-13T10:00:00Z', read_at: null },
+    { id: 6, booking_id: 'b1', body: 'Нове повідомлення · Гараж', created_at: '2026-11-13T09:00:00Z', read_at: '2026-11-13T09:30:00Z' },
+  ];
+  const { session, store, marked } = fakeAccount(rows);
+  const list = createNotifications();
+  list.notify('Профіль збережено');
+  const pilot = createPilot(session, store, { notifications: list });
+  await pilot.refresh();
+  await pilot.refresh();
+  const texts = () => list.getItems().map((x) => x.text);
+  eq([texts().filter((t) => t.includes('Гараж')).sort(), list.unreadCount()],
+    [['Нове повідомлення · Гараж', 'Новий запит на бронювання · Гараж'], 2]);
+  eq(typeof list.getItems().find((x) => x.key === 'booking-notice:7').open, 'function');
+  list.markAllRead();
+  await Promise.resolve();
+  eq(marked, [7]);
+  session.signOut();
+  eq(texts(), ['Профіль збережено']);
 });

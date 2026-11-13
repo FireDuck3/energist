@@ -76,7 +76,7 @@ export function render(_params, root, store, _session, userHistory) {
 
   root.append(h('div', { class: 'map-layout' },
     h('aside', { class: 'map-sidebar' },
-      h('h1', { class: 'map-title' }, 'Розетки у Вінниці'),
+      h('h1', { class: 'map-title' }, 'Карта зарядних точок'),
       search.el, banner, filtersToggle, filtersBox, count, list),
     h('div', { class: 'map-pane' }, mapEl, fallback)));
 

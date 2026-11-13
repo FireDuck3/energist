@@ -76,7 +76,14 @@ export async function loadSupabase() {
         source: input.source, connector: input.connector, power_kw: input.powerKw,
         price_per_kwh: input.pricePerKwh, devices: input.devices, opens: input.schedule.from, closes: input.schedule.to,
       })),
-      listPilotBookings: () => call(client.from('pilot_bookings').select('*').order('created_at', { ascending: false })),
+      listPilotBookings: () => call(client.rpc('list_my_pilot_bookings')),
+      listNotifications: () => call(client.from('booking_notifications').select('*').order('created_at', { ascending: false }).limit(100)),
+      readNotification: id => call(client.from('booking_notifications').update({ read_at: new Date().toISOString() }).eq('id', id)),
+      listMessages: async id => (await call(client.from('booking_messages').select('*').eq('booking_id', id).order('created_at', { ascending: false }).limit(500))).reverse(),
+      sendMessage: message => call(client.from('booking_messages').insert(message)),
+      listReviews: id => call(client.from('booking_reviews').select('*').eq('booking_id', id).order('created_at')),
+      sendReview: review => call(client.from('booking_reviews').insert(review)),
+      completeBooking: id => call(client.rpc('complete_pilot_booking', { booking: id })),
       requestPilotBooking: (id, { date, start, hours, device }) => call(client.rpc('request_pilot_booking', {
         point_id: id, requested_day: date, starts: start, hours, requested_device: device,
       })),
@@ -106,9 +113,15 @@ export async function loadSupabase() {
       async verifyUser() {
         const { user } = await call(auth.getUser());
         if (!user) throw fail(null, 'auth/invalid-credential');
-        const account = await call(client.from('users').select('status').eq('id', user.id).single());
+        const account = await call(client.from('users')
+          .select('status, first_name, last_name, email').eq('id', user.id).single());
         if (account.status !== 'active') throw fail(null, 'auth/account-disabled');
-        return toUser(user);
+        return {
+          ...toUser(user),
+          firstName: account.first_name,
+          lastName: account.last_name,
+          email: account.email ?? user.email,
+        };
       },
       sendLoginCode: (email) => call(auth.signInWithOtp({ email, options: { shouldCreateUser: true } })),
       verifyLoginCode: (email, code) => call(auth.verifyOtp({ email, token: code, type: 'email' })),
