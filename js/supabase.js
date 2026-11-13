@@ -77,6 +77,13 @@ export async function loadSupabase() {
         price_per_kwh: input.pricePerKwh, devices: input.devices, opens: input.schedule.from, closes: input.schedule.to,
       })),
       listPilotBookings: () => call(client.rpc('list_my_pilot_bookings')),
+      listNotifications: () => call(client.from('booking_notifications').select('*').order('created_at', { ascending: false }).limit(100)),
+      readNotification: id => call(client.from('booking_notifications').update({ read_at: new Date().toISOString() }).eq('id', id)),
+      listMessages: async id => (await call(client.from('booking_messages').select('*').eq('booking_id', id).order('created_at', { ascending: false }).limit(500))).reverse(),
+      sendMessage: message => call(client.from('booking_messages').insert(message)),
+      listReviews: id => call(client.from('booking_reviews').select('*').eq('booking_id', id).order('created_at')),
+      sendReview: review => call(client.from('booking_reviews').insert(review)),
+      completeBooking: id => call(client.rpc('complete_pilot_booking', { booking: id })),
       requestPilotBooking: (id, { date, start, hours, device }) => call(client.rpc('request_pilot_booking', {
         point_id: id, requested_day: date, starts: start, hours, requested_device: device,
       })),
