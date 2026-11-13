@@ -64,6 +64,11 @@ function renderHeader() {
         roleBtn('Я ділюсь енергією', isHost, '#/host')),
       h('div', { class: 'header-right' },
         h('a', { class: `nav-link${path === '/calc' ? ' active' : ''}`, href: '#/calc' }, 'Калькулятор'),
+        session.getState().status === 'signedIn' && h('a', {
+          class: `nav-link${path === '/profile' ? ' active' : ''}`,
+          href: '#/profile',
+          'aria-current': path === '/profile' ? 'page' : null,
+        }, 'Кабінет'),
         h('label', { class: 'switch', title: 'Режим блекауту' },
           h('input', { type: 'checkbox', checked: blackout, 'aria-label': 'Режим блекауту', onchange: (e) => store.setBlackout(e.target.checked) }),
           h('span', { class: 'switch-track' }, h('span', { class: 'switch-thumb' })),
