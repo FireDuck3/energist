@@ -62,11 +62,17 @@ export async function loadSupabase() {
       oauthResult,
       async listPilotSpots() {
         const rows = await call(client.from('pilot_spots').select('*').order('title'));
+        let feedback = [], reviewsUnavailable = false;
+        try { feedback = await call(client.rpc('list_public_spot_reviews')); }
+        catch { reviewsUnavailable = true; }
         return rows.map(row => ({
           id: row.id, archivedAt: row.archived_at, ownerId: row.owner_id, pilot: true, hostName: 'Господар точки',
           title: row.title, district: row.district, lat: Number(row.lat), lng: Number(row.lng),
           source: row.source, connector: row.connector, powerKw: Number(row.power_kw),
-          pricePerKwh: Number(row.price_per_kwh), devices: row.devices, reviews: [],
+          pricePerKwh: Number(row.price_per_kwh), devices: row.devices, reviewsUnavailable,
+          reviews: feedback.filter(r => r.spot_id === row.id).map(r => ({
+            author: r.author_name || 'Учасник WattWay', stars: r.rating, text: r.body, date: r.created_at,
+          })),
           schedule: { from: row.opens.slice(0, 5), to: row.closes.slice(0, 5) },
         }));
       },
@@ -155,4 +161,5 @@ export async function loadSupabase() {
     return null;
   }
 }
+
 
