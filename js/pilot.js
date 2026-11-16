@@ -105,6 +105,24 @@ export function createPilot(session, store, { notifications = bellList } = {}) {
       await refresh();
     },
     ownSpots: () => spots.filter(spot => !spot.archivedAt && spot.ownerId === uid()),
+    chatsPanel() {
+      const byId = new Map(spots.map(spot => [spot.id, spot]));
+      const rows = bookings.filter(b => uid() && [b.owner_id, b.guest_id].includes(uid()));
+      return h('section', { class: 'card panel' },
+        h('h2', { class: 'panel-title' }, 'Мої чати'),
+        h('p', { class: 'muted' }, 'Розмови з господарями та гостями. Кожне бронювання має окремий чат.'),
+        h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: refresh }, 'Оновити'),
+        error && h('p', { role: 'alert' }, 'Не вдалося завантажити чати. Спробуйте оновити.'),
+        !error && !rows.length && h('p', {}, 'Чат з’явиться після запиту на бронювання.', ' ',
+          h('a', { href: '#/map' }, 'Знайти точку')),
+        h('ul', { class: 'bookings' }, rows.map(b => h('li', { class: 'booking' },
+          h('div', { class: 'booking-main' },
+            h('b', {}, b.counterpart_name || 'Учасник бронювання'),
+            h('span', {}, byId.get(b.spot_id)?.title || 'Точка зарядки'),
+            h('small', {}, b.slot.replace(/["\[\]()]/g, '').replaceAll('T', ' ').split(',').map(s => s.slice(0, 16)).join(' — ') + ' (Київ)')),
+          h('button', { type: 'button', class: 'btn btn-primary btn-sm', onclick: () => openConversation(b, session, refresh) },
+            b.status === 'completed' ? 'Відкрити чат і відгуки' : 'Відкрити чат')))));
+    },
     panel(host = false) {
       const names = { pending: 'Очікує підтвердження', confirmed: 'Підтверджено', declined: 'Відхилено', cancelled: 'Скасовано', completed: 'Завершено' };
       const byId = new Map(spots.map(spot => [spot.id, spot]));
@@ -133,3 +151,4 @@ export function createPilot(session, store, { notifications = bellList } = {}) {
     },
   };
 }
+
