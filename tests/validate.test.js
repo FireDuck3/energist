@@ -14,8 +14,11 @@ test('без точки на карті', () => {
   eq([r.ok, typeof r.errors.location], [false, 'string']);
 });
 
-test('точка за межами Вінниці', () =>
-  eq(typeof validateSpotInput({ ...good, lat: 50.45, lng: 30.52 }).errors.location, 'string'));
+test('точка за межами Вінниці дозволена', () =>
+  eq(validateSpotInput({ ...good, lat: 50.45, lng: 30.52 }).ok, true));
+
+test('координати за межами світу відхиляються', () =>
+  eq(typeof validateSpotInput({ ...good, lat: 91 }).errors.location, 'string'));
 
 test('порожня назва', () => eq(typeof validateSpotInput({ ...good, title: '   ' }).errors.title, 'string'));
 

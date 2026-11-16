@@ -1,5 +1,6 @@
 // Кабінет господаря — шлях Олега.
-import { h, openModal, toast, formatDate, stars, spotCover, plural } from '../ui.js';
+import { h, openModal, formatDate, stars, spotCover, plural } from '../ui.js';
+import { notify } from '../notifications.js';
 import { hostSummary, bookingHostAmount } from '../stats.js';
 import { validateSpotInput } from '../validate.js';
 import { formatUAH, formatKwh } from '../pricing.js';
@@ -53,7 +54,7 @@ function bookingRow(b, spot, store) {
       b.status === 'pending' && h('div', { class: 'booking-actions' },
         h('button', { type: 'button', class: 'btn btn-ok btn-sm', onclick: () => {
           store.confirmBooking(b.id);
-          toast(`Бронювання підтверджено — ${b.guestName}, ${formatDate(b.date)} о ${b.start}`);
+          notify(`Бронювання підтверджено — ${b.guestName}, ${formatDate(b.date)} о ${b.start}`);
         } }, 'Підтвердити'),
         h('button', { type: 'button', class: 'btn btn-danger-ghost btn-sm', onclick: () => store.declineBooking(b.id) }, 'Відхилити'))));
 }
@@ -68,7 +69,7 @@ function ownSpotCard(spot) {
 }
 
 // ---- Форма «Додати розетку» ----
-function openAddSpot(store, hostName) {
+function openAddSpot(store, hostName, publish) {
   const input = {
     title: '', district: 'Вишенька', lat: null, lng: null, source: 'solar', connector: 'type2',
     powerKw: 7.4, pricePerKwh: 11, devices: ['ev', 'ecoflow', 'gadget'], schedule: { from: '08:00', to: '20:00' },
@@ -93,13 +94,16 @@ function openAddSpot(store, hostName) {
     oninput: (e) => { input[key] = e.target.value === '' ? NaN : Number(e.target.value); } });
   const time = (key) => h('input', { class: 'input', type: 'time', step: 3600, value: input.schedule[key],
     oninput: (e) => { input.schedule = { ...input.schedule, [key]: e.target.value }; } });
+  // Помилка відправки — у самій формі: дзвіночок у шапці закритий модалкою.
+  const submitError = h('p', { class: 'field-error form-error', role: 'alert', hidden: true });
 
   const form = h('form', { class: 'wizard add-form', novalidate: true, onsubmit: submit },
     h('p', { class: 'eyebrow' }, 'Кабінет господаря'),
     h('h2', {}, 'Додати розетку'),
+    publish && h('p', {}, 'Назва й координати точки будуть видимі на карті всім відвідувачам.'),
     h('div', { class: 'form-field' }, h('span', { class: 'field-label' }, 'Де вона?'), mapEl, coordsNote, err('location')),
     h('div', { class: 'form-grid' },
-      field('Назва', h('input', { class: 'input', type: 'text', placeholder: 'Напр.: Гараж з розеткою 220 В',
+      field('Назва', h('input', { class: 'input', type: 'text', maxlength: 100, placeholder: 'Напр.: Гараж з розеткою 220 В',
         oninput: (e) => { input.title = e.target.value; } }), 'title'),
       field('Район', h('select', { class: 'input', onchange: (e) => { input.district = e.target.value; } },
         DISTRICTS.map((d) => h('option', { value: d, selected: d === input.district }, d)))),
@@ -117,6 +121,7 @@ function openAddSpot(store, hostName) {
         input.devices = input.devices.includes(v) ? input.devices.filter((x) => x !== v) : [...input.devices, v];
       }),
       err('devices')),
+    submitError,
     h('div', { class: 'wizard-actions' },
       h('button', { type: 'button', class: 'btn btn-ghost', onclick: () => modal.close() }, 'Скасувати'),
       h('button', { type: 'submit', class: 'btn btn-primary btn-lg' }, 'Додати на карту')));
@@ -147,8 +152,9 @@ function openAddSpot(store, hostName) {
       h('button', { type: 'button', class: 'btn btn-secondary btn-sm', onclick: () => setPoint(...VINNYTSIA_CENTER) }, 'Поставити в центр Вінниці')));
   }
 
-  function submit(e) {
+  async function submit(e) {
     e.preventDefault();
+    submitError.hidden = true;
     const { ok, errors } = validateSpotInput(input);
     for (const [key, el] of Object.entries(errorEls)) {
       el.hidden = !errors[key];
@@ -158,13 +164,25 @@ function openAddSpot(store, hostName) {
       form.querySelector('.field-error:not([hidden])')?.closest('.form-field')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
-    store.addSpot({ ...input, title: input.title.trim(), hostName });
+    const data = { ...input, title: input.title.trim(), hostName };
+    if (publish) {
+      const button = form.querySelector('[type=submit]');
+      if (button.disabled) return;
+      button.disabled = true;
+      try { await publish(data); }
+      catch {
+        submitError.textContent = 'Не вдалося опублікувати точку. Спробуйте ще раз.';
+        submitError.hidden = false;
+        return;
+      }
+      finally { button.disabled = false; }
+    } else store.addSpot(data);
     modal.close();
-    toast('Розетку додано — її вже видно на карті гостей');
+    notify('Розетку додано — її вже видно на карті гостей');
   }
 }
 
-export function render(_params, root, store, session) {
+export function render(_params, root, store, session, _history, pilot) {
   let grown = false; // стовпчики «виростають» лише при першому показі, не після кожної дії
   function update() {
     const { status } = session.getState();
@@ -181,7 +199,29 @@ export function render(_params, root, store, session) {
       return;
     }
     const signedIn = status === 'signedIn';
-    const addSpot = () => openAddSpot(store, signedIn ? session.currentName() : undefined);
+    const addSpot = () => openAddSpot(store, undefined, signedIn ? pilot.publish : undefined);
+    if (signedIn) {
+      root.replaceChildren(h('div', { class: 'container host-page' },
+        h('div', { class: 'host-head' },
+          h('h1', {}, 'Кабінет господаря'),
+          h('button', { type: 'button', class: 'btn btn-primary', onclick: addSpot }, '+ Додати розетку')),
+        pilot.panel(true),
+        h('h2', { class: 'own-title' }, 'Мої точки'),
+        h('div', { class: 'own-spots' }, pilot.ownSpots().map(spot =>
+          h('div', {}, ownSpotCard(spot),
+            h('button', { type: 'button', class: 'btn btn-danger-ghost btn-sm',
+              'aria-label': `Видалити точку ${spot.title}`,
+              async onclick(e) {
+                if (!window.confirm(`Прибрати «${spot.title}» з карти? Активні бронювання буде скасовано.`)) return;
+                const button = e.currentTarget;
+                button.disabled = true;
+                try { await pilot.archive(spot.id); notify('Точку прибрано з карти'); }
+                catch { notify('Не вдалося видалити точку. Спробуйте ще раз.', { kind: 'error' }); }
+                finally { button.disabled = false; }
+              },
+            }, 'Видалити точку'))))));
+      return;
+    }
     const state = store.getState();
     const host = state.hosts.find((x) => x.id === DEMO_HOST_ID);
     const now = new Date();
@@ -228,5 +268,6 @@ export function render(_params, root, store, session) {
   update();
   const offStore = store.subscribe(update);
   const offSession = session.subscribe(update);
-  return () => { offStore(); offSession(); };
+  const offPilot = pilot.subscribe(update);
+  return () => { offStore(); offSession(); offPilot(); };
 }

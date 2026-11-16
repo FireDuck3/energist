@@ -96,13 +96,6 @@ export function installRipple(root = document, { reduce = prefersReducedMotion()
   return () => root.removeEventListener('pointerdown', onDown);
 }
 
-export function toast(text) {
-  const el = h('div', { class: 'toast' }, text);
-  document.getElementById('toast-root').append(el);
-  setTimeout(() => el.classList.add('toast-hide'), 2600);
-  setTimeout(() => el.remove(), 3000);
-}
-
 export function stars(rating, count) {
   return h('span', { class: 'rating', title: `Рейтинг ${rating}` },
     h('span', { class: 'rating-star' }, '★'), ' ', rating ? String(rating).replace('.', ',') : 'новий',

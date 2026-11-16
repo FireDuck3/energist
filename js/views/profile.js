@@ -1,5 +1,6 @@
 // Профіль: ім'я, email, роль, вихід; «Мої зарядки»; очистка історії пошуку; скидання демо-даних.
-import { h, toast, formatDate } from '../ui.js';
+import { h, formatDate } from '../ui.js';
+import { notify } from '../notifications.js';
 import { formatUAH, formatKwh } from '../pricing.js';
 import { isoDay } from '../data.js';
 import { signInPrompt } from './auth-modal.js';
@@ -13,15 +14,16 @@ function when(iso) {
   return `${formatDate(isoDay(0, d))}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export function render(_params, root, store, session, userHistory) {
+export function render(_params, root, store, session, userHistory, pilot) {
   let draft = null; // незбережені зміни переживають перемальовування від сесії
+  let activeSection = 'account';
 
   // Для репетицій пітчу: скидає демо-дані, але не виходить з акаунта.
   const resetLink = () => h('p', { class: 'reset-demo' },
     h('button', { type: 'button', class: 'link-btn', onclick: () => {
       store.reset();
       location.hash = '#/';
-      toast('Демо скинуто до початкового стану');
+      notify('Демо скинуто до початкового стану');
     } }, 'Скинути демо-дані'));
 
   const chargesBox = h('section', { class: 'card profile-card charges' });
@@ -52,11 +54,17 @@ export function render(_params, root, store, session, userHistory) {
       body,
       hasQueries && h('button', { type: 'button', class: 'link-btn clear-searches', onclick: () => {
         userHistory.clearQueries();
-        toast('Історію пошуку очищено');
+        notify('Історію пошуку очищено');
       } }, 'Очистити історію пошуку'),
     ].filter(Boolean));
   }
 
+  const pilotBox = h('div');
+  const chatsBox = h('div');
+  const drawPilot = () => {
+    pilotBox.replaceChildren(pilot.panel());
+    chatsBox.replaceChildren(pilot.chatsPanel());
+  };
   function update() {
     const { status, user, profile } = session.getState();
     if (status === 'loading') {
@@ -72,6 +80,7 @@ export function render(_params, root, store, session, userHistory) {
     }
     if (status !== 'signedIn') {
       draft = null;
+      activeSection = 'account';
       const gate = signInPrompt({
         title: 'Профіль доступний після входу',
         text: 'Увійдіть або зареєструйтесь — це займе хвилину.',
@@ -89,11 +98,15 @@ export function render(_params, root, store, session, userHistory) {
 
     function draw() {
       box.replaceChildren(
-        h('label', { class: 'form-field' }, h('span', { class: 'field-label' }, 'Ім\'я'),
+        h('dl', { class: 'account-details' },
+          [['Ім’я', user.firstName], ['Прізвище', user.lastName], ['Електронна пошта', user.email]]
+            .map(([label, value]) => h('div', {},
+              h('dt', { class: 'field-label' }, label),
+              h('dd', {}, value || 'Не вказано')))),
+        h('label', { class: 'form-field' }, h('span', { class: 'field-label' }, 'Ім’я в WattWay'),
           h('input', { class: 'input', type: 'text', maxlength: 60, value: draft.name, disabled: busy,
             oninput: (e) => { draft.name = e.target.value; } }),
           errors.name && h('span', { class: 'field-error' }, errors.name)),
-        h('div', { class: 'form-field' }, h('span', { class: 'field-label' }, 'Email'), h('span', {}, user.email)),
         h('div', { class: 'form-field' }, h('span', { class: 'field-label' }, 'Для чого вам WattWay?'),
           h('div', { class: 'role-choice' }, ROLES.map(([value, label]) =>
             h('button', { type: 'button', class: `chip${draft.role === value ? ' active' : ''}`, disabled: busy,
@@ -111,10 +124,10 @@ export function render(_params, root, store, session, userHistory) {
       try {
         await session.saveProfile(draft);
         draft = null;
-        toast('Профіль збережено');
+        notify('Профіль збережено');
       } catch (e) {
         if (e.code === 'invalid-profile') errors = e.errors;
-        else toast('Не вдалося зберегти — перевірте інтернет');
+        else notify('Не вдалося зберегти профіль — перевірте інтернет', { kind: 'error' });
       } finally {
         busy = false;
         if (draft) draw();
@@ -123,18 +136,55 @@ export function render(_params, root, store, session, userHistory) {
 
     draw();
     drawCharges();
-    root.replaceChildren(h('div', { class: 'container profile-page' },
+    drawPilot();
+    const account = h('div', {},
       h('div', { class: 'card profile-card' },
         h('div', { class: 'profile-head' },
           h('span', { class: 'avatar' }, (draft.name || user.email)[0].toUpperCase()),
-          h('div', {}, h('h1', {}, 'Профіль'), h('p', { class: 'muted' }, 'Ці дані бачите лише ви.'))),
+          h('div', {}, h('h2', { class: 'panel-title' }, 'Дані профілю'), h('p', { class: 'muted' }, 'Ці дані бачите лише ви.'))),
         box),
-      chargesBox,
-      resetLink()));
+      resetLink());
+    const sections = [
+      ['account', 'Профіль', account],
+      ['bookings', 'Бронювання', pilotBox],
+      ['chats', 'Чати', chatsBox],
+      ['charges', 'Історія зарядок', chargesBox],
+    ];
+    const menu = h('nav', { class: 'cabinet-menu card', 'aria-label': 'Меню особистого кабінету' });
+    const content = h('div', { class: 'cabinet-content' });
+    const items = sections.map(([id, label, body]) => {
+      const panel = h('div', { id: `cabinet-${id}` }, body);
+      const button = h('button', {
+        type: 'button',
+        class: 'cabinet-menu-item',
+        'aria-controls': panel.id,
+        onclick: () => { activeSection = id; showSection(); },
+      }, label);
+      menu.append(button);
+      content.append(panel);
+      return { id, panel, button };
+    });
+    function showSection() {
+      for (const { id, panel, button } of items) {
+        const selected = id === activeSection;
+        panel.hidden = !selected;
+        button.setAttribute('aria-pressed', String(selected));
+      }
+    }
+    showSection();
+    const siteMenu = h('nav', { class: 'cabinet-site-menu', 'aria-label': 'Основні розділи WattWay' },
+      [['#/', 'Головна'], ['#/map', 'Карта зарядок'], ['#/host', 'Господар']]
+        .map(([href, label]) => h('a', { class: 'btn btn-secondary btn-sm', href }, label)));
+    root.replaceChildren(h('div', { class: 'container cabinet-page' },
+      h('h1', {}, 'Особистий кабінет'),
+      siteMenu,
+      h('div', { class: 'cabinet-layout' }, menu, content)));
   }
 
   update();
   const offSession = session.subscribe(update);
+  const offPilot = pilot.subscribe(drawPilot);
   const offHistory = userHistory.subscribe(drawCharges);
-  return () => { offSession(); offHistory(); };
+  return () => { offSession(); offHistory(); offPilot(); };
 }
+

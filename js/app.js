@@ -1,27 +1,32 @@
+import { createPilot } from './pilot.js';
 // Точка входу: store, сесія, шапка, маршрути.
 import { createStore, safeLocalStorage, memoryStorage } from './store.js';
 import { createSession } from './auth.js';
 import { loadSupabase } from './supabase.js';
 import { createUserHistory } from './user-history.js';
 import { startRouter, currentPath } from './router.js';
-import { h, toast, installRipple } from './ui.js';
+import { h, installRipple } from './ui.js';
+import { notifications, notify } from './notifications.js';
 import * as landing from './views/landing.js';
 import * as map from './views/map.js';
 import * as spot from './views/spot.js';
 import * as host from './views/host.js';
-import * as calculator from './views/calculator.js';
 import * as profile from './views/profile.js';
 import { openAuthModal } from './views/auth-modal.js';
 import { loginPage, signupPage, logOut } from './views/auth-page.js';
+import { createBell } from './views/bell.js';
 
 export const store = createStore(safeLocalStorage() ?? memoryStorage());
 export const session = createSession(loadSupabase);
 // Вийшли з акаунта (напр., на спільному ноутбуці пітчу) — прибираємо і запит у полі пошуку.
 export const userHistory = createUserHistory(session, { onReset: () => store.setFilters({ query: '' }) });
 
-const view = (mod) => (params, root) => mod.render(params, root, store, session, userHistory);
+const pilot = createPilot(session, store);
+const view = (mod) => (params, root) => mod.render(params, root, store, session, userHistory, pilot);
 
 const signIn = () => session.requireAuth(() => {}, '');
+// Один дзвіночок на весь сайт: шапка перемальовується, а він лише переставляється, тож список не закривається.
+const bell = createBell(notifications);
 
 function accountArea() {
   const { status, user } = session.getState();
@@ -64,12 +69,17 @@ function renderHeader() {
         roleBtn('Я шукаю зарядку', isGuest, '#/map'),
         roleBtn('Я ділюсь енергією', isHost, '#/host')),
       h('div', { class: 'header-right' },
-        h('a', { class: `nav-link${path === '/calc' ? ' active' : ''}`, href: '#/calc' }, 'Калькулятор'),
+        session.getState().status === 'signedIn' && h('a', {
+          class: `nav-link${path === '/profile' ? ' active' : ''}`,
+          href: '#/profile',
+          'aria-current': path === '/profile' ? 'page' : null,
+        }, 'Кабінет'),
         h('label', { class: 'switch', title: 'Режим блекауту' },
           h('input', { type: 'checkbox', checked: blackout, 'aria-label': 'Режим блекауту', onchange: (e) => store.setBlackout(e.target.checked) }),
           h('span', { class: 'switch-track' }, h('span', { class: 'switch-thumb' })),
           h('span', { class: 'switch-icon', 'aria-hidden': 'true' }, '⚡'),
           h('span', { class: 'switch-label' }, 'Блекаут')),
+        bell.el,
         accountArea())));
 }
 
@@ -88,7 +98,6 @@ session.onNeedAuth((reason) => openAuthModal(session, { reason }));
 const TABS = [
   ['#/map', '🔌', 'Зарядка', (p) => p.startsWith('/map') || p.startsWith('/spot')],
   ['#/host', '☀️', 'Господар', (p) => p.startsWith('/host')],
-  ['#/calc', '🧮', 'Калькулятор', (p) => p === '/calc'],
   ['#/profile', '👤', 'Профіль', (p) => p.startsWith('/profile')],
 ];
 const tabbar = h('nav', { class: 'tabbar', 'aria-label': 'Розділи' });
@@ -110,7 +119,6 @@ startRouter({
   '/map': view(map),
   '/spot/:id': view(spot),
   '/host': view(host),
-  '/calc': view(calculator),
   '/profile': view(profile),
   '/login': view({ render: loginPage }),
   '/signup': view({ render: signupPage }),
@@ -123,4 +131,13 @@ startRouter({
     if (role && role !== store.getState().role) store.setRole(role);
     else renderHeader();
   },
+});
+
+// OAuth reloads the document, so resume at the saved route and finish a new profile.
+session.ready.then(() => {
+  const result = session.service?.oauthResult;
+  if (!result?.returned) return;
+  const state = session.getState();
+  if (result.error || state.error) openAuthModal(session, { error: result.error ?? state.error });
+  else if (state.status === 'needsProfile') openAuthModal(session, { mode: 'profile' });
 });

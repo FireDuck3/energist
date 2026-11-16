@@ -1,8 +1,9 @@
 // Окремі сторінки входу (#/login) і реєстрації (#/signup).
 // Вікно входу (auth-modal.js) лишається для дій, що потребують акаунта посеред сценарію (бронювання).
-import { h, toast } from '../ui.js';
+import { h } from '../ui.js';
+import { notify } from '../notifications.js';
 import { authErrorMessage } from '../auth.js';
-import { validateLogin, validateSignup, homePath, failureAdvice, MIN_PASSWORD } from '../auth-forms.js';
+import { validateLogin, validateSignup, displayName, homePath, failureAdvice } from '../auth-forms.js';
 
 const ROLES = [['guest', '🔌 Шукаю зарядку'], ['host', '☀️ Маю енергію для продажу']];
 const TEXT = {
@@ -13,15 +14,15 @@ const TEXT = {
 // Вихід: повідомлення і повернення на головну, де знову видно «Увійти» й «Реєстрація».
 export function logOut(session) {
   return session.service.signOut()
-    .then(() => { toast('Ви вийшли з акаунта'); location.hash = '#/'; })
-    .catch(() => toast('Не вдалося вийти — перевірте інтернет'));
+    .then(() => { notify('Ви вийшли з акаунта'); location.hash = '#/'; })
+    .catch(() => notify('Не вдалося вийти — перевірте інтернет', { kind: 'error' }));
 }
 
 export const loginPage = (_params, root, _store, session) => renderAuthPage('signin', root, session);
 export const signupPage = (_params, root, _store, session) => renderAuthPage('signup', root, session);
 
 function renderAuthPage(mode, root, session) {
-  const st = { name: '', email: '', password: '', confirm: '', role: null, errors: {}, error: '', errorCode: '', busy: false };
+  const st = { firstName: '', lastName: '', email: '', password: '', confirm: '', role: null, errors: {}, error: '', errorCode: '', busy: false };
   const text = TEXT[mode];
   let alive = true;
 
@@ -75,10 +76,11 @@ function renderAuthPage(mode, root, session) {
   function drawForm() {
     const signup = mode === 'signup';
     const form = h('form', { class: 'auth-form', novalidate: true, onsubmit: (e) => { e.preventDefault(); submit(); } },
-      signup && input('name', 'Як вас звати?', { type: 'text', autocomplete: 'given-name', maxlength: 60, placeholder: 'Ім\'я' }),
+      signup && input('firstName', 'Ім’я', { type: 'text', autocomplete: 'given-name', maxlength: 60 }),
+      signup && input('lastName', 'Прізвище', { type: 'text', autocomplete: 'family-name', maxlength: 60 }),
       input('email', 'Email', { type: 'email', autocomplete: 'email', placeholder: 'you@example.com' }),
       input('password', 'Пароль', { type: 'password', autocomplete: signup ? 'new-password' : 'current-password' },
-        signup ? `Щонайменше ${MIN_PASSWORD} символів` : null),
+        signup ? 'Від 8 до 128 символів' : null),
       signup && input('confirm', 'Повторіть пароль', { type: 'password', autocomplete: 'new-password' }),
       signup && h('div', { class: 'form-field' },
         h('span', { class: 'field-label' }, 'Для чого вам WattWay?'),
@@ -88,17 +90,40 @@ function renderAuthPage(mode, root, session) {
         st.errors.role && h('span', { class: 'field-error' }, st.errors.role)),
       errorBlock(),
       h('button', { type: 'submit', class: 'btn btn-primary btn-lg btn-block', disabled: st.busy }, st.busy ? 'Зачекайте…' : text.submit));
+    // Вхід через Google відкриває сторінку Google і повертає на сайт уже із сесією (js/oauth.js).
+    const google = session.service?.signInWithGoogle && [
+      h('div', { class: 'auth-divider' }, 'або'),
+      h('button', { type: 'button', class: 'btn btn-secondary btn-lg btn-block', disabled: st.busy, onclick: googleSignIn },
+        signup ? 'Продовжити з Google' : 'Увійти через Google')];
 
     card.replaceChildren(
       h('div', { class: 'auth-brand' }, h('span', { class: 'logo-mark' }, '⚡'), h('b', {}, 'WattWay')),
       h('h1', {}, text.title),
       h('p', { class: 'muted auth-lead' }, text.lead),
       form,
+      ...(google || []),
       h('p', { class: 'auth-switch' },
         signup ? 'Вже є акаунт? ' : 'Ще немає акаунта? ',
         h('a', { href: signup ? '#/login' : '#/signup' }, signup ? 'Увійти' : 'Зареєструватися')));
     const bad = card.querySelector('[aria-invalid="true"]');
     (bad ?? card.querySelector('input:not([disabled])'))?.focus();
+  }
+
+  async function googleSignIn() {
+    if (st.busy) return;
+    st.busy = true;
+    st.error = '';
+    st.errors = {};
+    draw();
+    try {
+      await session.service.signInWithGoogle();
+    } catch (e) {
+      st.error = authErrorMessage(e.code);
+      st.errorCode = e.code ?? '';
+    } finally {
+      st.busy = false;
+      draw();
+    }
   }
 
   async function submit() {
@@ -116,14 +141,15 @@ function renderAuthPage(mode, root, session) {
       if (mode === 'signin') {
         await svc.signInWithPassword(st.email, st.password);
       } else if (session.getState().status !== 'needsProfile') { // після збою збереження профілю акаунт уже є
-        await svc.signUpWithPassword(st.email, st.password);
+        await svc.signUpWithPassword(st.email, st.password, { firstName: st.firstName, lastName: st.lastName });
       }
       if (!(await session.waitForSignIn(10000))) {
-        throw Object.assign(new Error('timeout'), { code: 'auth/network-request-failed' });
+        // Сесія відхилила вхід (напр., акаунт заблоковано) або сервер не відповів.
+        throw Object.assign(new Error('timeout'), { code: session.getState().error ?? 'auth/network-request-failed' });
       }
       if (mode === 'signup') {
         try {
-          await session.saveProfile({ name: st.name, role: st.role });
+          await session.saveProfile({ name: displayName(st), role: st.role });
         } catch (e) {
           st.error = 'Акаунт створено, але профіль не збережено. Натисніть «Створити акаунт» ще раз';
           st.errorCode = e.code ?? '';
@@ -132,7 +158,7 @@ function renderAuthPage(mode, root, session) {
       }
       // Вхід без профілю (реєстрація раніше обірвалась): сесія сама покаже крок «Завершіть профіль».
       if (session.getState().status === 'needsProfile') return;
-      toast(mode === 'signup' ? `Акаунт створено. Вітаємо, ${session.currentName()}!` : `З поверненням, ${session.currentName()}!`);
+      notify(mode === 'signup' ? `Акаунт створено. Вітаємо, ${session.currentName()}!` : `З поверненням, ${session.currentName()}!`);
       const role = session.getState().profile?.role;
       alive = false;
       location.hash = homePath(role);

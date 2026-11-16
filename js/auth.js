@@ -9,6 +9,12 @@ import { DEMO_GUEST_NAME } from './data.js';
 const ROLES = ['guest', 'host'];
 const FALLBACK_MESSAGE = 'Щось пішло не так. Спробуйте ще раз';
 const MESSAGES = {
+  'auth/google-unavailable': 'Вхід через Google ще не налаштовано',
+  'auth/oauth-cancelled': 'Вхід через Google скасовано. Спробуйте ще раз',
+  'auth/oauth-failed': 'Не вдалося завершити вхід через Google. Спробуйте ще раз',
+  'auth/account-disabled': 'Обліковий запис заблоковано або деактивовано',
+  'auth/email-not-confirmed': 'Підтвердьте електронну пошту, а потім увійдіть',
+  'auth/verification-failed': 'Не вдалося перевірити акаунт. Спробуйте увійти ще раз',
   'auth/invalid-email': 'Невірний формат email',
   'auth/missing-password': 'Введіть пароль',
   'auth/weak-password': 'Пароль має бути щонайменше 6 символів',
@@ -85,10 +91,20 @@ export function createSession(loadService, { timeoutMs = 8000, retryMs = 1000 } 
     service.onUser(async (user) => {
       const seq = ++userSeq;
       if (!user) {
-        set({ status: 'signedOut', user: null, profile: null });
+        set({ status: 'signedOut', user: null, profile: null, error: null });
         resolveReady();
         return;
       }
+      if (service.verifyUser) {
+        try { user = await service.verifyUser(); }
+        catch (error) {
+          if (seq !== userSeq) return;
+          set({ status: 'signedOut', user: null, profile: null, error: error.code ?? 'auth/verification-failed' });
+          resolveReady();
+          return;
+        }
+      }
+      if (seq !== userSeq) return;
       // supabase-js повторює подію входу (напр., коли вкладка знову видима) — профіль уже є, не перечитуємо.
       if (state.user?.uid === user.uid && state.profile) {
         resolveReady();
@@ -104,7 +120,7 @@ export function createSession(loadService, { timeoutMs = 8000, retryMs = 1000 } 
         }
       }
       if (seq !== userSeq) return; // поки читали профіль, користувач змінився
-      set({ status: profile ? 'signedIn' : 'needsProfile', user, profile });
+      set({ status: profile ? 'signedIn' : 'needsProfile', user, profile, error: null });
       resolveReady();
     });
   })();

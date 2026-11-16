@@ -51,6 +51,9 @@ const newId = (prefix) => `${prefix}-${Date.now().toString(36)}${(seq++).toStrin
 export function createStore(storage) {
   let state = load(storage) ?? seedState();
   const listeners = new Set();
+  let pilotSpots = [];
+  let pilotReady = false;
+  const getState = () => ({ ...state, spots: [...state.spots, ...pilotSpots], pilotReady });
 
   const save = () => {
     try { storage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* демо працює і без збереження */ }
@@ -58,7 +61,7 @@ export function createStore(storage) {
   const set = (patch) => {
     state = { ...state, ...patch };
     save();
-    listeners.forEach((fn) => fn(state));
+    listeners.forEach((fn) => fn(getState()));
   };
   const findSpot = (id) => state.spots.find((s) => s.id === id);
   const findBooking = (id) => state.bookings.find((b) => b.id === id);
@@ -66,7 +69,12 @@ export function createStore(storage) {
     set({ bookings: state.bookings.map((b) => (b.id === id ? { ...b, ...patch } : b)) });
 
   return {
-    getState: () => state,
+    getState,
+    setPilotSpots(spots) {
+      pilotSpots = spots;
+      pilotReady = true;
+      listeners.forEach(fn => fn(getState()));
+    },
     subscribe(fn) {
       listeners.add(fn);
       return () => listeners.delete(fn);
@@ -115,7 +123,7 @@ export function createStore(storage) {
     reset() {
       try { storage.removeItem(STORAGE_KEY); } catch { /* ігноруємо */ }
       state = seedState();
-      listeners.forEach((fn) => fn(state));
+      listeners.forEach((fn) => fn(getState()));
     },
   };
 }
