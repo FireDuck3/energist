@@ -66,6 +66,9 @@ export function openConversation(booking, session, refresh) {
       return;
     }
     if (rows.some(row => row.author_id === account)) return;
+    reviews.append(h('p', { class: 'muted' }, account === booking.guest_id
+      ? 'Ваш відгук і нік будуть видимі всім на сторінці точки.'
+      : 'Цей відгук про гостя побачать учасники бронювання.'));
     const rating = h('select', { class: 'input', 'aria-label': 'Оцінка' }, [5,4,3,2,1].map(n => h('option', { value: n }, n + '/5')));
     const body = h('textarea', { class: 'input', required: true, maxlength: 2000, 'aria-label': 'Текст відгуку' });
     const button = h('button', { type: 'submit', class: 'btn btn-primary' }, 'Залишити відгук');
@@ -86,3 +89,4 @@ export function openConversation(booking, session, refresh) {
   const timer = setInterval(load, 5000);
   void load();
 }
+
