@@ -52,6 +52,8 @@ function renderSpot(spot, host, { blackout }, store, session, userHistory, pilot
           fact('Під час блекауту', spot.pilot ? 'Уточніть у господаря' : isLiveInBlackout(spot) ? `працює ще ~${spot.blackoutHours} год` : 'не працює без світла')),
 
         h('h2', { class: 'reviews-title' }, 'Відгуки'),
+        spot.reviewsUnavailable && h('p', { role: 'status' }, 'Не вдалося завантажити відгуки. Повторна спроба відбудеться автоматично.'),
+        !spot.reviewsUnavailable && !spot.reviews.length && h('p', { class: 'muted' }, 'Відгуків ще немає. Після завершення зарядки гість може залишити відгук у чаті бронювання.'),
         h('div', { class: 'reviews' }, spot.reviews.map((r) =>
           h('div', { class: 'review' },
             h('div', { class: 'review-head' },
@@ -104,3 +106,4 @@ export function render({ id }, root, store, session, userHistory, pilot) {
   const offSession = session.subscribe(update);
   return () => { offStore(); offSession(); };
 }
+
