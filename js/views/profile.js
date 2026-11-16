@@ -59,7 +59,11 @@ export function render(_params, root, store, session, userHistory, pilot) {
   }
 
   const pilotBox = h('div');
-  const drawPilot = () => pilotBox.replaceChildren(pilot.panel());
+  const chatsBox = h('div');
+  const drawPilot = () => {
+    pilotBox.replaceChildren(pilot.panel());
+    chatsBox.replaceChildren(pilot.chatsPanel());
+  };
   function update() {
     const { status, user, profile } = session.getState();
     if (status === 'loading') {
@@ -144,6 +148,7 @@ export function render(_params, root, store, session, userHistory, pilot) {
     const sections = [
       ['account', 'Профіль', account],
       ['bookings', 'Бронювання', pilotBox],
+      ['chats', 'Чати', chatsBox],
       ['charges', 'Історія зарядок', chargesBox],
     ];
     const menu = h('nav', { class: 'cabinet-menu card', 'aria-label': 'Меню особистого кабінету' });
@@ -183,3 +188,4 @@ export function render(_params, root, store, session, userHistory, pilot) {
   const offHistory = userHistory.subscribe(drawCharges);
   return () => { offSession(); offHistory(); offPilot(); };
 }
+
