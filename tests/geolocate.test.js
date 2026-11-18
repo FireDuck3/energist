@@ -18,3 +18,8 @@ test('locate: відмова, недоступність, таймаут, від
 test('geoMessage: український текст для кожного коду', () => {
   for (const c of ['unsupported', 'denied', 'unavailable', 'timeout']) eq(geoMessage(c).length > 10, true, c);
 });
+
+test('locate: браузер так і не відповів (закрито запит дозволу) — відхиляється з timeout', async () => {
+  const silent = { getCurrentPosition: () => {} };
+  try { await locate({ geolocation: silent, timeoutMs: 20 }); eq('resolved', 'rejected'); } catch (e) { eq(e.code, 'timeout'); }
+});

@@ -211,7 +211,7 @@ export function render(_params, root, store, _session, userHistory) {
 
   if (window.L) {
     map = L.map(mapEl, { zoomControl: true, scrollWheelZoom: true, maxZoom: 19 }).setView(VINNYTSIA_CENTER, 13);
-    stationLayer = (L.markerClusterGroup ? L.markerClusterGroup({ maxClusterRadius: 50 }) : L.layerGroup()).addTo(map);
+    stationLayer = (L.markerClusterGroup ? L.markerClusterGroup({ maxClusterRadius: 50, disableClusteringAtZoom: 18 }) : L.layerGroup()).addTo(map);
     const tiles = L.tileLayer(TILES.url, { attribution: TILES.attribution, maxZoom: 19 }).addTo(map);
     tiles.on('load', () => { tilesLoaded = true; fallback.hidden = true; });
     tiles.on('tileerror', () => { if (!tilesLoaded) fallback.hidden = false; });
@@ -272,8 +272,9 @@ export function render(_params, root, store, _session, userHistory) {
   const showStation = (st) => {
     const m = publicMarkers.find((x) => x.st === st);
     if (!map || !m) return;
-    if (stationLayer.zoomToShowLayer) stationLayer.zoomToShowLayer(m.marker, () => m.marker.openPopup());
-    else { map.setView([st.lat, st.lng], Math.max(map.getZoom(), 15), { animate: false }); m.marker.openPopup(); }
+    if (view !== 'map') { view = 'map'; paintView(); }
+    map.setView([st.lat, st.lng], 18, { animate: false }); // на цьому масштабі кластери вже розгорнуті
+    m.marker.openPopup();
   };
   function renderPublicMarkers(stations) {
     if (!map) return;
@@ -287,8 +288,20 @@ export function render(_params, root, store, _session, userHistory) {
   // ---- Місцеположення й «найближча зарядка» ----
   async function requestLocation() {
     locateBtn.disabled = true;
+    nearestBtn.disabled = true;
+    let found;
     try {
-      origin = await locate();
+      found = await locate();
+    } catch (e) {
+      if (!destroyed) setNote(geoMessage(e.code));
+      return false;
+    } finally {
+      locateBtn.disabled = false;
+      nearestBtn.disabled = false;
+    }
+    if (destroyed) return false;
+    {
+      origin = found;
       originMarker?.remove();
       if (map) {
         originMarker = L.circleMarker([origin.lat, origin.lng], { radius: 8, color: '#fff', weight: 3, fillColor: '#2563eb', fillOpacity: 1 })
@@ -296,19 +309,15 @@ export function render(_params, root, store, _session, userHistory) {
         map.setView([origin.lat, origin.lng], 13, { animate: false });
       }
       setNote('');
-      update();
-      return true;
-    } catch (e) {
-      setNote(geoMessage(e.code));
-      return false;
-    } finally {
-      locateBtn.disabled = false;
     }
+    update();
+    return true;
   }
   locateBtn.addEventListener('click', requestLocation);
 
   nearestBtn.addEventListener('click', async () => {
     if (!origin && !(await requestLocation())) return;
+    if (destroyed) return;
     const best = nearest([
       ...current.spots.map((spot) => ({ lat: spot.lat, lng: spot.lng, spot })),
       ...current.stations.map((station) => ({ lat: station.lat, lng: station.lng, station }))], origin);
@@ -341,7 +350,7 @@ export function render(_params, root, store, _session, userHistory) {
       .filter((s) => matchSpotExtra(s, filters, { origin })), origin);
     const q = normalizeQuery(filters.query);
     const stations = sortByDistance(publicStations.filter((st) => matchStation(st, filters, { origin, blackout })
-      && (!q || normalizeQuery(`${st.name} ${st.address} ${st.operator}`).includes(q))), origin);
+      && (!q || normalizeQuery([st.name, st.address, st.operator].filter(Boolean).join(' ')).includes(q))), origin);
     current = { spots: visible, stations };
 
     renderFilters(filters, demoMode);
@@ -370,6 +379,7 @@ export function render(_params, root, store, _session, userHistory) {
     lastDemo = demoMode;
   }
 
+  if (store.getState().filters.radiusKm) store.setFilters({ radiusKm: null }); // без місцеположення радіус не діє
   update();
   loadPublicStations().then((rows) => {
     if (destroyed || !rows.length) return;

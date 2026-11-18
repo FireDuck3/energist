@@ -986,5 +986,5 @@ input.input { height: 44px; }
 .map-layout.view-list { grid-template-columns: 1fr; }
 .map-layout.view-list .map-pane { display: none; }
 @media (max-width: 900px) {
-  .map-layout.view-map .spot-list, .map-layout.view-map .result-count { display: none; }
+  .map-layout.view-map .spot-list .spot-card:not(.empty) { display: none; } /* лічильник і «Нічого не знайдено» лишаються видимими */
 }

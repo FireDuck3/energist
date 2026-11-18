@@ -14,9 +14,11 @@ export function locate({ geolocation = globalThis.navigator?.geolocation, timeou
   return new Promise((resolve, reject) => {
     const fail = (code) => reject(Object.assign(new Error(MESSAGES[code]), { code }));
     if (!geolocation) return fail('unsupported');
+    // Браузерний timeout рахується лише після дозволу: якщо запит закрито, жоден колбек не викликається.
+    const guard = setTimeout(() => fail('timeout'), timeoutMs + 2000);
     geolocation.getCurrentPosition(
-      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      (err) => fail(CODES[err?.code] ?? 'unavailable'),
+      (pos) => { clearTimeout(guard); resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }); },
+      (err) => { clearTimeout(guard); fail(CODES[err?.code] ?? 'unavailable'); },
       { enableHighAccuracy: false, timeout: timeoutMs, maximumAge: 60000 });
   });
 }
