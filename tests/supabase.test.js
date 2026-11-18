@@ -42,3 +42,11 @@ test('spotCover: перше фото точки, інакше — обклади
   eq(spotCover({ source: 'solar', photos: ['https://cdn/x.jpg'] }), 'https://cdn/x.jpg');
   eq(spotCover({ source: 'solar', photos: [] }), spotCover({ source: 'solar' }));
 });
+
+test('toPilotSpot: порожні шляхи фото відкидаються, а не ламають карту', async () => {
+  const { toPilotSpot } = await import('../js/supabase.js');
+  const row = { id: 'p1', title: 'Т', district: 'Д', lat: 1, lng: 1, power_kw: 1, price_per_kwh: 10, devices: ['ev'],
+    opens: '08:00:00', closes: '20:00:00', photos: [null, '', 'u/p1/a.jpg'] };
+  const s = toPilotSpot(row, [], (p) => { if (typeof p !== 'string') throw new TypeError('bad path'); return `https://cdn/${p}`; });
+  eq([s.photoPaths, s.photos], [['u/p1/a.jpg'], ['https://cdn/u/p1/a.jpg']]);
+});

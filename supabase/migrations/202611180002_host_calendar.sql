@@ -6,10 +6,21 @@ alter table public.pilot_spots
   add column closed_weekdays smallint[] not null default '{}' check (closed_weekdays <@ array[1,2,3,4,5,6,7]::smallint[]),
   add column photos text[] not null default '{}' check (cardinality(photos) <= 5);
 
--- Точку на паузі бачить лише її власник.
+-- Чи має поточний користувач активне бронювання цієї точки. Security definer: читає pilot_bookings
+-- поза RLS, інакше політики pilot_spots і pilot_bookings посилалися б одна на одну (рекурсія).
+create function public.has_active_pilot_booking(point_id uuid) returns boolean
+language sql stable security definer set search_path = '' as $$
+ select auth.uid() is not null and exists (select 1 from public.pilot_bookings b
+  where b.spot_id = point_id and b.guest_id = auth.uid() and b.status in ('pending','confirmed'));
+$$;
+revoke all on function public.has_active_pilot_booking(uuid) from public;
+grant execute on function public.has_active_pilot_booking(uuid) to anon, authenticated;
+
+-- Точку на паузі бачать лише власник і гості з активним бронюванням (їм потрібні адреса й координати).
 drop policy "Read pilot points" on public.pilot_spots;
 create policy "Read pilot points" on public.pilot_spots for select to anon, authenticated
- using ((archived_at is null and not paused) or owner_id = auth.uid());
+ using ((archived_at is null and not paused) or owner_id = auth.uid()
+  or (archived_at is null and public.has_active_pilot_booking(id)));
 
 create table public.pilot_spot_days_off (
  spot_id uuid not null references public.pilot_spots(id),
@@ -89,7 +100,7 @@ declare prefix text := auth.uid()::text || '/' || point_id::text || '/';
 begin
  perform public.require_own_pilot_spot(point_id);
  if paths is null or cardinality(paths) > 5 or exists (
-   select 1 from unnest(paths) p where left(p, length(prefix)) <> prefix or p like '%..%' or p !~ '\.(jpg|png|webp)$') then
+   select 1 from unnest(paths) p where p is null or left(p, length(prefix)) <> prefix or p like '%..%' or p !~ '\.(jpg|png|webp)$') then
   raise exception 'Invalid photo paths' using errcode = '22023';
  end if;
  update public.pilot_spots set photos = paths where id = point_id;
@@ -154,5 +165,8 @@ on conflict (id) do nothing;
 create policy "Owners upload spot photos" on storage.objects for insert to authenticated
  with check (bucket_id = 'spot-photos' and (storage.foldername(name))[1] = auth.uid()::text);
 create policy "Owners delete spot photos" on storage.objects for delete to authenticated
+ using (bucket_id = 'spot-photos' and (storage.foldername(name))[1] = auth.uid()::text);
+-- remove() виконує DELETE … RETURNING: без select-політики видалення тихо не спрацьовує.
+create policy "Owners read own spot photo objects" on storage.objects for select to authenticated
  using (bucket_id = 'spot-photos' and (storage.foldername(name))[1] = auth.uid()::text);
 commit;

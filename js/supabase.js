@@ -49,7 +49,8 @@ const PHOTO_BUCKET = 'spot-photos';
 
 // Рядок pilot_spots → точка для карти. photoUrl перетворює шлях у Storage на публічну адресу.
 export function toPilotSpot(row, feedback, photoUrl, reviewsUnavailable = false) {
-  const photoPaths = row.photos ?? [];
+  // Захист від зіпсованого рядка: один порожній шлях не повинен ламати карту для всіх.
+  const photoPaths = (row.photos ?? []).filter(p => typeof p === 'string' && p);
   return {
     id: row.id, archivedAt: row.archived_at, ownerId: row.owner_id, pilot: true, hostName: 'Господар точки',
     title: row.title, district: row.district, lat: Number(row.lat), lng: Number(row.lng),

@@ -266,6 +266,15 @@ export function openPhotos(spot, pilot) {
   const modal = openModal(h('div', { class: 'wizard' },
     h('p', { class: 'eyebrow' }, spot.title), h('h2', {}, 'Фото точки'), body), { className: 'modal-wide' });
   const fail = (text) => { error.textContent = text; error.hidden = false; };
+  // Одна операція за раз: паралельні збереження перезаписували б список фото одне одного.
+  let loading = false;
+  async function exclusive(action) {
+    if (loading) return;
+    loading = true;
+    error.hidden = true;
+    draw();
+    try { await action(); } finally { loading = false; draw(); }
+  }
 
   async function save(nextPaths, nextUrls, removed = []) {
     await pilot.setPhotos(spot.id, nextPaths);
@@ -275,13 +284,11 @@ export function openPhotos(spot, pilot) {
   }
 
   const fileInput = h('input', { type: 'file', accept: PHOTO_LIMITS.types.join(','), multiple: true, hidden: true,
-    async onchange(e) {
-      error.hidden = true;
+    onchange: (e) => exclusive(async () => {
       const { ok, errors } = checkPhotos([...e.target.files], paths.length, { beforeResize: true });
       e.target.value = '';
       const uploaded = [];
       const messages = [...errors];
-      draw(true);
       for (const file of ok) {
         try {
           const blob = await resizeImage(file);
@@ -296,27 +303,25 @@ export function openPhotos(spot, pilot) {
           messages.push('Не вдалося зберегти фото. Спробуйте ще раз.');
         }
       }
-      draw();
-      if (messages.length) fail(messages.join(' '));
-    } });
+      if (messages.length) queueMicrotask(() => fail(messages.join(' ')));
+    }) });
 
-  function draw(loading = false) {
+  function draw() {
     body.replaceChildren(
       h('p', { class: 'muted' }, `JPEG, PNG або WebP, до ${PHOTO_LIMITS.max} фото. Перше фото — обкладинка на карті.`),
       h('div', { class: 'photo-grid' }, urls.map((url, i) => h('figure', { class: 'photo-item' },
         h('img', { src: url, alt: `Фото ${i + 1}` }),
         i === 0 ? h('span', { class: 'badge badge-info' }, 'Обкладинка') : h('button', { type: 'button', class: 'btn btn-ghost btn-sm',
-          async onclick(e) {
+          disabled: loading, onclick: () => exclusive(async () => {
             const order = [i, ...paths.keys()].filter((x, k, arr) => arr.indexOf(x) === k);
-            await busy(e.currentTarget, error, () => save(order.map((k) => paths[k]), order.map((k) => urls[k])), 'Не вдалося змінити обкладинку.');
-            draw();
-          } }, 'Зробити обкладинкою'),
-        h('button', { type: 'button', class: 'btn btn-danger-ghost btn-sm', async onclick(e) {
-          await busy(e.currentTarget, error,
-            () => save(paths.filter((_, k) => k !== i), urls.filter((_, k) => k !== i), [paths[i]]), 'Не вдалося видалити фото.');
-          draw();
-        } }, 'Видалити')))),
-      loading && h('p', { class: 'muted' }, 'Завантажуємо…'),
+            try { await save(order.map((k) => paths[k]), order.map((k) => urls[k])); }
+            catch { queueMicrotask(() => fail('Не вдалося змінити обкладинку.')); }
+          }) }, 'Зробити обкладинкою'),
+        h('button', { type: 'button', class: 'btn btn-danger-ghost btn-sm', disabled: loading, onclick: () => exclusive(async () => {
+          try { await save(paths.filter((_, k) => k !== i), urls.filter((_, k) => k !== i), [paths[i]]); }
+          catch { queueMicrotask(() => fail('Не вдалося видалити фото.')); }
+        }) }, 'Видалити')))),
+      loading ? h('p', { class: 'muted' }, 'Зачекайте…') : '',
       error,
       fileInput,
       h('div', { class: 'wizard-actions' },
