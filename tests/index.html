@@ -20,7 +20,7 @@
       document.getElementById('summary').textContent = `FAIL load: ${e.message}`;
     });
     try {
-      for (const file of ['oauth', 'credentials', 'authorization', 'pricing', 'data', 'filters', 'validate', 'store', 'stats', 'ui', 'auth', 'supabase', 'history', 'user-history', 'search-box', 'landing', 'notifications', 'auth-forms', 'stations-normalize', 'stations-dedupe', 'stations-sync', 'stations-client', 'map-filters']) {
+      for (const file of ['oauth', 'credentials', 'authorization', 'pricing', 'data', 'filters', 'validate', 'store', 'stats', 'ui', 'auth', 'supabase', 'history', 'user-history', 'search-box', 'landing', 'notifications', 'auth-forms', 'stations-normalize', 'stations-dedupe', 'stations-sync', 'stations-client', 'map-filters', 'geolocate']) {
         await import(`./${file}.test.js`);
       }
       await run();
