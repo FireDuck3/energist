@@ -7,5 +7,5 @@ export const supabaseConfig = {
   // (шаблони редагуються лише з власним SMTP) — тож поки false ці кнопки не показуються.
   emailCodes: false,
   // Публічний VAPID-ключ для push (README → «Чати й push»). Порожній — кнопка push показує «не налаштовано».
-  vapidPublicKey: '',
+  vapidPublicKey: 'BPfjESHCj7ps7p0hWE3MfvPTqyrHbxqHJlxFNGY_aHKOJcOj8b0GA2Lsyxi0LKS_yNl8Updu-ViF33zFPHBkhs0',
 };
