@@ -65,3 +65,27 @@ test('sync: ключ OCM іде в запит, але не потрапляє в
   eq(seen.some((u) => u.includes('key=SECRET-KEY')), true);
   eq(JSON.stringify(out).includes('SECRET-KEY'), false);
 });
+
+test('sync: OSM впав — злитий рядок з OCM+OSM не деактивується і не вважається дублікатом', async () => {
+  const merged = { id: 'm', source: 'merged', external_id: 'ocm:4242', missed_runs: 0,
+    sources: [{ source: 'ocm', external_id: '4242' }, { source: 'osm', external_id: 'node/123' }] };
+  const db = fakeDb([merged]);
+  await run({ fetchImpl: fakeFetch({ osm: res(503, {}) }), supabase: db });
+  eq(db.deactivated, []);
+});
+
+test('sync: Overpass 200 з remark або порожнім списком — це помилка джерела, а не успіх', async () => {
+  const osmRow = { id: 'o', source: 'osm', external_id: 'node/9', sources: [{ source: 'osm', external_id: 'node/9' }], missed_runs: 2 };
+  for (const body of [{ elements: [], remark: 'runtime error: timeout' }, { elements: [] }]) {
+    const db = fakeDb([osmRow]);
+    const out = await run({ fetchImpl: fakeFetch({ osm: res(200, body) }), supabase: db });
+    eq(typeof out.results.osm.error, 'string'); eq(db.deactivated, []); eq(db.missed, []);
+  }
+});
+
+test('sync: збій Supabase не губить журнал запуску', async () => {
+  const db = fakeDb();
+  db.upsert = async () => { throw new Error('HTTP 500'); };
+  const out = await run({ fetchImpl: fakeFetch(), supabase: db });
+  eq(out.ok, false); eq(db.runs.length, 2); eq(db.runs.every((r) => /Supabase/.test(r.error)), true);
+});

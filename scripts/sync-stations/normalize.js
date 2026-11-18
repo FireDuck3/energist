@@ -20,6 +20,14 @@ export function parseOpeningHours(raw) {
   return v === '24/7' ? 'Цілодобово' : v;
 }
 
+// Лише офіційні http(s)-посилання: OSM-теги редагує будь-хто, javascript:/data: у href недопустимі.
+export function safeHttpUrl(v) {
+  try {
+    const u = new URL(String(v));
+    return u.protocol === 'http:' || u.protocol === 'https:' ? u.href : null;
+  } catch { return null; }
+}
+
 const num = (v) => (Number.isFinite(Number(v)) && v !== null && v !== '' ? Number(v) : null);
 const maxPower = (connectors) => connectors.reduce((m, c) => (c.power_kw != null && (m == null || c.power_kw > m) ? c.power_kw : m), null);
 
@@ -38,7 +46,7 @@ export function normalizeOcm(poi) {
     source: 'ocm', external_id: String(poi.ID), name: a.Title ?? null, address,
     operator: poi.OperatorInfo?.Title ?? null, lat, lng, max_power_kw: maxPower(connectors), connectors,
     price_per_kwh: null, price_verified: false, opening_hours: null,
-    access: poi.UsageType?.Title ?? null, operator_url: poi.OperatorInfo?.WebsiteURL ?? null,
+    access: poi.UsageType?.Title ?? null, operator_url: safeHttpUrl(poi.OperatorInfo?.WebsiteURL),
     sources: [{ source: 'ocm', external_id: String(poi.ID), url: `https://openchargemap.org/site/poi/details/${poi.ID}`, license: OCM_LICENSE }],
     source_updated_at: poi.DateLastStatusUpdate ?? null,
   };
@@ -64,7 +72,7 @@ export function normalizeOsm(el) {
     address: [tags['addr:street'], tags['addr:housenumber'], tags['addr:city']].filter(Boolean).join(' ') || null,
     operator: tags.operator ?? tags.brand ?? null, lat, lng, max_power_kw: maxPower(connectors), connectors,
     price_per_kwh: null, price_verified: false, opening_hours: parseOpeningHours(tags.opening_hours),
-    access: tags.access ?? null, operator_url: tags.website ?? tags['contact:website'] ?? null,
+    access: tags.access ?? null, operator_url: safeHttpUrl(tags.website ?? tags['contact:website']),
     sources: [{ source: 'osm', external_id: id, url: `https://www.openstreetmap.org/${id}`, license: OSM_LICENSE }],
     source_updated_at: null,
   };

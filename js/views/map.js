@@ -4,7 +4,7 @@ import { filterSpots, spotRating, isLiveInBlackout, isOpenAt } from '../filters.
 import { formatUAH } from '../pricing.js';
 import { DEVICES, SOURCES, CONNECTORS, VINNYTSIA_CENTER } from '../data.js';
 import { searchBox } from './search-box.js';
-import { loadPublicStations, routeUrl, statusLabel, attribution, connectorLabel, spotKind } from '../stations.js';
+import { loadPublicStations, routeUrl, statusLabel, attribution, connectorLabel, spotKind, safeUrl } from '../stations.js';
 
 // Тайли OpenStreetMap; світлу й темну (блекаут) тему дає CSS-фільтр на .leaflet-tile-pane.
 export const TILES = {
@@ -88,7 +88,7 @@ function stationDetails(st) {
 
 const stationActions = (st) => h('div', { class: 'st-actions' },
   h('a', { class: 'btn btn-primary btn-sm', href: routeUrl(st), target: '_blank', rel: 'noopener' }, 'Прокласти маршрут'),
-  st.operator_url && h('a', { class: 'btn btn-secondary btn-sm', href: st.operator_url, target: '_blank', rel: 'noopener' }, 'Відкрити в застосунку оператора'));
+  safeUrl(st.operator_url) && h('a', { class: 'btn btn-secondary btn-sm', href: safeUrl(st.operator_url), target: '_blank', rel: 'noopener' }, 'Відкрити в застосунку оператора'));
 
 function stationPopup(st) {
   return h('div', { class: 'popup station-popup' },

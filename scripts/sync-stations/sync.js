@@ -37,6 +37,8 @@ export async function fetchOsm({ fetchImpl, bbox, sleep = defaultSleep }) {
   const q = `[out:json][timeout:60];nwr["amenity"="charging_station"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});out center tags;`;
   const body = await fetchJson(fetchImpl, 'https://overpass-api.de/api/interpreter',
     { method: 'POST', body: `data=${encodeURIComponent(q)}`, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }, sleep);
+  // Overpass при перевантаженні відповідає 200 із remark і порожнім списком — це не успіх.
+  if (body.remark) throw new Error('Overpass remark');
   return body.elements ?? [];
 }
 
@@ -55,6 +57,7 @@ export async function syncStations({ fetchImpl, supabase, apiKey, bbox = BBOX, n
     const r = { fetched: 0, inserted: 0, updated: 0, skipped: 0, started_at: new Date().toISOString() };
     try {
       const raw = await job.fetch();
+      if (raw.length === 0) throw new Error('порожня відповідь');
       r.fetched = raw.length;
       for (const item of raw) {
         const s = job.normalize(item);
@@ -67,6 +70,7 @@ export async function syncStations({ fetchImpl, supabase, apiKey, bbox = BBOX, n
     results[name] = r;
   }
 
+  try {
   const active = succeeded.size ? await supabase.listActive() : [];
   const existingByKey = new Map(active.map((r) => [rowKey(r), r]));
   const stamp = now.toISOString();
@@ -84,20 +88,25 @@ export async function syncStations({ fetchImpl, supabase, apiKey, bbox = BBOX, n
 
   // Стара копія, що ділить джерело з новим записом, але має інший ключ, — зайвий дублікат.
   const newPairs = new Set(rows.flatMap(pairKeys));
-  const superseded = active.filter((r) => !newKeys.has(rowKey(r)) && pairKeys(r).some((p) => newPairs.has(p)));
+  const touchable = (r) => (r.sources ?? []).every((s) => succeeded.has(s.source)); // записи впалого джерела не чіпаємо
+  const superseded = active.filter((r) => touchable(r) && !newKeys.has(rowKey(r)) && pairKeys(r).some((p) => newPairs.has(p)));
   const supersededIds = new Set(superseded.map((r) => r.id));
   const toDeactivate = superseded.map((r) => r.id);
   const missed = [];
   for (const r of active) {
     if (newKeys.has(rowKey(r)) || supersededIds.has(r.id)) continue;
     // Чіпаємо лише записи, усі джерела яких успішно відпрацювали в цьому запуску.
-    if (!(r.sources ?? []).every((s) => succeeded.has(s.source))) continue;
+    if (!touchable(r)) continue;
     const n = (r.missed_runs ?? 0) + 1;
     if (n >= MAX_MISSED_RUNS) toDeactivate.push(r.id); else missed.push({ id: r.id, missed_runs: n });
   }
   if (missed.length) await supabase.markMissed(missed);
   if (toDeactivate.length) await supabase.deactivate(toDeactivate);
 
+  } catch (e) {
+    // Збій бази не повинен губити журнал: помічаємо всі джерела помилкою і все одно пишемо run.
+    for (const r of Object.values(results)) r.error ??= `Supabase: ${e.message}`;
+  }
   for (const [source, r] of Object.entries(results)) {
     await supabase.logRun({ source, started_at: r.started_at, finished_at: new Date().toISOString(),
       fetched: r.fetched, inserted: r.inserted, updated: r.updated, skipped: r.skipped, error: r.error ?? null });

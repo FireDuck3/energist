@@ -9,6 +9,14 @@ export const statusLabel = (_station) => 'Статус невідомий'; // �
 
 export const routeUrl = ({ lat, lng }) => `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
 
+// Посилання оператора з бази: лише http(s), решта (javascript:, data:, без схеми) відкидається.
+export function safeUrl(v) {
+  try {
+    const u = new URL(String(v));
+    return u.protocol === 'http:' || u.protocol === 'https:' ? u.href : null;
+  } catch { return null; }
+}
+
 export const attribution = (station) => [...new Set((station.sources ?? []).map((s) => s.license).filter(Boolean))];
 
 function readCache(storage) {

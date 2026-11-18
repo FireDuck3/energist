@@ -39,3 +39,11 @@ test('parseOpeningHours', () => {
   eq(parseOpeningHours('Mo-Su 08:00-22:00'), 'Mo-Su 08:00-22:00');
   eq(parseOpeningHours(null), null);
 });
+
+test('operator_url: лише http(s); javascript: і адреса без схеми відкидаються', () => {
+  const osm = (website) => normalizeOsm({ ...OSM_NODE, tags: { ...OSM_NODE.tags, website } }).operator_url;
+  eq(osm('javascript:alert(1)'), null);
+  eq(osm('www.op.ua'), null);
+  eq(osm('https://op.ua/x'), 'https://op.ua/x');
+  eq(normalizeOcm({ ...OCM_POI, OperatorInfo: { Title: 'X', WebsiteURL: 'data:text/html,hi' } }).operator_url, null);
+});

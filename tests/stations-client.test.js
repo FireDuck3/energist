@@ -58,3 +58,10 @@ test('spotKind: пілотна точка — приватна, засіяна �
   eq(spotKind({ pilot: true }), 'private');
   eq(spotKind({ id: 'oleh-ses' }), 'demo');
 });
+
+test('safeUrl: пропускає лише http(s)', async () => {
+  const { safeUrl } = await import('../js/stations.js');
+  eq(safeUrl('https://a.ua/'), 'https://a.ua/');
+  eq(safeUrl('javascript:alert(1)'), null);
+  eq(safeUrl(null), null);
+});
