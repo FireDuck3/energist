@@ -42,8 +42,10 @@ export function openConversation(booking, session, refresh) {
   const off = session.subscribe(() => {
     if (session.getState().user?.uid !== account || session.getState().status !== 'signedIn') modal.close();
   });
+  let reloadAfter = false; // подія Realtime прийшла під час завантаження — перезавантажимо ще раз
   async function load() {
-    if (closed || loading) return;
+    if (closed) return;
+    if (loading) { reloadAfter = true; return; }
     loading = true;
     try {
       const [rows, feedback] = await Promise.all([service.listMessages(booking.id), service.listReviews(booking.id)]);
@@ -62,7 +64,10 @@ export function openConversation(booking, session, refresh) {
       // Preserve an unfinished review while polling for new messages.
       if (!reviews.querySelector('form')) drawReviews(feedback);
     } catch { if (!closed) status.textContent = 'Не вдалося завантажити чат. Повторна спроба за кілька секунд.'; }
-    finally { loading = false; }
+    finally {
+      loading = false;
+      if (reloadAfter && !closed) { reloadAfter = false; void load(); }
+    }
   }
   function drawReviews(rows) {
     reviews.replaceChildren(h('h3', {}, 'Відгуки про співпрацю'),

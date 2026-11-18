@@ -65,3 +65,10 @@ test('disablePush: відписує й видаляє з сервера', async 
   await disablePush({ service: { deletePushSubscription: async (e) => deleted.push(e) }, env });
   eq([deleted, state.unsubscribed], [['https://push.example/1'], true]);
 });
+
+test('pushState: підписка цього браузера належить іншому акаунту → off', async () => {
+  const { env } = fakeEnv({ permission: 'granted', subscription: 'https://push.example/1' });
+  const service = { ownsPushSubscription: async (endpoint) => endpoint === 'https://push.example/other' };
+  eq(await pushState({ env, vapidKey: 'K', service }), 'off');
+  eq(await pushState({ env, vapidKey: 'K', service: { ownsPushSubscription: async () => true } }), 'on');
+});

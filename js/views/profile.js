@@ -16,7 +16,7 @@ function pushCard(service) {
   const button = h('button', { type: 'button', class: 'btn btn-secondary btn-sm', hidden: true });
   async function draw() {
     let state;
-    try { state = service?.savePushSubscription ? await pushState({ vapidKey }) : 'unconfigured'; } catch { state = 'unsupported'; }
+    try { state = service?.savePushSubscription ? await pushState({ vapidKey, service }) : 'unconfigured'; } catch { state = 'unsupported'; }
     text.textContent = PUSH_STATE_TEXT[state];
     button.hidden = !['on', 'off'].includes(state);
     button.textContent = state === 'on' ? 'Вимкнути' : 'Увімкнути';

@@ -145,8 +145,9 @@ docs/                 спеки і плани
 **Розгортання:**
 1. Supabase → SQL Editor: виконайте `supabase/migrations/202611180003_chats_push.sql` (вмикає `pg_cron`, Realtime для чатів і сповіщень, ліміт повідомлень, push-підписки й нагадування).
 2. Згенеруйте VAPID-ключі: `npx web-push generate-vapid-keys`. Публічний ключ вставте в `vapidPublicKey` у `js/supabase-config.js` (його можна викладати).
-3. Supabase → Edge Functions → Create function `send-push`: вставте `supabase/functions/send-push/index.ts` і `payload.js` з репозиторію. У Secrets додайте `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (напр. `mailto:ваша-пошта`). `SUPABASE_URL` і `SUPABASE_SERVICE_ROLE_KEY` функція отримує автоматично.
-4. Supabase → Database → Webhooks → Create: таблиця `booking_notifications`, подія Insert, тип «Supabase Edge Functions», функція `send-push`.
+3. Supabase → Edge Functions → Create function `send-push`: вставте `supabase/functions/send-push/index.ts` і `payload.js` з репозиторію. У Secrets додайте `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (напр. `mailto:ваша-пошта`) і `WEBHOOK_SECRET` — довгий випадковий рядок (напр. `openssl rand -hex 32`). `SUPABASE_URL` і `SUPABASE_SERVICE_ROLE_KEY` функція отримує автоматично.
+4. Supabase → Database → Webhooks → Create: таблиця `booking_notifications`, подія Insert, тип «Supabase Edge Functions», функція `send-push`. У HTTP Headers додайте `x-webhook-secret` зі значенням `WEBHOOK_SECRET`: без нього функція відповідає 401, тож сторонні не можуть розсилати push від імені WattWay.
+5. Якщо Realtime для `booking_messages` чи `booking_notifications` уже вмикали в Dashboard, приберіть рядок `alter publication …` з міграції перед запуском (інакше вона зупиниться з помилкою).
 
 **Ручна перевірка:**
 1. 11-те повідомлення за хвилину в чаті → «Забагато повідомлень. Зачекайте хвилину.» (код `WW429`).
@@ -155,5 +156,7 @@ docs/                 спеки і плани
 4. Підтверджене бронювання через ~1 год → по одному нагадуванню господарю й гостю (не повторюється).
 5. Увімкніть push у профілі на телефоні, закрийте сайт, надішліть повідомлення з іншого акаунта → приходить push, клік відкриває WattWay.
 6. «Вимкнути» в профілі → рядок зникає з `push_subscriptions`, push більше не приходять.
+7. Виклик функції `send-push` без заголовка `x-webhook-secret` (навіть з anon-ключем) → 401; повторний виклик для того самого сповіщення → `skipped`.
+8. Вихід з акаунта на пристрої з увімкненим push → пристрій більше не отримує push цього акаунта.
 
 **Як це працює:** нові повідомлення й сповіщення приходять через Supabase Realtime (опитування лишається запасним: чат 20 с, дзвіночок 60 с). У «Мої чати» видно непрочитані й час останнього повідомлення; відкритий чат позначається прочитаним. Ліміт — 10 повідомлень за хвилину й 300 за добу. У профілі блок «Сповіщення на пристрої» вмикає push (лише після вашого кліку й дозволу браузера). Код: `js/chats.js`, `js/push.js`, `sw.js`, `supabase/functions/send-push/`.

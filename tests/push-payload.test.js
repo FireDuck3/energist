@@ -11,3 +11,12 @@ test('buildPayload: довгий текст обрізається до 180 си
   eq(p.body.length, 180);
   eq(p.body.endsWith('…'), true);
 });
+
+test('secretMatches: лише точний збіг непорожнього секрету', async () => {
+  const { secretMatches } = await import('../supabase/functions/send-push/payload.js');
+  eq(secretMatches('s3cret', 's3cret'), true);
+  eq(secretMatches('s3creT', 's3cret'), false);
+  eq(secretMatches('s3cre', 's3cret'), false);
+  eq(secretMatches(null, 's3cret'), false);
+  eq(secretMatches('', ''), false);
+});

@@ -55,6 +55,8 @@ create index booking_messages_author_time on public.booking_messages(author_id, 
 create function public.limit_booking_messages() returns trigger
 language plpgsql security definer set search_path = '' as $$
 begin
+ -- Серіалізуємо вставки одного автора, інакше паралельні запити обійшли б ліміт.
+ perform pg_advisory_xact_lock(hashtext('booking_messages:' || new.author_id::text));
  if (select count(*) from public.booking_messages
      where author_id = new.author_id and created_at > now() - interval '1 minute') >= 10
   or (select count(*) from public.booking_messages
@@ -69,6 +71,8 @@ create trigger limit_booking_messages before insert on public.booking_messages
  for each row execute function public.limit_booking_messages();
 
 -- ---- Push-підписки ----
+-- Кожне сповіщення пушиться не більше одного разу (send-push «бере» рядок, ставлячи pushed_at).
+alter table public.booking_notifications add column pushed_at timestamptz;
 create table public.push_subscriptions (
  id uuid primary key default gen_random_uuid(),
  user_id uuid not null references auth.users(id) on delete cascade,

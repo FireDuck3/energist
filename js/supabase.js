@@ -127,6 +127,8 @@ export async function loadSupabase() {
       savePushSubscription: sub => call(client.rpc('save_push_subscription', {
         sub_endpoint: sub.endpoint, sub_p256dh: sub.keys?.p256dh, sub_auth: sub.keys?.auth,
       })),
+      ownsPushSubscription: async endpoint =>
+        (await call(client.from('push_subscriptions').select('id').eq('endpoint', endpoint).limit(1))).length > 0,
       deletePushSubscription: endpoint => call(client.rpc('delete_push_subscription', { sub_endpoint: endpoint })),
       archivePilotSpot: id => call(client.rpc('archive_pilot_spot', { point_id: id })),
       publishPilotSpot: (input, uid) => call(client.from('pilot_spots').insert({

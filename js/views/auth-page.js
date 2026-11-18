@@ -1,6 +1,7 @@
 // Окремі сторінки входу (#/login) і реєстрації (#/signup).
 // Вікно входу (auth-modal.js) лишається для дій, що потребують акаунта посеред сценарію (бронювання).
 import { h } from '../ui.js';
+import { disablePush } from '../push.js';
 import { notify } from '../notifications.js';
 import { authErrorMessage } from '../auth.js';
 import { validateLogin, validateSignup, displayName, homePath, failureAdvice } from '../auth-forms.js';
@@ -12,7 +13,9 @@ const TEXT = {
 };
 
 // Вихід: повідомлення і повернення на головну, де знову видно «Увійти» й «Реєстрація».
-export function logOut(session) {
+export async function logOut(session) {
+  // Спільний пристрій: після виходу він не отримує push цього акаунта. Збій не заважає виходу.
+  try { await disablePush({ service: session.service }); } catch { /* ігноруємо */ }
   return session.service.signOut()
     .then(() => { notify('Ви вийшли з акаунта'); location.hash = '#/'; })
     .catch(() => notify('Не вдалося вийти — перевірте інтернет', { kind: 'error' }));

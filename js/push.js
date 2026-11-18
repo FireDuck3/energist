@@ -16,12 +16,16 @@ async function currentSubscription(env) {
   return (await registration?.pushManager.getSubscription()) ?? null;
 }
 
-export async function pushState({ env = globalThis, vapidKey } = {}) {
+// service.ownsPushSubscription: на спільному пристрої підписка може належати іншому акаунту —
+// тоді для поточного це «вимкнено», і «Увімкнути» перепризначить пристрій йому.
+export async function pushState({ env = globalThis, vapidKey, service } = {}) {
   if (!pushSupported(env)) return 'unsupported';
   if (!vapidKey) return 'unconfigured';
   if (env.Notification.permission === 'denied') return 'denied';
   const subscription = await currentSubscription(env);
-  return subscription && env.Notification.permission === 'granted' ? 'on' : 'off';
+  if (!subscription || env.Notification.permission !== 'granted') return 'off';
+  if (service?.ownsPushSubscription && !(await service.ownsPushSubscription(subscription.endpoint))) return 'off';
+  return 'on';
 }
 
 export async function enablePush({ service, vapidKey, env = globalThis }) {
