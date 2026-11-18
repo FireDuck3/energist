@@ -8,6 +8,10 @@ export const BBOX = { south: 47.9, west: 27.2, north: 49.8, east: 30.2 };
 export const MAX_MISSED_RUNS = 3;
 
 const inBox = (s, b) => s.lat >= b.south && s.lat <= b.north && s.lng >= b.west && s.lng <= b.east;
+// Overpass відхиляє запити без описового User-Agent (HTTP 406); OCM теж просить ідентифікувати клієнта.
+export const USER_AGENT = 'WattWay-station-sync/1.0 (+https://wattway.onrender.com)';
+const HEADERS = { 'User-Agent': USER_AGENT, Accept: 'application/json' };
+
 const defaultSleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Помилка без URL: у ньому ключ OCM, який не повинен потрапити в логи.
@@ -30,13 +34,13 @@ async function fetchJson(fetchImpl, url, init, sleep, tries = 3) {
 export function fetchOcm({ fetchImpl, apiKey, bbox, sleep = defaultSleep }) {
   const box = `(${bbox.south},${bbox.west}),(${bbox.north},${bbox.east})`;
   const url = `https://api.openchargemap.io/v3/poi/?output=json&countrycode=UA&maxresults=5000&compact=false&verbose=false&boundingbox=${encodeURIComponent(box)}&key=${encodeURIComponent(apiKey)}`;
-  return fetchJson(fetchImpl, url, undefined, sleep);
+  return fetchJson(fetchImpl, url, { headers: HEADERS }, sleep);
 }
 
 export async function fetchOsm({ fetchImpl, bbox, sleep = defaultSleep }) {
   const q = `[out:json][timeout:60];nwr["amenity"="charging_station"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});out center tags;`;
   const body = await fetchJson(fetchImpl, 'https://overpass-api.de/api/interpreter',
-    { method: 'POST', body: `data=${encodeURIComponent(q)}`, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }, sleep);
+    { method: 'POST', body: `data=${encodeURIComponent(q)}`, headers: { ...HEADERS, 'Content-Type': 'application/x-www-form-urlencoded' } }, sleep);
   // Overpass при перевантаженні відповідає 200 із remark і порожнім списком — це не успіх.
   if (body.remark) throw new Error('Overpass remark');
   return body.elements ?? [];

@@ -89,3 +89,11 @@ test('sync: збій Supabase не губить журнал запуску', as
   const out = await run({ fetchImpl: fakeFetch(), supabase: db });
   eq(out.ok, false); eq(db.runs.length, 2); eq(db.runs.every((r) => /Supabase/.test(r.error)), true);
 });
+
+test('sync: запити до Overpass і OCM мають описовий User-Agent (без нього Overpass відповідає 406)', async () => {
+  const calls = [];
+  const fetchImpl = async (url, init) => { calls.push({ url: String(url), init }); return String(url).includes('openchargemap') ? res(200, [OCM_POI]) : res(200, { elements: [OSM_NODE] }); };
+  await run({ fetchImpl, supabase: fakeDb() });
+  for (const c of calls) eq(/WattWay/.test(c.init?.headers?.['User-Agent'] ?? ''), true, c.url.slice(0, 30));
+  eq(calls.find((c) => c.url.includes('overpass')).init.headers.Accept, 'application/json');
+});
