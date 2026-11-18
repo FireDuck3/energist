@@ -5,6 +5,37 @@ import { formatUAH, formatKwh } from '../pricing.js';
 import { isoDay } from '../data.js';
 import { signInPrompt } from './auth-modal.js';
 import { logOut } from './auth-page.js';
+import { pushState, enablePush, disablePush, PUSH_STATE_TEXT } from '../push.js';
+import { supabaseConfig } from '../supabase-config.js';
+
+// Блок «Сповіщення на пристрої»: стан, увімкнення й вимкнення push лише за кліком.
+function pushCard(service) {
+  const vapidKey = supabaseConfig.vapidPublicKey;
+  const text = h('p', { class: 'muted' }, 'Перевіряємо…');
+  const error = h('p', { class: 'field-error', role: 'alert', hidden: true });
+  const button = h('button', { type: 'button', class: 'btn btn-secondary btn-sm', hidden: true });
+  async function draw() {
+    let state;
+    try { state = service?.savePushSubscription ? await pushState({ vapidKey }) : 'unconfigured'; } catch { state = 'unsupported'; }
+    text.textContent = PUSH_STATE_TEXT[state];
+    button.hidden = !['on', 'off'].includes(state);
+    button.textContent = state === 'on' ? 'Вимкнути' : 'Увімкнути';
+    button.onclick = async () => {
+      button.disabled = true;
+      error.hidden = true;
+      try {
+        if (state === 'on') await disablePush({ service });
+        else await enablePush({ service, vapidKey });
+      } catch (e) {
+        error.textContent = e?.code === 'denied' ? PUSH_STATE_TEXT.denied : 'Не вдалося змінити налаштування. Спробуйте ще раз.';
+        error.hidden = false;
+      } finally { button.disabled = false; void draw(); }
+    };
+  }
+  void draw();
+  return h('div', { class: 'card profile-card push-card' },
+    h('h2', { class: 'panel-title' }, 'Сповіщення на пристрої'), text, button, error);
+}
 
 const ROLES = [['guest', '🔌 Шукаю зарядку'], ['host', '☀️ Маю енергію для продажу']];
 
@@ -143,6 +174,7 @@ export function render(_params, root, store, session, userHistory, pilot) {
           h('span', { class: 'avatar' }, (draft.name || user.email)[0].toUpperCase()),
           h('div', {}, h('h2', { class: 'panel-title' }, 'Дані профілю'), h('p', { class: 'muted' }, 'Ці дані бачите лише ви.'))),
         box),
+      pushCard(session.service),
       resetLink());
     const sections = [
       ['account', 'Профіль', account],

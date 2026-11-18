@@ -39,7 +39,8 @@ const fail = (error, code = toAuthCode(error)) => Object.assign(new Error(error?
 async function call(request) {
   let res;
   try { res = await request; } catch (e) { throw fail(e); }
-  if (res.error) throw fail(res.error, res.error.code === '23P01' ? '23P01' : responseCode(res));
+  // 23P01 — перетин бронювань, WW429 — ліміт повідомлень: їх показуємо користувачу окремо.
+  if (res.error) throw fail(res.error, ['23P01', 'WW429'].includes(res.error.code) ? res.error.code : responseCode(res));
   return res.data;
 }
 
@@ -106,6 +107,27 @@ export async function loadSupabase() {
         if (error) throw fail(error);
       },
       setPilotSpotPhotos: (id, paths) => call(client.rpc('set_pilot_spot_photos', { point_id: id, paths })),
+      listMyChats: () => call(client.rpc('list_my_chats')),
+      markBookingRead: id => call(client.rpc('mark_booking_read', { booking: id })),
+      // Realtime: RLS гарантує, що подію отримають лише учасники. Повертає функцію відписки.
+      subscribeToChat(bookingId, onInsert) {
+        const channel = client.channel(`chat-${bookingId}-${crypto.randomUUID()}`)
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'booking_messages', filter: `booking_id=eq.${bookingId}` },
+            payload => onInsert(payload.new))
+          .subscribe();
+        return () => { client.removeChannel(channel); };
+      },
+      subscribeToNotifications(userId, onInsert) {
+        const channel = client.channel(`notices-${userId}-${crypto.randomUUID()}`)
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'booking_notifications', filter: `recipient_id=eq.${userId}` },
+            payload => onInsert(payload.new))
+          .subscribe();
+        return () => { client.removeChannel(channel); };
+      },
+      savePushSubscription: sub => call(client.rpc('save_push_subscription', {
+        sub_endpoint: sub.endpoint, sub_p256dh: sub.keys?.p256dh, sub_auth: sub.keys?.auth,
+      })),
+      deletePushSubscription: endpoint => call(client.rpc('delete_push_subscription', { sub_endpoint: endpoint })),
       archivePilotSpot: id => call(client.rpc('archive_pilot_spot', { point_id: id })),
       publishPilotSpot: (input, uid) => call(client.from('pilot_spots').insert({
         owner_id: uid, title: input.title, district: input.district, lat: input.lat, lng: input.lng,

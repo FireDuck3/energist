@@ -25,7 +25,8 @@ export function openConversation(booking, session, refresh) {
       input.value = '';
       submittedText = null;
       await load();
-    } catch {
+    } catch (error) {
+      if (error?.code === 'WW429') { status.textContent = 'Забагато повідомлень. Зачекайте хвилину.'; return; }
       // A lost response can follow a successful insert. Check the id before offering a retry.
       try {
         const rows = await service.listMessages(booking.id);
@@ -37,7 +38,7 @@ export function openConversation(booking, session, refresh) {
   const content = h('section', { class: 'conversation' },
     h('h2', {}, 'Чат із ', booking.counterpart_name || 'учасником бронювання'),
     messages, status, form, reviews);
-  const modal = openModal(content, { onClose: () => { closed = true; clearInterval(timer); off(); } });
+  const modal = openModal(content, { onClose: () => { closed = true; clearInterval(timer); off(); offRealtime(); void refresh?.(); } });
   const off = session.subscribe(() => {
     if (session.getState().user?.uid !== account || session.getState().status !== 'signedIn') modal.close();
   });
@@ -51,6 +52,12 @@ export function openConversation(booking, session, refresh) {
         h('b', {}, row.author_id === account ? 'Ви' : booking.counterpart_name || 'Співрозмовник'),
         h('p', {}, row.body), h('small', {}, new Date(row.created_at).toLocaleString('uk-UA')))));
       if (!rows.length) messages.append(h('p', { class: 'muted' }, 'Уточніть місце зустрічі, підключення та умови зарядки.'));
+      // Чат відкритий — нові повідомлення прочитані.
+      const lastId = rows.at(-1)?.id ?? null;
+      if (lastId !== lastReadId && service.markBookingRead) {
+        lastReadId = lastId;
+        service.markBookingRead(booking.id).catch(() => {});
+      }
       status.textContent = '';
       // Preserve an unfinished review while polling for new messages.
       if (!reviews.querySelector('form')) drawReviews(feedback);
@@ -86,7 +93,11 @@ export function openConversation(booking, session, refresh) {
     } }, rating, body, button);
     reviews.append(reviewForm);
   }
-  const timer = setInterval(load, 5000);
+  // Нові повідомлення приходять через Realtime; опитування кожні 20 с — запасний шлях.
+  let lastReadId;
+  let offRealtime = () => {};
+  try { offRealtime = service.subscribeToChat?.(booking.id, () => { void load(); }) ?? offRealtime; } catch { /* лишається опитування */ }
+  const timer = setInterval(load, 20000);
   void load();
 }
 

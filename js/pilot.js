@@ -2,13 +2,15 @@ import { h } from './ui.js';
 import { notifications as bellList, notify } from './notifications.js';
 import { openConversation } from './views/conversation.js';
 import { photoPath } from './photos.js';
+import { formatLastMessage, sortChats, totalUnread, unreadLabel } from './chats.js';
 
 // Серверні сповіщення (нові запити, рішення господаря, повідомлення в чаті) показуються лише
 // під дзвіночком у шапці; клік відкриває чат бронювання.
 const NOTICE = 'booking-notice:';
 
 export function createPilot(session, store, { notifications = bellList } = {}) {
-  let spots = [], bookings = [], error = false, seq = 0;
+  let spots = [], bookings = [], chats = null, error = false, seq = 0;
+  let offNotices = () => {};
   const listeners = new Set();
   const emit = () => listeners.forEach(fn => fn());
   const uid = () => session.getState().status === 'signedIn' ? session.getState().user.uid : null;
@@ -38,10 +40,11 @@ export function createPilot(session, store, { notifications = bellList } = {}) {
     const request = ++seq;
     const account = uid();
     try {
-      const [points, requests, notices] = await Promise.allSettled([
+      const [points, requests, notices, chatRows] = await Promise.allSettled([
         service.listPilotSpots(),
         account ? service.listPilotBookings() : [],
         account && service.listNotifications ? service.listNotifications() : [],
+        account && service.listMyChats ? service.listMyChats() : null,
       ]);
       if (request !== seq) return;
       if (account !== uid()) return;
@@ -51,6 +54,8 @@ export function createPilot(session, store, { notifications = bellList } = {}) {
         if (changed || !store.getState().pilotReady) store.setPilotSpots(spots.filter(spot => !spot.archivedAt));
       }
       if (requests.status === 'fulfilled') bookings = requests.value;
+      // Без міграції чатів (або при збої) список чатів будується з бронювань, без лічильників.
+      chats = chatRows.status === 'fulfilled' && chatRows.value ? sortChats(chatRows.value) : null;
       error = requests.status === 'rejected';
       if (account && notices.status === 'fulfilled') syncNotices(notices.value);
     } catch {
@@ -61,19 +66,31 @@ export function createPilot(session, store, { notifications = bellList } = {}) {
     emit();
   }
 
+  // Нові сповіщення приходять через Realtime одразу; опитування раз на хвилину — запасний шлях.
+  function listenNotices() {
+    offNotices();
+    offNotices = () => {};
+    const id = uid();
+    if (id && session.service?.subscribeToNotifications) {
+      try { offNotices = session.service.subscribeToNotifications(id, () => { void refresh(); }); } catch { /* лишається опитування */ }
+    }
+  }
+
   let account = uid();
   session.subscribe(() => {
     if (account !== uid()) {
       account = uid();
+      listenNotices();
       bookings = [];
+      chats = null;
       // Сповіщення попереднього акаунта не лишаються під дзвіночком (спільний ноутбук на пітчі).
       notifications.remove(n => String(n.key).startsWith(NOTICE));
       emit();
     }
     void refresh();
   });
-  void session.ready.then(refresh);
-  setInterval(() => { if (document.visibilityState === 'visible') void refresh(); }, 20000);
+  void session.ready.then(() => { listenNotices(); return refresh(); });
+  setInterval(() => { if (document.visibilityState === 'visible') void refresh(); }, 60000);
 
   // Успіх видно одразу: статус у списку змінюється, а сервер надсилає сповіщення в дзвіночок.
   async function change(id, status) {
@@ -126,19 +143,25 @@ export function createPilot(session, store, { notifications = bellList } = {}) {
     },
     removePhoto: path => session.service.removeSpotPhoto(path),
     ownSpots: () => spots.filter(spot => !spot.archivedAt && spot.ownerId === uid()),
+    totalUnread: () => totalUnread(chats ?? []),
     chatsPanel() {
       const byId = new Map(spots.map(spot => [spot.id, spot]));
-      const rows = bookings.filter(b => uid() && [b.owner_id, b.guest_id].includes(uid()));
+      const rows = (chats ?? bookings).filter(b => uid() && [b.owner_id, b.guest_id].includes(uid()));
+      const unread = totalUnread(rows);
+      const now = new Date();
       return h('section', { class: 'card panel' },
-        h('h2', { class: 'panel-title' }, 'Мої чати'),
+        h('h2', { class: 'panel-title' }, 'Мої чати', unread > 0 && h('span', { class: 'badge badge-warn' }, `${unreadLabel(unread)} непрочитаних`)),
         h('p', { class: 'muted' }, 'Розмови з господарями та гостями. Кожне бронювання має окремий чат.'),
         h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: refresh }, 'Оновити'),
         error && h('p', { role: 'alert' }, 'Не вдалося завантажити чати. Спробуйте оновити.'),
         !error && !rows.length && h('p', {}, 'Чат з’явиться після запиту на бронювання.', ' ',
           h('a', { href: '#/map' }, 'Знайти точку')),
-        h('ul', { class: 'bookings' }, rows.map(b => h('li', { class: 'booking' },
+        h('ul', { class: 'bookings' }, rows.map(b => h('li', { class: `booking${b.unread_count ? ' chat-unread' : ''}` },
           h('div', { class: 'booking-main' },
-            h('b', {}, b.counterpart_name || 'Учасник бронювання'),
+            h('b', {}, b.counterpart_name || 'Учасник бронювання',
+              b.unread_count > 0 && h('span', { class: 'unread-badge', 'aria-label': `${b.unread_count} непрочитаних` }, unreadLabel(b.unread_count))),
+            b.last_message_at && h('small', { class: 'muted' },
+              `${b.last_message_mine ? 'Ви' : 'Останнє повідомлення'} · ${formatLastMessage(b.last_message_at, now)}`),
             h('span', {}, byId.get(b.spot_id)?.title || 'Точка зарядки'),
             h('small', {}, b.slot.replace(/["\[\]()]/g, '').replaceAll('T', ' ').split(',').map(s => s.slice(0, 16)).join(' — ') + ' (Київ)')),
           h('button', { type: 'button', class: 'btn btn-primary btn-sm', onclick: () => openConversation(b, session, refresh) },

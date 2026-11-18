@@ -1010,3 +1010,9 @@ input.input { height: 44px; }
 .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin: 12px 0; }
 .photo-item { margin: 0; display: grid; gap: 6px; align-content: start; }
 .photo-item img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; }
+
+/* Чати: непрочитані */
+.unread-badge { display: inline-block; min-width: 20px; margin-left: 8px; padding: 1px 7px; border-radius: 999px;
+  background: var(--orange, #F07C1E); color: #fff; font-size: .75rem; font-weight: 700; text-align: center; vertical-align: middle; }
+.chat-unread .booking-main b { font-weight: 800; }
+.push-card { margin-top: 16px; display: grid; gap: 8px; justify-items: start; }
