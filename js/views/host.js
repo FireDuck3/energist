@@ -8,6 +8,10 @@ import { DEMO_HOST_ID, DEVICES, SOURCES, CONNECTORS, VINNYTSIA_CENTER, SPOTS } f
 import { spotRating } from '../filters.js';
 import { TILES } from './map.js';
 import { signInPrompt } from './auth-modal.js';
+import { kyivNow, addDays, isoWeekday } from '../calendar.js';
+import { checkPhotos, resizeImage, PHOTO_LIMITS } from '../photos.js';
+
+const WEEKDAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
 
 const STATUS = {
   pending: ['Очікує підтвердження', 'badge-warn'],
@@ -69,11 +73,17 @@ function ownSpotCard(spot) {
 }
 
 // ---- Форма «Додати розетку» ----
-function openAddSpot(store, hostName, publish) {
-  const input = {
-    title: '', district: 'Вишенька', lat: null, lng: null, source: 'solar', connector: 'type2',
-    powerKw: 7.4, pricePerKwh: 11, devices: ['ev', 'ecoflow', 'gadget'], schedule: { from: '08:00', to: '20:00' },
-  };
+// existing — точка для редагування: форма заповнюється її значеннями, а publish зберігає зміни.
+export function openAddSpot(store, hostName, publish, existing = null) {
+  const input = existing
+    ? { title: existing.title, district: existing.district, lat: existing.lat, lng: existing.lng, source: existing.source,
+      connector: existing.connector, powerKw: existing.powerKw, pricePerKwh: existing.pricePerKwh,
+      devices: [...existing.devices], schedule: { ...existing.schedule } }
+    : {
+      title: '', district: 'Вишенька', lat: null, lng: null, source: 'solar', connector: 'type2',
+      powerKw: 7.4, pricePerKwh: 11, devices: ['ev', 'ecoflow', 'gadget'], schedule: { from: '08:00', to: '20:00' },
+    };
+  const districts = existing && !DISTRICTS.includes(existing.district) ? [existing.district, ...DISTRICTS] : DISTRICTS;
   const errorEls = {};
   const err = (key) => (errorEls[key] = h('span', { class: 'field-error', hidden: true }));
   const field = (label, control, key, hint) =>
@@ -99,14 +109,16 @@ function openAddSpot(store, hostName, publish) {
 
   const form = h('form', { class: 'wizard add-form', novalidate: true, onsubmit: submit },
     h('p', { class: 'eyebrow' }, 'Кабінет господаря'),
-    h('h2', {}, 'Додати розетку'),
-    publish && h('p', {}, 'Назва й координати точки будуть видимі на карті всім відвідувачам.'),
+    h('h2', {}, existing ? 'Редагувати точку' : 'Додати розетку'),
+    publish && h('p', {}, existing
+      ? 'Зміни побачать гості на карті. Уже створені бронювання не зміняться.'
+      : 'Назва й координати точки будуть видимі на карті всім відвідувачам.'),
     h('div', { class: 'form-field' }, h('span', { class: 'field-label' }, 'Де вона?'), mapEl, coordsNote, err('location')),
     h('div', { class: 'form-grid' },
-      field('Назва', h('input', { class: 'input', type: 'text', maxlength: 100, placeholder: 'Напр.: Гараж з розеткою 220 В',
+      field('Назва', h('input', { class: 'input', type: 'text', maxlength: 100, placeholder: 'Напр.: Гараж з розеткою 220 В', value: input.title,
         oninput: (e) => { input.title = e.target.value; } }), 'title'),
       field('Район', h('select', { class: 'input', onchange: (e) => { input.district = e.target.value; } },
-        DISTRICTS.map((d) => h('option', { value: d, selected: d === input.district }, d)))),
+        districts.map((d) => h('option', { value: d, selected: d === input.district }, d)))),
       field('Потужність, кВт', num('powerKw', { min: 0.5, max: 22, step: 0.1 }), 'powerKw'),
       field('Ціна, грн за кВт·год', num('pricePerKwh', { min: 5, max: 25, step: 0.5 }), 'pricePerKwh', '8–15 грн — середня ціна в місті'),
       field('Підключення', h('select', { class: 'input', onchange: (e) => { input.connector = e.target.value; } },
@@ -124,7 +136,7 @@ function openAddSpot(store, hostName, publish) {
     submitError,
     h('div', { class: 'wizard-actions' },
       h('button', { type: 'button', class: 'btn btn-ghost', onclick: () => modal.close() }, 'Скасувати'),
-      h('button', { type: 'submit', class: 'btn btn-primary btn-lg' }, 'Додати на карту')));
+      h('button', { type: 'submit', class: 'btn btn-primary btn-lg' }, existing ? 'Зберегти' : 'Додати на карту')));
 
   let map = null;
   const modal = openModal(form, { className: 'modal-wide', onClose: () => map?.remove() });
@@ -137,13 +149,14 @@ function openAddSpot(store, hostName, publish) {
   }
 
   if (window.L) {
-    map = L.map(mapEl).setView(VINNYTSIA_CENTER, 12);
+    map = L.map(mapEl).setView(existing ? [existing.lat, existing.lng] : VINNYTSIA_CENTER, existing ? 15 : 12);
     L.tileLayer(TILES.url, { attribution: TILES.attribution, maxZoom: 19 }).addTo(map);
-    let marker = null;
+    const pinIcon = () => L.divIcon({ className: 'pin-wrap', html: '<div class="pin pin-solar"><span class="pin-icon">📍</span>Тут</div>', iconSize: null });
+    let marker = existing ? L.marker([existing.lat, existing.lng], { icon: pinIcon() }).addTo(map) : null;
     map.on('click', (e) => {
       setPoint(e.latlng.lat, e.latlng.lng);
       if (marker) marker.setLatLng(e.latlng);
-      else marker = L.marker(e.latlng, { icon: L.divIcon({ className: 'pin-wrap', html: '<div class="pin pin-solar"><span class="pin-icon">📍</span>Тут</div>', iconSize: null }) }).addTo(map);
+      else marker = L.marker(e.latlng, { icon: pinIcon() }).addTo(map);
     });
     setTimeout(() => map.invalidateSize(), 50);
   } else {
@@ -171,15 +184,147 @@ function openAddSpot(store, hostName, publish) {
       button.disabled = true;
       try { await publish(data); }
       catch {
-        submitError.textContent = 'Не вдалося опублікувати точку. Спробуйте ще раз.';
+        submitError.textContent = existing ? 'Не вдалося зберегти зміни. Спробуйте ще раз.' : 'Не вдалося опублікувати точку. Спробуйте ще раз.';
         submitError.hidden = false;
         return;
       }
       finally { button.disabled = false; }
     } else store.addSpot(data);
     modal.close();
-    notify('Розетку додано — її вже видно на карті гостей');
+    notify(existing ? 'Зміни збережено' : 'Розетку додано — її вже видно на карті гостей');
   }
+  if (existing) coordsNote.textContent = `📍 ${input.lat}, ${input.lng}`;
+}
+
+// Кнопка, що блокується на час запиту; помилка показується в переданому елементі.
+async function busy(button, errorEl, action, failText) {
+  if (button.disabled) return false;
+  button.disabled = true;
+  if (errorEl) errorEl.hidden = true;
+  try { await action(); return true; }
+  catch {
+    if (errorEl) { errorEl.textContent = failText; errorEl.hidden = false; }
+    else notify(failText, { kind: 'error' });
+    return false;
+  } finally { button.disabled = false; }
+}
+
+// ---- Графік: неробочі дні тижня та вихідні на 60 днів ----
+export async function openSchedule(spot, pilot) {
+  const today = kyivNow(new Date()).day;
+  const days = Array.from({ length: 61 }, (_, i) => addDays(today, i));
+  const weekdays = new Set(spot.closedWeekdays ?? []);
+  let daysOff = new Set();
+  const error = h('p', { class: 'field-error form-error', role: 'alert', hidden: true });
+  const body = h('div', { class: 'wizard-body' }, h('p', { class: 'muted' }, 'Завантажуємо вихідні…'));
+  const modal = openModal(h('div', { class: 'wizard' },
+    h('p', { class: 'eyebrow' }, spot.title), h('h2', {}, 'Графік роботи'), body), { className: 'modal-wide' });
+  try {
+    daysOff = new Set((await pilot.listDaysOff(spot.id)).filter((d) => d >= today));
+  } catch {
+    body.replaceChildren(h('p', { class: 'field-error' }, 'Не вдалося завантажити вихідні. Закрийте вікно й спробуйте ще раз.'));
+    return;
+  }
+  const draw = () => body.replaceChildren(
+    h('p', { class: 'muted' }, `Години роботи: ${spot.schedule.from}–${spot.schedule.to} (змінюються в «Редагувати»).`),
+    h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Неробочі дні тижня'),
+      h('div', { class: 'chips' }, WEEKDAY_NAMES.map((name, i) => {
+        const wd = i + 1;
+        return h('button', { type: 'button', class: `chip${weekdays.has(wd) ? ' active' : ''}`, 'aria-pressed': String(weekdays.has(wd)),
+          disabled: !weekdays.has(wd) && weekdays.size >= 6,
+          onclick: () => { weekdays.has(wd) ? weekdays.delete(wd) : weekdays.add(wd); draw(); } }, name);
+      }))),
+    h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Вихідні дати (60 днів)'),
+      h('div', { class: 'day-strip day-strip-wrap' }, days.map((d) => {
+        const off = daysOff.has(d);
+        const closed = weekdays.has(isoWeekday(d));
+        return h('button', { type: 'button', class: `day-cell${off ? ' active' : ''}${closed ? ' day-closed' : ''}`,
+          'aria-pressed': String(off), title: closed ? 'Неробочий день тижня' : '',
+          onclick: () => { off ? daysOff.delete(d) : daysOff.add(d); draw(); } },
+          h('span', { class: 'day-wd' }, WEEKDAY_NAMES[isoWeekday(d) - 1]),
+          h('b', {}, String(Number(d.slice(8, 10)))),
+          h('span', { class: 'day-state' }, off ? 'Вихідний' : ''));
+      }))),
+    error,
+    h('div', { class: 'wizard-actions' },
+      h('button', { type: 'button', class: 'btn btn-ghost', onclick: () => modal.close() }, 'Скасувати'),
+      h('button', { type: 'button', class: 'btn btn-primary btn-lg', async onclick(e) {
+        const ok = await busy(e.currentTarget, error,
+          () => pilot.setSchedule(spot.id, { weekdays: [...weekdays].sort(), days: [...daysOff].sort() }),
+          'Не вдалося зберегти графік. Спробуйте ще раз.');
+        if (ok) { modal.close(); notify('Графік збережено'); }
+      } }, 'Зберегти')));
+  draw();
+}
+
+// ---- Фото точки: до 5, перше — обкладинка ----
+export function openPhotos(spot, pilot) {
+  let paths = [...(spot.photoPaths ?? [])];
+  let urls = [...(spot.photos ?? [])];
+  const error = h('p', { class: 'field-error form-error', role: 'alert', hidden: true });
+  const body = h('div', { class: 'wizard-body' });
+  const modal = openModal(h('div', { class: 'wizard' },
+    h('p', { class: 'eyebrow' }, spot.title), h('h2', {}, 'Фото точки'), body), { className: 'modal-wide' });
+  const fail = (text) => { error.textContent = text; error.hidden = false; };
+
+  async function save(nextPaths, nextUrls, removed = []) {
+    await pilot.setPhotos(spot.id, nextPaths);
+    paths = nextPaths; urls = nextUrls;
+    // Файли, прибрані зі списку, видаляємо зі сховища; збій тут не критичний.
+    for (const p of removed) await pilot.removePhoto(p).catch(() => {});
+  }
+
+  const fileInput = h('input', { type: 'file', accept: PHOTO_LIMITS.types.join(','), multiple: true, hidden: true,
+    async onchange(e) {
+      error.hidden = true;
+      const { ok, errors } = checkPhotos([...e.target.files], paths.length, { beforeResize: true });
+      e.target.value = '';
+      const uploaded = [];
+      const messages = [...errors];
+      draw(true);
+      for (const file of ok) {
+        try {
+          const blob = await resizeImage(file);
+          if (blob.size > PHOTO_LIMITS.bytes) { messages.push(`«${file.name}»: навіть після стискання більше 2 МБ.`); continue; }
+          uploaded.push({ path: await pilot.uploadPhoto(spot, blob, blob.type), url: URL.createObjectURL(blob) });
+        } catch { messages.push(`«${file.name}»: не вдалося завантажити.`); }
+      }
+      if (uploaded.length) {
+        try { await save([...paths, ...uploaded.map((u) => u.path)], [...urls, ...uploaded.map((u) => u.url)]); }
+        catch {
+          for (const u of uploaded) await pilot.removePhoto(u.path).catch(() => {});
+          messages.push('Не вдалося зберегти фото. Спробуйте ще раз.');
+        }
+      }
+      draw();
+      if (messages.length) fail(messages.join(' '));
+    } });
+
+  function draw(loading = false) {
+    body.replaceChildren(
+      h('p', { class: 'muted' }, `JPEG, PNG або WebP, до ${PHOTO_LIMITS.max} фото. Перше фото — обкладинка на карті.`),
+      h('div', { class: 'photo-grid' }, urls.map((url, i) => h('figure', { class: 'photo-item' },
+        h('img', { src: url, alt: `Фото ${i + 1}` }),
+        i === 0 ? h('span', { class: 'badge badge-info' }, 'Обкладинка') : h('button', { type: 'button', class: 'btn btn-ghost btn-sm',
+          async onclick(e) {
+            const order = [i, ...paths.keys()].filter((x, k, arr) => arr.indexOf(x) === k);
+            await busy(e.currentTarget, error, () => save(order.map((k) => paths[k]), order.map((k) => urls[k])), 'Не вдалося змінити обкладинку.');
+            draw();
+          } }, 'Зробити обкладинкою'),
+        h('button', { type: 'button', class: 'btn btn-danger-ghost btn-sm', async onclick(e) {
+          await busy(e.currentTarget, error,
+            () => save(paths.filter((_, k) => k !== i), urls.filter((_, k) => k !== i), [paths[i]]), 'Не вдалося видалити фото.');
+          draw();
+        } }, 'Видалити')))),
+      loading && h('p', { class: 'muted' }, 'Завантажуємо…'),
+      error,
+      fileInput,
+      h('div', { class: 'wizard-actions' },
+        h('button', { type: 'button', class: 'btn btn-ghost', onclick: () => modal.close() }, 'Готово'),
+        h('button', { type: 'button', class: 'btn btn-primary', disabled: loading || paths.length >= PHOTO_LIMITS.max,
+          onclick: () => fileInput.click() }, '+ Додати фото')));
+  }
+  draw();
 }
 
 export function render(_params, root, store, session, _history, pilot) {
@@ -208,7 +353,17 @@ export function render(_params, root, store, session, _history, pilot) {
         pilot.panel(true),
         h('h2', { class: 'own-title' }, 'Мої точки'),
         h('div', { class: 'own-spots' }, pilot.ownSpots().map(spot =>
-          h('div', {}, ownSpotCard(spot),
+          h('div', { class: 'own-spot-wrap' }, ownSpotCard(spot),
+            spot.paused && h('span', { class: 'badge badge-warn' }, 'На паузі — гості не бачать точку'),
+            h('div', { class: 'own-spot-actions' },
+              h('button', { type: 'button', class: 'btn btn-secondary btn-sm',
+                onclick: () => openAddSpot(store, undefined, (data) => pilot.update(spot.id, data), spot) }, 'Редагувати'),
+              h('button', { type: 'button', class: 'btn btn-secondary btn-sm', onclick: () => openSchedule(spot, pilot) }, 'Графік'),
+              h('button', { type: 'button', class: 'btn btn-secondary btn-sm', onclick: () => openPhotos(spot, pilot) }, 'Фото'),
+              h('button', { type: 'button', class: 'btn btn-secondary btn-sm', async onclick(e) {
+                const ok = await busy(e.currentTarget, null, () => pilot.setPaused(spot.id, !spot.paused), 'Не вдалося змінити стан точки. Спробуйте ще раз.');
+                if (ok) notify(spot.paused ? 'Точку знову видно на карті' : 'Точку поставлено на паузу');
+              } }, spot.paused ? 'Увімкнути' : 'На паузу')),
             h('button', { type: 'button', class: 'btn btn-danger-ghost btn-sm',
               'aria-label': `Видалити точку ${spot.title}`,
               async onclick(e) {

@@ -988,3 +988,25 @@ input.input { height: 44px; }
 @media (max-width: 900px) {
   .map-layout.view-map .spot-list .spot-card:not(.empty) { display: none; } /* лічильник і «Нічого не знайдено» лишаються видимими */
 }
+
+/* Календар бронювання й графік господаря */
+.day-strip { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x proximity; }
+.day-strip-wrap { flex-wrap: wrap; overflow-x: visible; }
+.day-cell {
+  flex: 0 0 auto; min-width: 58px; display: grid; justify-items: center; gap: 2px; padding: 6px 4px;
+  border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: inherit; cursor: pointer;
+  font: inherit; scroll-snap-align: start;
+}
+.day-cell b { font-size: 1.05rem; }
+.day-wd, .day-state { font-size: .7rem; color: var(--muted); }
+.day-cell.active { background: var(--indigo); border-color: var(--indigo); color: #fff; }
+.day-cell.active .day-wd, .day-cell.active .day-state { color: #fff; }
+.day-cell:disabled { opacity: .45; cursor: not-allowed; }
+.day-cell.day-closed:not(.active) { background: var(--surface-2); }
+
+/* Кабінет: керування точкою й фото */
+.own-spot-wrap { display: grid; gap: 8px; align-content: start; }
+.own-spot-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin: 12px 0; }
+.photo-item { margin: 0; display: grid; gap: 6px; align-content: start; }
+.photo-item img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; }

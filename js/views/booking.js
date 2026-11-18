@@ -4,6 +4,9 @@ import { notify } from '../notifications.js';
 import { availableStarts } from '../filters.js';
 import { estimateKwh, holdAmount, sessionCost, savingsVsCommercial, formatUAH, formatKwh, round2 } from '../pricing.js';
 import { DEVICES, SIM_DURATION_MS, COMMERCIAL_PRICE, COMMISSION, isoDay } from '../data.js';
+import { calendarDays, freeStarts, maxHoursFrom, dayStatus, isoWeekday, DAY_STATUS_LABEL } from '../calendar.js';
+
+const WEEKDAYS = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'нд'];
 
 const STEPS = ['Час', 'Підтвердження', 'Зарядка', 'Оплата', 'Відгук'];
 const MAX_HOURS = 6;
@@ -30,7 +33,12 @@ export function openBooking(spot, store, { now = new Date(), session, userHistor
     day: todayStarts.length ? 'today' : 'tomorrow',
     start: null,
     hours: 2,
+    date: null, // для приватних точок — вибрана дата YYYY-MM-DD у 30-денному календарі
   };
+  // Доступність приватної точки з сервера: null — ще вантажиться, 'error' — не вдалося.
+  let avail = spot.pilot ? null : { busy: [], daysOff: [] };
+  const days = spot.pilot ? calendarDays(now) : [];
+  const statusOf = (day) => dayStatus(day, spot, avail, now);
   const hostName = spot.hostName ?? store.getState().hosts.find((x) => x.id === spot.hostId)?.name ?? 'господар';
   const userName = session?.currentName();
   let booking = null;
@@ -47,8 +55,43 @@ export function openBooking(spot, store, { now = new Date(), session, userHistor
     },
   });
 
-  const starts = () => availableStarts(spot.schedule, sel.day, now);
-  const maxHours = () => Math.max(1, Math.min(MAX_HOURS, hourOf(spot.schedule.to) - hourOf(sel.start)));
+  const starts = () => (spot.pilot
+    ? (sel.date ? freeStarts(sel.date, spot, avail.busy, now) : [])
+    : availableStarts(spot.schedule, sel.day, now));
+  const maxHours = () => (spot.pilot
+    ? maxHoursFrom(sel.date, sel.start, spot, avail.busy, MAX_HOURS)
+    : Math.max(1, Math.min(MAX_HOURS, hourOf(spot.schedule.to) - hourOf(sel.start))));
+  const whenLabel = () => (spot.pilot ? formatDate(sel.date) : dayLabel(sel.day));
+
+  async function loadAvailability() {
+    avail = null;
+    show(h('div', { class: 'wizard-body' }, h('p', { class: 'muted' }, 'Перевіряємо вільний час…')));
+    try {
+      avail = await pilot.availability(spot.id, days[0], days.at(-1));
+    } catch {
+      avail = 'error';
+      show(h('div', { class: 'wizard-body' },
+        h('h2', {}, 'Не вдалося завантажити календар'),
+        h('p', {}, 'Перевірте з\'єднання й спробуйте ще раз.'),
+        h('div', { class: 'wizard-actions' },
+          h('button', { type: 'button', class: 'btn btn-primary', onclick: loadAvailability }, 'Спробувати ще раз'))));
+      return;
+    }
+    if (!sel.date || statusOf(sel.date) !== 'open') sel.date = days.find((d) => statusOf(d) === 'open') ?? null;
+    stepTime();
+  }
+
+  function dayStrip() {
+    return h('div', { class: 'day-strip', role: 'listbox', 'aria-label': 'Дата' }, days.map((d) => {
+      const status = statusOf(d);
+      return h('button', { type: 'button', role: 'option', 'aria-selected': String(sel.date === d),
+        class: `day-cell day-${status}${sel.date === d ? ' active' : ''}`, disabled: status !== 'open',
+        title: DAY_STATUS_LABEL[status], onclick: () => { sel.date = d; sel.start = null; stepTime(); } },
+        h('span', { class: 'day-wd' }, WEEKDAYS[isoWeekday(d) - 1]),
+        h('b', {}, String(Number(d.slice(8, 10)))),
+        h('span', { class: 'day-state' }, status === 'open' ? '' : DAY_STATUS_LABEL[status]));
+    }));
+  }
 
   function show(content) {
     // Анімуємо лише перехід на новий крок, а не кожен клік усередині кроку.
@@ -66,8 +109,11 @@ export function openBooking(spot, store, { now = new Date(), session, userHistor
     const list = starts();
     if (!list.length) {
       show(h('div', { class: 'wizard-body' },
+        spot.pilot && h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'День'), dayStrip()),
         h('h2', {}, 'Немає вільного часу'),
-        h('p', {}, `Господар приймає з ${spot.schedule.from} до ${spot.schedule.to} — у цей проміжок не вміщується жодна година зарядки.`),
+        h('p', {}, spot.pilot
+          ? 'На найближчі 30 днів вільного часу немає: точка на паузі, у вихідних або повністю заброньована.'
+          : `Господар приймає з ${spot.schedule.from} до ${spot.schedule.to} — у цей проміжок не вміщується жодна година зарядки.`),
         h('div', { class: 'wizard-actions' }, h('button', { type: 'button', class: 'btn btn-primary', onclick: () => modal.close() }, 'Зрозуміло'))));
       return;
     }
@@ -82,7 +128,8 @@ export function openBooking(spot, store, { now = new Date(), session, userHistor
       h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'Пристрій'),
         h('div', { class: 'chips' }, DEVICES.filter((d) => spot.devices.includes(d.id)).map((d) =>
           choice(d.label, sel.device === d.id, () => { sel.device = d.id; stepTime(); })))),
-      h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'День'),
+      spot.pilot && h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'День'), dayStrip()),
+      !spot.pilot && h('div', { class: 'field' }, h('span', { class: 'field-label' }, 'День'),
         h('div', { class: 'chips' },
           choice(`Сьогодні, ${formatDate(isoDay(0, now))}`, sel.day === 'today', () => { sel.day = 'today'; stepTime(); }, !todayStarts.length),
           choice(`Завтра, ${formatDate(isoDay(1, now))}`, sel.day === 'tomorrow', () => { sel.day = 'tomorrow'; stepTime(); })),
@@ -116,7 +163,7 @@ export function openBooking(spot, store, { now = new Date(), session, userHistor
       h('div', { class: 'summary' },
         row('Точка', `${spot.title}, ${spot.district}`),
         row('Пристрій', DEVICES.find((d) => d.id === sel.device).label),
-        row('Коли', `${dayLabel(sel.day)}, ${sel.start}–${endTime(sel.start, sel.hours)}`),
+        row('Коли', `${whenLabel()}, ${sel.start}–${endTime(sel.start, sel.hours)}`),
         row('Очікувано', formatKwh(kwh)),
         row('Ціна', `${formatUAH(spot.pricePerKwh)} / кВт·год`)),
       !spot.pilot && h('div', { class: 'secure' },
@@ -132,11 +179,16 @@ export function openBooking(spot, store, { now = new Date(), session, userHistor
           button.disabled = true;
           requestError.hidden = true;
           try {
-            await pilot.request(spot.id, { ...sel, date: isoDay(sel.day === 'tomorrow' ? 1 : 0, now) });
+            await pilot.request(spot.id, { device: sel.device, start: sel.start, hours: sel.hours, date: sel.date });
             modal.close();
             notify('Запит надіслано. Статус можна перевірити в профілі.', { href: '#/profile' });
           } catch (error) {
-            requestError.textContent = error.code === '23P01' ? 'Цей час уже зайнятий. Оберіть інший.' : 'Не вдалося надіслати запит. Перевірте час і спробуйте ще раз.';
+            if (error.code === '23P01') { // інший гість щойно забронював цей час
+              notify('Цей час щойно зайняли — оберіть інший.', { kind: 'error' });
+              await loadAvailability();
+              return;
+            }
+            requestError.textContent = 'Не вдалося надіслати запит. Перевірте час і спробуйте ще раз.';
             requestError.hidden = false;
           } finally { button.disabled = false; }
         } }, 'Надіслати запит'),
@@ -240,6 +292,6 @@ export function openBooking(spot, store, { now = new Date(), session, userHistor
         } }, 'Надіслати відгук'))));
   }
 
-  stepTime();
+  if (spot.pilot) void loadAvailability(); else stepTime();
   return modal;
 }
