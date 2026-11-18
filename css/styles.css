@@ -977,3 +977,14 @@ input.input { height: 44px; }
 .st-attr { font-size: .75rem; }
 .st-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
 .st-actions .btn { margin-top: 0; }
+
+/* Пошук: дії, повідомлення про місцеположення, перемикач карта/список */
+.map-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.geo-note { margin: 0 0 10px; font-size: .88rem; }
+.geo-note[hidden] { display: none; }
+.chip:disabled { opacity: .45; cursor: not-allowed; }
+.map-layout.view-list { grid-template-columns: 1fr; }
+.map-layout.view-list .map-pane { display: none; }
+@media (max-width: 900px) {
+  .map-layout.view-map .spot-list, .map-layout.view-map .result-count { display: none; }
+}
