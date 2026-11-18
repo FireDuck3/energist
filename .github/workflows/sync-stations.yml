@@ -1,0 +1,26 @@
+# Щоденний імпорт публічних зарядних станцій (Open Charge Map + OpenStreetMap) у Supabase.
+# Секрети: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, OCM_API_KEY (Settings → Secrets and variables → Actions).
+name: Sync public charging stations
+
+on:
+  schedule:
+    - cron: '43 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run sync
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          OCM_API_KEY: ${{ secrets.OCM_API_KEY }}
+        run: node scripts/sync-stations/run.js
