@@ -1,6 +1,7 @@
 import { h } from './ui.js';
 import { notifications as bellList, notify } from './notifications.js';
 import { openConversation } from './views/conversation.js';
+import { photoPath } from './photos.js';
 
 // Серверні сповіщення (нові запити, рішення господаря, повідомлення в чаті) показуються лише
 // під дзвіночком у шапці; клік відкриває чат бронювання.
@@ -104,6 +105,26 @@ export function createPilot(session, store, { notifications = bellList } = {}) {
       await session.service.archivePilotSpot(id);
       await refresh();
     },
+    // Керування власною точкою: кожна зміна після успіху оновлює дані.
+    async update(id, input) { await session.service.updatePilotSpot(id, input); await refresh(); },
+    async setPaused(id, on) { await session.service.setPilotSpotPaused(id, on); await refresh(); },
+    async setSchedule(id, schedule) { await session.service.setPilotSpotSchedule(id, schedule); await refresh(); },
+    async setPhotos(id, paths) { await session.service.setPilotSpotPhotos(id, paths); await refresh(); },
+    async availability(id, from, to) {
+      const [busy, daysOff] = await Promise.all([
+        session.service.pilotAvailability(id, from, to),
+        session.service.listDaysOff(id),
+      ]);
+      return { busy, daysOff };
+    },
+    listDaysOff: id => session.service.listDaysOff(id),
+    async uploadPhoto(spot, blob, type) {
+      if (!uid()) throw new Error('Sign-in required');
+      const path = photoPath(uid(), spot.id, type);
+      await session.service.uploadSpotPhoto(path, blob);
+      return path;
+    },
+    removePhoto: path => session.service.removeSpotPhoto(path),
     ownSpots: () => spots.filter(spot => !spot.archivedAt && spot.ownerId === uid()),
     chatsPanel() {
       const byId = new Map(spots.map(spot => [spot.id, spot]));

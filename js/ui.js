@@ -124,5 +124,5 @@ export function plural(n, [one, few, many]) {
 
 const COVERS = { solar: 'assets/house-ses.jpg', battery: 'assets/apartment.jpg', grid: 'assets/ev-charging.jpg' };
 export function spotCover(spot) {
-  return COVERS[spot.source];
+  return spot.photos?.[0] ?? COVERS[spot.source];
 }

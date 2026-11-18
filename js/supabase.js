@@ -45,6 +45,25 @@ async function call(request) {
 
 const toUser = (u) => ({ uid: u.id, email: u.email, name: u.user_metadata?.full_name ?? u.user_metadata?.name ?? null, photoURL: u.user_metadata?.avatar_url ?? null, provider: u.app_metadata?.provider ?? 'email', emailVerified: Boolean(u.email_confirmed_at) });
 
+const PHOTO_BUCKET = 'spot-photos';
+
+// Рядок pilot_spots → точка для карти. photoUrl перетворює шлях у Storage на публічну адресу.
+export function toPilotSpot(row, feedback, photoUrl, reviewsUnavailable = false) {
+  const photoPaths = row.photos ?? [];
+  return {
+    id: row.id, archivedAt: row.archived_at, ownerId: row.owner_id, pilot: true, hostName: 'Господар точки',
+    title: row.title, district: row.district, lat: Number(row.lat), lng: Number(row.lng),
+    source: row.source, connector: row.connector, powerKw: Number(row.power_kw),
+    pricePerKwh: Number(row.price_per_kwh), devices: row.devices, reviewsUnavailable,
+    reviews: feedback.filter(r => r.spot_id === row.id).map(r => ({
+      author: r.author_name || 'Учасник WattWay', stars: r.rating, text: r.body, date: r.created_at,
+    })),
+    schedule: { from: row.opens.slice(0, 5), to: row.closes.slice(0, 5) },
+    paused: Boolean(row.paused), closedWeekdays: row.closed_weekdays ?? [],
+    photoPaths, photos: photoPaths.map(photoUrl),
+  };
+}
+
 // null — бібліотека чи конфіг не завантажились (немає інтернету): тоді сайт пропонує демо-режим.
 export async function loadSupabase() {
   try {
@@ -65,17 +84,27 @@ export async function loadSupabase() {
         let feedback = [], reviewsUnavailable = false;
         try { feedback = await call(client.rpc('list_public_spot_reviews')); }
         catch { reviewsUnavailable = true; }
-        return rows.map(row => ({
-          id: row.id, archivedAt: row.archived_at, ownerId: row.owner_id, pilot: true, hostName: 'Господар точки',
-          title: row.title, district: row.district, lat: Number(row.lat), lng: Number(row.lng),
-          source: row.source, connector: row.connector, powerKw: Number(row.power_kw),
-          pricePerKwh: Number(row.price_per_kwh), devices: row.devices, reviewsUnavailable,
-          reviews: feedback.filter(r => r.spot_id === row.id).map(r => ({
-            author: r.author_name || 'Учасник WattWay', stars: r.rating, text: r.body, date: r.created_at,
-          })),
-          schedule: { from: row.opens.slice(0, 5), to: row.closes.slice(0, 5) },
-        }));
+        const photoUrl = path => client.storage.from(PHOTO_BUCKET).getPublicUrl(path).data.publicUrl;
+        return rows.map(row => toPilotSpot(row, feedback, photoUrl, reviewsUnavailable));
       },
+      updatePilotSpot: (id, input) => call(client.rpc('update_pilot_spot', {
+        point_id: id, new_title: input.title, new_district: input.district, new_lat: input.lat, new_lng: input.lng,
+        new_source: input.source, new_connector: input.connector, new_power_kw: input.powerKw, new_price: input.pricePerKwh,
+        new_devices: input.devices, new_opens: input.schedule.from, new_closes: input.schedule.to,
+      })),
+      setPilotSpotPaused: (id, paused) => call(client.rpc('set_pilot_spot_paused', { point_id: id, is_paused: paused })),
+      setPilotSpotSchedule: (id, { weekdays, days }) => call(client.rpc('set_pilot_spot_schedule', { point_id: id, weekdays, days })),
+      listDaysOff: async id => (await call(client.from('pilot_spot_days_off').select('day').eq('spot_id', id))).map(r => r.day),
+      pilotAvailability: (id, from, to) => call(client.rpc('pilot_spot_availability', { point_id: id, from_day: from, to_day: to })),
+      uploadSpotPhoto: async (path, blob) => {
+        const { error } = await client.storage.from(PHOTO_BUCKET).upload(path, blob, { contentType: blob.type, upsert: false });
+        if (error) throw fail(error);
+      },
+      removeSpotPhoto: async path => {
+        const { error } = await client.storage.from(PHOTO_BUCKET).remove([path]);
+        if (error) throw fail(error);
+      },
+      setPilotSpotPhotos: (id, paths) => call(client.rpc('set_pilot_spot_photos', { point_id: id, paths })),
       archivePilotSpot: id => call(client.rpc('archive_pilot_spot', { point_id: id })),
       publishPilotSpot: (input, uid) => call(client.from('pilot_spots').insert({
         owner_id: uid, title: input.title, district: input.district, lat: input.lat, lng: input.lng,
