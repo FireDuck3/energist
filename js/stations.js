@@ -36,3 +36,6 @@ export async function loadPublicStations({ fetchImpl = globalThis.fetch, storage
     return cached?.rows ?? [];
   }
 }
+
+// Приватні точки користувачів WattWay (пілот у Supabase) відрізняємо від засіяних демонстраційних.
+export const spotKind = (spot) => (spot.pilot ? 'private' : 'demo');

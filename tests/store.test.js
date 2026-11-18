@@ -135,3 +135,13 @@ test('сховище кидає винятки — store працює', () => {
   store.reset();
   eq(store.getState().spots.length, 15);
 });
+
+test('деморежим: за замовчуванням вимкнений, setDemoMode зберігається і переживає скидання демо-даних', () => {
+  const storage = memoryStorage();
+  const store = createStore(storage);
+  eq(store.getState().demoMode, false);
+  store.setDemoMode(true);
+  eq(createStore(storage).getState().demoMode, true);
+  store.reset();
+  eq(store.getState().demoMode, true);
+});

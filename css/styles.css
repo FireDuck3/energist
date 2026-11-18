@@ -966,3 +966,14 @@ input.input { height: 44px; }
 @media (max-width: 480px) { .auth-buttons .btn-secondary { display: none; } }
 .auth-divider { display: flex; align-items: center; gap: 12px; color: var(--muted); }
 .auth-divider::before, .auth-divider::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
+
+/* Публічні станції та демо-точки: різні маркери для різних видів точок */
+.source-public { background: #E0F4F1; color: #0E6B5E; }
+.pin-public { border-color: #0E9F8E; }
+.pin-demo { border-style: dashed; }
+.station-card { cursor: pointer; }
+.station-card .spot-info, .station-popup .popup-body { display: grid; gap: 4px; }
+.st-row { font-size: .88rem; }
+.st-attr { font-size: .75rem; }
+.st-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.st-actions .btn { margin-top: 0; }

@@ -4,6 +4,7 @@ import { filterSpots, spotRating, isLiveInBlackout, isOpenAt } from '../filters.
 import { formatUAH } from '../pricing.js';
 import { DEVICES, SOURCES, CONNECTORS, VINNYTSIA_CENTER } from '../data.js';
 import { searchBox } from './search-box.js';
+import { loadPublicStations, routeUrl, statusLabel, attribution, connectorLabel, spotKind } from '../stations.js';
 
 // Тайли OpenStreetMap; світлу й темну (блекаут) тему дає CSS-фільтр на .leaflet-tile-pane.
 export const TILES = {
@@ -13,7 +14,7 @@ export const TILES = {
 
 // Пін-«пігулка» кольору джерела з ціною, як на Airbnb.
 export function spotPin(spot, { dimmed = false, selected = false } = {}) {
-  const cls = ['pin', `pin-${spot.source}`, dimmed && 'pin-dimmed', selected && 'pin-selected'].filter(Boolean).join(' ');
+  const cls = ['pin', `pin-${spot.source}`, spotKind(spot) === 'demo' && 'pin-demo', dimmed && 'pin-dimmed', selected && 'pin-selected'].filter(Boolean).join(' ');
   const label = dimmed ? 'немає світла' : `${spot.pricePerKwh} грн`;
   return L.divIcon({
     className: 'pin-wrap',
@@ -55,6 +56,57 @@ function popupContent(spot) {
       h('a', { class: 'btn btn-primary btn-sm', href: `#/spot/${spot.id}` }, 'Детальніше')));
 }
 
+// Пін публічної станції: інший колір і підпис — потужність, бо ціна невідома.
+export function stationPin(station) {
+  const kw = station.max_power_kw != null ? `${String(station.max_power_kw).replace('.', ',')} кВт` : 'EV';
+  return L.divIcon({
+    className: 'pin-wrap',
+    html: `<div class="pin pin-public"><span class="pin-icon">🔌</span>${kw}</div>`,
+    iconSize: null, iconAnchor: [0, 0],
+  });
+}
+
+const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('uk-UA') : 'невідомо');
+
+// Деталі станції для popup і списку: показуємо лише те, що справді відомо.
+function stationDetails(st) {
+  const connectors = (st.connectors ?? []).map((c) =>
+    `${connectorLabel(c.type)}${c.power_kw != null ? ` ${String(c.power_kw).replace('.', ',')} кВт` : ''}${c.count > 1 ? ` ×${c.count}` : ''}`);
+  const row = (label, value) => h('div', { class: 'st-row' }, h('span', { class: 'muted' }, `${label}: `), value);
+  return [
+    st.address && row('Адреса', st.address),
+    st.operator && row('Оператор', st.operator),
+    connectors.length ? row("Роз'єми", connectors.join(', ')) : null,
+    st.opening_hours && row('Графік', st.opening_hours),
+    st.access && row('Доступ', st.access),
+    st.price_verified && st.price_per_kwh != null && row('Ціна', `${formatUAH(st.price_per_kwh)} / кВт·год`),
+    row('Статус', statusLabel(st)),
+    row('Оновлено', fmtDate(st.updated_at)),
+    h('div', { class: 'muted st-attr' }, 'Дані: ', attribution(st).join(' · ') || 'публічні джерела'),
+  ].filter(Boolean);
+}
+
+const stationActions = (st) => h('div', { class: 'st-actions' },
+  h('a', { class: 'btn btn-primary btn-sm', href: routeUrl(st), target: '_blank', rel: 'noopener' }, 'Прокласти маршрут'),
+  st.operator_url && h('a', { class: 'btn btn-secondary btn-sm', href: st.operator_url, target: '_blank', rel: 'noopener' }, 'Відкрити в застосунку оператора'));
+
+function stationPopup(st) {
+  return h('div', { class: 'popup station-popup' },
+    h('div', { class: 'popup-body' },
+      h('span', { class: 'source-badge source-public' }, '🔌 Публічна станція'),
+      h('b', {}, st.name ?? st.operator ?? 'Зарядна станція'),
+      ...stationDetails(st), stationActions(st)));
+}
+
+function stationCard(st, onShow) {
+  return h('div', { class: 'spot-card card station-card', role: 'button', tabindex: '0', onclick: onShow,
+    onkeydown: (e) => { if (e.key === 'Enter') onShow(); } },
+    h('div', { class: 'spot-info' },
+      h('span', { class: 'source-badge source-public' }, '🔌 Публічна станція'),
+      h('h3', { class: 'spot-title' }, st.name ?? st.operator ?? 'Зарядна станція'),
+      ...stationDetails(st)));
+}
+
 const chip = (label, active, onclick) =>
   h('button', { type: 'button', class: `chip${active ? ' active' : ''}`, 'aria-pressed': String(active), onclick }, label);
 
@@ -87,12 +139,15 @@ export function render(_params, root, store, _session, userHistory) {
   const deviceChips = h('div', { class: 'chips' });
   const ratingChips = h('div', { class: 'chips' });
   const nowChip = h('div', { class: 'chips' });
+  const demoChip = h('div', { class: 'chips' });
   filtersBox.append(
     h('div', { class: 'filter-row' }, h('span', { class: 'filter-label' }, 'Пристрій'), deviceChips),
     h('div', { class: 'filter-row' }, h('span', { class: 'filter-label' }, 'Ціна'), priceInput, priceLabel),
-    h('div', { class: 'filter-row' }, h('span', { class: 'filter-label' }, 'Рейтинг'), ratingChips, nowChip));
+    h('div', { class: 'filter-row' }, h('span', { class: 'filter-label' }, 'Рейтинг'), ratingChips, nowChip),
+    h('div', { class: 'filter-row' }, h('span', { class: 'filter-label' }, 'Точки'), demoChip));
 
-  function renderFilters(f) {
+  function renderFilters(f, demoMode) {
+    demoChip.replaceChildren(chip('🧪 Демо-точки', demoMode, () => store.setDemoMode(!demoMode)));
     deviceChips.replaceChildren(
       chip('Усі', !f.device, () => store.setFilters({ device: null })),
       ...DEVICES.map((d) => chip(d.label, f.device === d.id, () => store.setFilters({ device: f.device === d.id ? null : d.id }))));
@@ -117,9 +172,13 @@ export function render(_params, root, store, _session, userHistory) {
     const tiles = L.tileLayer(TILES.url, { attribution: TILES.attribution, maxZoom: 19 }).addTo(map);
     tiles.on('load', () => { tilesLoaded = true; fallback.hidden = true; });
     tiles.on('tileerror', () => { if (!tilesLoaded) fallback.hidden = false; });
-    const all = store.getState().spots;
     // Без анімації: якщо піти з карти посеред анімації масштабу, Leaflet падає на вже прибраній карті.
-    const fitAll = () => map.fitBounds(L.latLngBounds(all.map((s) => [s.lat, s.lng])), { padding: [28, 28], animate: false });
+    const fitAll = () => {
+      const { spots, demoMode } = store.getState();
+      const pts = (demoMode ? spots : spots.filter((s) => spotKind(s) === 'private')).map((s) => [s.lat, s.lng]);
+      if (pts.length) map.fitBounds(L.latLngBounds(pts), { padding: [28, 28], animate: false });
+      else map.setView(VINNYTSIA_CENTER, 12, { animate: false });
+    };
     fitAll();
     // Контейнер змінює розмір після верстки й при повороті телефону — Leaflet треба про це сказати.
     // Перший виклик приходить, коли розмір уже справжній, — тоді й підганяємо масштаб.
@@ -163,23 +222,43 @@ export function render(_params, root, store, _session, userHistory) {
     }
   }
 
+  // ---- Публічні станції: окремий шар, не змішується з приватними й демо-точками ----
+  let publicStations = [];
+  let publicMarkers = [];
+  let destroyed = false;
+  const showStation = (st) => {
+    const m = publicMarkers.find((x) => x.st === st);
+    if (map && m) { map.setView([st.lat, st.lng], Math.max(map.getZoom(), 15), { animate: false }); m.marker.openPopup(); }
+  };
+  function renderPublicMarkers() {
+    publicMarkers.forEach((m) => m.marker.remove());
+    publicMarkers = [];
+    if (!map) return;
+    publicMarkers = publicStations.map((st) => ({ st, marker: L.marker([st.lat, st.lng], { icon: stationPin(st), zIndexOffset: -100 })
+      .bindPopup(() => stationPopup(st), { closeButton: false, minWidth: 240 }).addTo(map) }));
+  }
+  const MAX_STATION_CARDS = 50;
+
   function update() {
-    const { spots, filters, blackout } = store.getState();
+    const { spots: allSpots, filters, blackout, demoMode } = store.getState();
+    const spots = demoMode ? allSpots : allSpots.filter((s) => spotKind(s) === 'private');
     const now = new Date();
     const visible = filterSpots(spots, filters, { blackout, now });
 
-    renderFilters(filters);
+    renderFilters(filters, demoMode);
     search.update(filters);
     banner.hidden = !blackout;
-    count.textContent = `Знайдено ${visible.length} ${plural(visible.length, ['точку', 'точки', 'точок'])}`;
+    count.textContent = `Знайдено ${visible.length} ${plural(visible.length, ['точку', 'точки', 'точок'])}`
+      + (publicStations.length ? ` · ${publicStations.length} публічних станцій` : '');
 
-    list.replaceChildren(...(visible.length
-      ? visible.map((spot) => {
+    const stationCards = publicStations.slice(0, MAX_STATION_CARDS).map((st) => stationCard(st, () => showStation(st)));
+    list.replaceChildren(...(visible.length || stationCards.length
+      ? [...visible.map((spot) => {
         const card = spotCard(spot, { blackout, now });
         card.addEventListener('mouseenter', () => highlight(spot.id, true));
         card.addEventListener('mouseleave', () => highlight(spot.id, false));
         return card;
-      })
+      }), ...stationCards]
       : [h('div', { class: 'empty card' },
         h('img', { src: 'assets/phone-map.jpg', alt: '', class: 'empty-img' }),
         h('h3', {}, 'Нічого не знайдено'),
@@ -190,8 +269,16 @@ export function render(_params, root, store, _session, userHistory) {
   }
 
   update();
+  loadPublicStations().then((rows) => {
+    if (destroyed || !rows.length) return;
+    publicStations = rows;
+    map?.attributionControl.addAttribution('Станції: © Open Charge Map (CC BY 4.0), © OpenStreetMap contributors (ODbL)');
+    renderPublicMarkers();
+    update();
+  });
   const unsubscribe = store.subscribe(update);
   return () => {
+    destroyed = true;
     unsubscribe();
     search.destroy();
     resizeObserver?.disconnect();

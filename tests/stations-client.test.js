@@ -52,3 +52,9 @@ test('attribution: для злитої станції і CC BY, і ODbL', () => 
   const s = { sources: [{ license: 'CC BY 4.0 Open Charge Map' }, { license: 'ODbL © OpenStreetMap contributors' }, { license: 'ODbL © OpenStreetMap contributors' }] };
   eq(attribution(s), ['CC BY 4.0 Open Charge Map', 'ODbL © OpenStreetMap contributors']);
 });
+
+test('spotKind: пілотна точка — приватна, засіяна — демонстраційна', async () => {
+  const { spotKind } = await import('../js/stations.js');
+  eq(spotKind({ pilot: true }), 'private');
+  eq(spotKind({ id: 'oleh-ses' }), 'demo');
+});

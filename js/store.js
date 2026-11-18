@@ -7,7 +7,7 @@ export const STORAGE_KEY = 'energist-demo-v1';
 
 export function seedState() {
   return structuredClone({
-    version: DATA_VERSION, role: 'guest', blackout: false, filters: DEFAULT_FILTERS,
+    version: DATA_VERSION, role: 'guest', blackout: false, demoMode: false, filters: DEFAULT_FILTERS,
     spots: SPOTS, hosts: HOSTS, bookings: SEED_BOOKINGS,
   });
 }
@@ -81,6 +81,7 @@ export function createStore(storage) {
     },
     setRole: (role) => set({ role }),
     setBlackout: (on) => set({ blackout: Boolean(on) }),
+    setDemoMode: (on) => set({ demoMode: Boolean(on) }),
     setFilters: (partial) => set({ filters: { ...state.filters, ...partial } }),
     resetFilters: () => set({ filters: { ...DEFAULT_FILTERS } }),
 
@@ -122,7 +123,7 @@ export function createStore(storage) {
 
     reset() {
       try { storage.removeItem(STORAGE_KEY); } catch { /* ігноруємо */ }
-      state = seedState();
+      state = { ...seedState(), demoMode: state.demoMode };
       listeners.forEach((fn) => fn(getState()));
     },
   };
