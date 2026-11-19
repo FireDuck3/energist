@@ -93,10 +93,12 @@ function stationDetails(st) {
   ].filter(Boolean);
 }
 
-const stationActions = (st, session) => h('div', { class: 'st-actions' },
+// Дії станції всередині картки-кнопки: клік і Enter не повинні доходити до самої картки.
+const stopInside = (e) => e.stopPropagation();
+const stationActions = (st, session) => h('div', { class: 'st-actions', onclick: stopInside, onkeydown: stopInside },
   h('a', { class: 'btn btn-primary btn-sm', href: routeUrl(st), target: '_blank', rel: 'noopener' }, 'Прокласти маршрут'),
   safeUrl(st.operator_url) && h('a', { class: 'btn btn-secondary btn-sm', href: safeUrl(st.operator_url), target: '_blank', rel: 'noopener' }, 'Відкрити в застосунку оператора'),
-  session && h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: (e) => { e.stopPropagation();
+  session && h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => {
     openReport({ targetType: 'station', targetId: st.id, title: st.name ?? st.operator ?? 'Зарядна станція' }, session); } }, 'Повідомити про проблему'));
 
 function stationPopup(st, session) {

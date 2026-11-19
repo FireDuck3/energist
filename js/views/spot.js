@@ -33,7 +33,7 @@ function renderSpot(spot, host, { blackout, spots }, store, session, userHistory
         h('h1', { class: 'spot-name' }, spot.title),
         spot.verified && h('span', { class: 'verified-badge', title: 'WattWay перевірив точку на місці' }, '✓ Перевірена точка'),
         h('p', { class: 'spot-sub' },
-          spot.reviews.length ? stars(rating, spot.reviews.length) : h('span', { class: 'new-badge' }, ratingLabel(null, 0, 'spot')), ' · ', spot.district, ' · ',
+          spot.reviews.length || spot.reviewsUnavailable ? stars(rating, spot.reviews.length) : h('span', { class: 'new-badge' }, ratingLabel(null, 0, 'spot')), ' · ', spot.district, ' · ',
           h('span', { class: `source-badge source-${spot.source}` }, `${SOURCES[spot.source].icon} ${SOURCES[spot.source].label}`)))),
     h('img', { class: 'spot-hero', src: spotCover(spot), alt: '' }),
 
@@ -43,7 +43,7 @@ function renderSpot(spot, host, { blackout, spots }, store, session, userHistory
           h('span', { class: 'avatar' }, hostName[0].toUpperCase()),
           h('div', {},
             h('b', {}, `Господар — ${hostName}`),
-            spot.pilot && h('div', { class: 'muted' }, (() => { const r = hostRating(spots, spot.ownerId); return `${ratingLabel(r.avg, r.count, 'host')}${r.count ? ' про господаря' : ''}`; })()),
+            spot.pilot && !spot.reviewsUnavailable && h('div', { class: 'muted' }, (() => { const r = hostRating(spots, spot.ownerId); return `${ratingLabel(r.avg, r.count, 'host')}${r.count ? ' про господаря' : ''}`; })()),
             host && h('div', { class: 'muted' },
               `${host.chargesCount} ${plural(host.chargesCount, ['зарядка', 'зарядки', 'зарядок'])} · на WattWay з ${host.sinceYear} року`))),
 
