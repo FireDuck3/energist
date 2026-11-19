@@ -2,6 +2,7 @@
 // Потрібні змінні середовища: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, OCM_API_KEY (лише секрети CI).
 import { syncStations } from './sync.js';
 import { fetchAllPages } from './paging.js';
+import { buildSnapshot } from './snapshot.js';
 
 const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, OCM_API_KEY } = process.env;
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !OCM_API_KEY) {
@@ -40,4 +41,26 @@ const supabase = {
 
 const out = await syncStations({ fetchImpl: fetch, supabase, apiKey: OCM_API_KEY });
 console.log(JSON.stringify(out.results));
+
+// Стислий знімок для карти: з таблиці (джерело правди), навіть якщо одне джерело сьогодні збоїло.
+try {
+  const rows = await fetchAllPages((from, to) => rest(
+    `${T}?select=id,name,operator,lat,lng,max_power_kw,connectors,opening_hours,price_verified,price_per_kwh,is_active&is_active=eq.true&order=id`,
+    { headers: { 'Range-Unit': 'items', Range: `${from}-${to}` } }));
+  if (!rows.length) {
+    console.error('snapshot skipped: no active stations'); // не затираємо попередній знімок порожнім
+  } else {
+    const body = JSON.stringify(buildSnapshot(rows));
+    const r = await fetch(`${SUPABASE_URL}/storage/v1/object/public-data/stations-v1.json`, {
+      method: 'POST', body,
+      headers: { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json', 'x-upsert': 'true', 'cache-control': 'max-age=3600' },
+    });
+    if (!r.ok) throw new Error(`snapshot upload HTTP ${r.status}`);
+    console.log(JSON.stringify({ snapshot: { stations: rows.length, bytes: body.length } }));
+  }
+} catch (e) {
+  console.error('snapshot failed:', e.message);
+  process.exit(1);
+}
 process.exit(out.ok ? 0 : 1);
