@@ -71,3 +71,12 @@ test('safeUrl: пропускає лише http(s)', async () => {
   eq(safeUrl('javascript:alert(1)'), null);
   eq(safeUrl(null), null);
 });
+
+test('loadStationsDetails: один запит на всі id, результат — Map за id', async () => {
+  const { loadStationsDetails } = await import('../js/stations.js');
+  const urls = [];
+  const out = await loadStationsDetails(['a', 'b'], { config, fetchImpl: async (u) => { urls.push(decodeURIComponent(String(u))); return json(200, [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }]); } });
+  eq([urls.length, urls[0].includes('id=in.(a,b)'), out.get('b').name], [1, true, 'B']);
+  eq((await loadStationsDetails(['a'], { config, fetchImpl: async () => json(500, {}) })).size, 0);
+  eq((await loadStationsDetails([], { config, fetchImpl: async () => { throw new Error('не мав викликатися'); } })).size, 0);
+});

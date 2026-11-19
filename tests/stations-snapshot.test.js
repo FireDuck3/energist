@@ -35,3 +35,10 @@ test('expandSnapshot: фільтри дають той самий результ
   }
   eq(compact[0].compact, true);
 });
+
+test('знімок зберігає коротку адресу й оператора для пошуку', () => {
+  const [st] = expandSnapshot(buildSnapshot([row({ name: 'ЕКО Келецька', operator: 'ЕКО', address: 'вул. Келецька 1, Вінниця' })]));
+  eq([st.address, st.operator], ['вул. Келецька 1, Вінниця', 'ЕКО']);
+  const [long] = buildSnapshot([row({ address: 'я'.repeat(200) })]).rows;
+  eq(long[8].length, 60);
+});

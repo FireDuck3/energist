@@ -62,6 +62,21 @@ export async function loadPublicStations({ fetchImpl = globalThis.fetch, config,
   return [];
 }
 
+// Повні дані для видимих у списку станцій — одним запитом (до 50 id).
+export async function loadStationsDetails(ids, { fetchImpl = globalThis.fetch, config } = {}) {
+  const out = new Map();
+  if (!ids.length) return out;
+  try {
+    const cfg = await configOf(config);
+    const list = ids.map((id) => encodeURIComponent(id)).join(',');
+    const res = await fetchImpl(`${cfg.url}/rest/v1/public_charging_stations?select=*&id=in.(${list})`, { headers: authHeaders(cfg) });
+    if (!res.ok) return out;
+    const rows = await res.json();
+    for (const r of Array.isArray(rows) ? rows : []) out.set(r.id, r);
+  } catch { /* лишаються короткі картки */ }
+  return out;
+}
+
 // Повна картка станції (адреса, оператор, роз'єми з потужністю, джерела) — при відкритті.
 export async function loadStationDetails(id, { fetchImpl = globalThis.fetch, config } = {}) {
   try {

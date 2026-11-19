@@ -7,7 +7,7 @@ import { openReport } from './report.js';
 import { formatUAH } from '../pricing.js';
 import { DEVICES, SOURCES, CONNECTORS, VINNYTSIA_CENTER } from '../data.js';
 import { searchBox } from './search-box.js';
-import { loadPublicStations, loadStationDetails, routeUrl, statusLabel, attribution, connectorLabel, spotKind, safeUrl } from '../stations.js';
+import { loadPublicStations, loadStationDetails, loadStationsDetails, routeUrl, statusLabel, attribution, connectorLabel, spotKind, safeUrl } from '../stations.js';
 
 // Тайли OpenStreetMap; світлу й темну (блекаут) тему дає CSS-фільтр на .leaflet-tile-pane.
 export const TILES = {
@@ -284,14 +284,17 @@ export function render(_params, root, store, session, userHistory) {
   };
   // Знімок містить лише коротке; повну картку (адреса, оператор, джерела) довантажуємо при відкритті.
   const details = new Map();
-  function lazyPopup(st) {
+  const inflight = new Map(); // id → Promise, щоб повторні відкриття не робили зайвих запитів
+  function lazyPopup(st, marker) {
     const box = h('div', {}, stationPopup(details.get(st.id) ?? st, session));
     if (st.compact && !details.has(st.id)) {
       box.append(h('p', { class: 'muted st-loading' }, 'Завантаження…'));
-      loadStationDetails(st.id).then((full) => {
+      if (!inflight.has(st.id)) inflight.set(st.id, loadStationDetails(st.id).finally(() => inflight.delete(st.id)));
+      inflight.get(st.id).then((full) => {
         if (destroyed) return;
         if (full) { details.set(st.id, full); box.replaceChildren(stationPopup(full, session)); }
         else box.querySelector('.st-loading')?.remove(); // лишається коротка картка з маршрутом
+        marker?.getPopup()?.update(); // новий розмір → Leaflet перераховує положення й автопрокрутку
       });
     }
     return box;
@@ -301,8 +304,11 @@ export function render(_params, root, store, session, userHistory) {
     if (!map || key === markersKey) return; // перебудовуємо кластери лише коли змінився набір
     markersKey = key;
     stationLayer.clearLayers();
-    publicMarkers = stations.map((st) => ({ st, marker: L.marker([st.lat, st.lng], { icon: stationPin(st), zIndexOffset: -100 })
-      .bindPopup(() => lazyPopup(st), { closeButton: false, minWidth: 240 }) }));
+    publicMarkers = stations.map((st) => {
+      const marker = L.marker([st.lat, st.lng], { icon: stationPin(st), zIndexOffset: -100 });
+      marker.bindPopup(() => lazyPopup(st, marker), { closeButton: false, minWidth: 240 });
+      return { st, marker };
+    });
     stationLayer.addLayers ? stationLayer.addLayers(publicMarkers.map((m) => m.marker)) : publicMarkers.forEach((m) => stationLayer.addLayer(m.marker));
   }
   const MAX_STATION_CARDS = 50;
@@ -380,11 +386,27 @@ export function render(_params, root, store, session, userHistory) {
     banner.hidden = !blackout;
     count.textContent = resultsLabel(visible.length, stations.length);
 
+    lastList = { visible, stations, blackout, now };
+    renderList();
+
+    renderMarkers(visible, blackout, spots);
+    renderPublicMarkers(stations, `${publicStations.length}|${stations.length}|${JSON.stringify(filters)}|${blackout}|${origin?.lat},${origin?.lng}`);
+    if (lastDemo !== null && lastDemo !== demoMode) fitAll();
+    lastDemo = demoMode;
+  }
+
+  // Список зліва окремо від маркерів: при переміщенні карти змінюються лише «50 найближчих»,
+  // а маркери приватних точок не перестворюються (інакше закривався б відкритий popup).
+  let lastList = null;
+  function renderList() {
+    if (!lastList) return;
+    const { visible, stations, blackout, now } = lastList;
     // У списку — до 50 найближчих до мого місця або до центру карти (по всій Україні їх тисячі).
     const center = origin ?? (map ? map.getCenter() : null);
     const shown = nearestN(stations, center && { lat: center.lat, lng: center.lng }, MAX_STATION_CARDS);
     const stationCards = shown.map((st) => stationCard(details.get(st.id) ?? st, () => showStation(st), origin, session));
     if (stations.length > MAX_STATION_CARDS) stationCards.push(h('p', { class: 'muted' }, `Показано ${MAX_STATION_CARDS} найближчих із ${stations.length}.`));
+    loadListDetails(shown);
     list.replaceChildren(...(visible.length || stationCards.length
       ? [...visible.map((spot) => {
         const card = spotCard(spot, { blackout, now, origin });
@@ -397,11 +419,20 @@ export function render(_params, root, store, session, userHistory) {
         h('h3', {}, 'Нічого не знайдено'),
         h('p', { class: 'muted' }, 'Спробуйте змінити фільтри — поруч точно є розетка.'),
         h('button', { type: 'button', class: 'btn btn-primary', onclick: () => store.resetFilters() }, 'Скинути фільтри'))]));
+  }
 
-    renderMarkers(visible, blackout, spots);
-    renderPublicMarkers(stations, `${publicStations.length}|${stations.length}|${JSON.stringify(filters)}|${blackout}|${origin?.lat},${origin?.lng}`);
-    if (lastDemo !== null && lastDemo !== demoMode) fitAll();
-    lastDemo = demoMode;
+  // Повні картки для видимих у списку станцій — одним запитом; потім список перемальовується.
+  let listDetailsKey = '';
+  function loadListDetails(shown) {
+    const missing = shown.filter((st) => st.compact && !details.has(st.id)).map((st) => st.id);
+    const key = missing.join(',');
+    if (!missing.length || key === listDetailsKey) return;
+    listDetailsKey = key;
+    loadStationsDetails(missing).then((found) => {
+      if (destroyed || !found.size) return;
+      found.forEach((row, id) => details.set(id, row));
+      renderList();
+    });
   }
 
   if (store.getState().filters.radiusKm) store.setFilters({ radiusKm: null }); // без місцеположення радіус не діє
@@ -415,7 +446,7 @@ export function render(_params, root, store, session, userHistory) {
   const unsubscribe = store.subscribe(update);
   // Список найближчих станцій іде за центром карти; маркери при цьому не перебудовуються.
   let moveTimer = null;
-  map?.on('moveend', () => { clearTimeout(moveTimer); moveTimer = setTimeout(() => { if (!destroyed && !origin) update(); }, 250); });
+  map?.on('moveend', () => { clearTimeout(moveTimer); moveTimer = setTimeout(() => { if (!destroyed && !origin) renderList(); }, 250); });
   return () => {
     clearTimeout(moveTimer);
     destroyed = true;

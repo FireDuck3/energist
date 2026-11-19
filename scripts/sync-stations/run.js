@@ -45,7 +45,7 @@ console.log(JSON.stringify(out.results));
 // Стислий знімок для карти: з таблиці (джерело правди), навіть якщо одне джерело сьогодні збоїло.
 try {
   const rows = await fetchAllPages((from, to) => rest(
-    `${T}?select=id,name,operator,lat,lng,max_power_kw,connectors,opening_hours,price_verified,price_per_kwh,is_active&is_active=eq.true&order=id`,
+    `${T}?select=id,name,operator,address,lat,lng,max_power_kw,connectors,opening_hours,price_verified,price_per_kwh,is_active&is_active=eq.true&order=id`,
     { headers: { 'Range-Unit': 'items', Range: `${from}-${to}` } }));
   if (!rows.length) {
     console.error('snapshot skipped: no active stations'); // не затираємо попередній знімок порожнім
@@ -57,7 +57,7 @@ try {
         'Content-Type': 'application/json', 'x-upsert': 'true', 'cache-control': 'max-age=3600' },
     });
     if (!r.ok) throw new Error(`snapshot upload HTTP ${r.status}`);
-    console.log(JSON.stringify({ snapshot: { stations: rows.length, bytes: body.length } }));
+    console.log(JSON.stringify({ snapshot: { stations: rows.length, bytes: Buffer.byteLength(body) } }));
   }
 } catch (e) {
   console.error('snapshot failed:', e.message);

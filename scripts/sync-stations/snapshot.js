@@ -11,7 +11,9 @@ function connectorMask(connectors) {
   return (connectors ?? []).reduce((mask, c) => mask | (CONNECTOR_BITS[c.type] ?? CONNECTOR_BITS.other), 0);
 }
 
-// Рядок: [id, lat, lng, maxPowerKw|null, connMask, flags, priceUah|null, name]
+// Рядок: [id, lat, lng, maxPowerKw|null, connMask, flags, priceUah|null, name, address|null, operator|null]
+// Адреса (до 60 символів) і оператор (до 40) — щоб пошук на карті знаходив станції за вулицею чи мережею.
+const cut = (v, n) => (v ? String(v).slice(0, n) : null);
 export function buildSnapshot(rows, now = new Date()) {
   const active = rows.filter((r) => r.is_active !== false);
   return {
@@ -27,6 +29,8 @@ export function buildSnapshot(rows, now = new Date()) {
         (r.opening_hours === 'Цілодобово' ? FLAG_24H : 0) | (verified ? FLAG_PRICE : 0),
         verified ? Number(r.price_per_kwh) : null,
         r.name ?? r.operator ?? null,
+        cut(r.address, 60),
+        cut(r.operator, 40),
       ];
     }),
   };
@@ -37,8 +41,8 @@ const TYPES = Object.entries(CONNECTOR_BITS);
 // Легкі об'єкти, сумісні з фільтрами карти (matchStation, stationConnectors, sortByDistance).
 export function expandSnapshot(snap) {
   if (snap?.v !== SNAPSHOT_VERSION || !Array.isArray(snap.rows)) return [];
-  return snap.rows.map(([id, lat, lng, kw, mask, flags, price, name]) => ({
-    id, lat, lng, name, compact: true,
+  return snap.rows.map(([id, lat, lng, kw, mask, flags, price, name, address = null, operator = null]) => ({
+    id, lat, lng, name, address, operator, compact: true,
     max_power_kw: kw,
     connectors: TYPES.filter(([, bit]) => mask & bit).map(([type]) => ({ type })),
     opening_hours: flags & FLAG_24H ? 'Цілодобово' : null,
