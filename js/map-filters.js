@@ -59,6 +59,22 @@ export function sortByDistance(items, origin) {
 
 export const nearest = (items, origin) => sortByDistance(items, origin)[0] ?? null;
 
+// N найближчих до точки (для списку зліва): без повного сортування тисяч станцій.
+export function nearestN(items, point, n = 50) {
+  if (!point) return items.slice(0, n);
+  const best = [];
+  for (const item of items) {
+    const d = distanceKm(point, item);
+    if (best.length < n || d < best[best.length - 1].d) {
+      let i = best.length;
+      while (i > 0 && best[i - 1].d > d) i--;
+      best.splice(i, 0, { item, d });
+      if (best.length > n) best.pop();
+    }
+  }
+  return best.map((b) => b.item);
+}
+
 export function resultsLabel(spotCount, stationCount) {
   const spots = `Знайдено ${spotCount} ${plural(spotCount, ['точку', 'точки', 'точок'])}`;
   return stationCount ? `${spots} · ${stationCount} ${plural(stationCount, ['публічна станція', 'публічні станції', 'публічних станцій'])}` : spots;

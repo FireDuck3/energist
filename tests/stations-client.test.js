@@ -7,39 +7,45 @@ const ok = (rows) => async () => ({ ok: true, status: 200, json: async () => row
 const ROW = { id: '1', name: 'ЕКО', lat: 49.2, lng: 28.4, sources: [{ source: 'ocm', license: 'CC BY 4.0 Open Charge Map' }] };
 const H = 3600 * 1000;
 
-test('loadPublicStations: успіх кладе кеш, повторний виклик у межах 3 год не б\'є мережу', async () => {
-  const storage = mem(); let calls = 0;
-  const fetchImpl = async (...a) => { calls++; return ok([ROW])(...a); };
-  eq((await loadPublicStations({ fetchImpl, storage, now: 0, config })).length, 1);
-  eq((await loadPublicStations({ fetchImpl, storage, now: 2 * H, config })).length, 1);
+const SNAP = { v: 1, generated_at: '2026-11-19T03:00:00.000Z', count: 2,
+  rows: [['s1', 49.2, 28.4, 50, 3, 1, null, 'ЕКО'], ['s2', 50.45, 30.52, null, 16, 0, null, null]] };
+const json = (status, body) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
+
+test('loadPublicStations: знімок → розгорнуті станції, без запитів до таблиці', async () => {
+  const urls = [];
+  const out = await loadPublicStations({ config, cache: {}, fetchImpl: async (u) => { urls.push(String(u)); return json(200, SNAP); } });
+  eq(out.map((s) => [s.id, s.compact, s.max_power_kw]), [['s1', true, 50], ['s2', true, null]]);
+  eq(urls, ['https://x.supabase.co/storage/v1/object/public/public-data/stations-v1.json']);
+});
+
+test('loadPublicStations: повторний виклик бере дані з пам\'яті', async () => {
+  const cache = {}; let calls = 0;
+  const fetchImpl = async () => { calls++; return json(200, SNAP); };
+  await loadPublicStations({ config, cache, fetchImpl });
+  await loadPublicStations({ config, cache, fetchImpl });
   eq(calls, 1);
-  await loadPublicStations({ fetchImpl, storage, now: 4 * H, config });
-  eq(calls, 2);
 });
 
-test('loadPublicStations: запит іде на PostgREST з anon-ключем', async () => {
-  let seen;
-  await loadPublicStations({ fetchImpl: async (u, i) => { seen = { u, i }; return ok([])(); }, storage: mem(), now: 0, config });
-  eq(seen.u.startsWith('https://x.supabase.co/rest/v1/public_charging_stations?'), true);
-  eq(seen.i.headers.apikey, 'anon');
+test('loadPublicStations: без знімка — таблиця порціями, не більше 2000 станцій', async () => {
+  const ranges = [];
+  const fetchImpl = async (u, init) => {
+    if (String(u).includes('/storage/')) return json(404, {});
+    ranges.push(init.headers.Range);
+    return json(200, Array.from({ length: 1000 }, (_, i) => ({ id: `${ranges.length}-${i}`, lat: 49, lng: 28 })));
+  };
+  const out = await loadPublicStations({ config, cache: {}, fetchImpl });
+  eq([out.length, ranges], [2000, ['0-999', '1000-1999']]);
 });
 
-test('loadPublicStations: збій мережі без кешу → [] без винятку; з кешем → кеш', async () => {
-  const boom = async () => { throw new TypeError('offline'); };
-  eq(await loadPublicStations({ fetchImpl: boom, storage: mem(), now: 0, config }), []);
-  const storage = mem();
-  await loadPublicStations({ fetchImpl: ok([ROW]), storage, now: 0, config });
-  eq((await loadPublicStations({ fetchImpl: boom, storage, now: 5 * H, config })).length, 1);
+test('loadPublicStations: усе недоступне → [] без винятку', async () => {
+  eq(await loadPublicStations({ config, cache: {}, fetchImpl: async () => { throw new TypeError('offline'); } }), []);
 });
 
-test('loadPublicStations: порожня відповідь не затирає непорожній кеш', async () => {
-  const storage = mem();
-  await loadPublicStations({ fetchImpl: ok([ROW]), storage, now: 0, config });
-  eq((await loadPublicStations({ fetchImpl: ok([]), storage, now: 5 * H, config })).length, 1);
-});
-
-test('loadPublicStations: HTTP-помилка не кидає', async () => {
-  eq(await loadPublicStations({ fetchImpl: async () => ({ ok: false, status: 500 }), storage: mem(), now: 0, config }), []);
+test('loadStationDetails: повний рядок або null', async () => {
+  const { loadStationDetails } = await import('../js/stations.js');
+  eq((await loadStationDetails('s1', { config, fetchImpl: async () => json(200, [ROW]) })).name, 'ЕКО');
+  eq(await loadStationDetails('s1', { config, fetchImpl: async () => json(500, {}) }), null);
+  eq(await loadStationDetails('s1', { config, fetchImpl: async () => json(200, []) }), null);
 });
 
 test('routeUrl, statusLabel, connectorLabel', () => {

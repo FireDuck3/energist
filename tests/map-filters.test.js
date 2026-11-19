@@ -80,3 +80,11 @@ test('resultsLabel: відмінювання', () => {
   eq(resultsLabel(2, 0), 'Знайдено 2 точки');
   eq(resultsLabel(1, 22), 'Знайдено 1 точку · 22 публічні станції');
 });
+
+test('nearestN: найближчі до точки, відсортовані, не більше n', async () => {
+  const { nearestN } = await import('../js/map-filters.js');
+  const pts = Array.from({ length: 120 }, (_, i) => ({ id: i, lat: 49 + i * 0.01, lng: 28 }));
+  const out = nearestN(pts, { lat: 49.5, lng: 28 }, 50);
+  eq([out.length, out[0].id, out.every((p, i) => i === 0 || Math.abs(p.lat - 49.5) >= Math.abs(out[i - 1].lat - 49.5) - 1e-9)], [50, 50, true]);
+  eq(nearestN(pts.slice(0, 3), { lat: 49, lng: 28 }, 50).length, 3);
+});

@@ -1,13 +1,13 @@
 // Карта і список точок — шлях Саші, частина 1.
 import { h, stars, spotCover, plural } from '../ui.js';
 import { filterSpots, spotRating, isLiveInBlackout, isOpenAt, normalizeQuery } from '../filters.js';
-import { RADII, POWER_BANDS, CONNECTOR_FILTERS, distanceKm, matchSpotExtra, matchStation, sortByDistance, nearest, resultsLabel } from '../map-filters.js';
+import { RADII, POWER_BANDS, CONNECTOR_FILTERS, distanceKm, matchSpotExtra, matchStation, sortByDistance, nearest, nearestN, resultsLabel } from '../map-filters.js';
 import { locate, geoMessage } from '../geolocate.js';
 import { openReport } from './report.js';
 import { formatUAH } from '../pricing.js';
 import { DEVICES, SOURCES, CONNECTORS, VINNYTSIA_CENTER } from '../data.js';
 import { searchBox } from './search-box.js';
-import { loadPublicStations, routeUrl, statusLabel, attribution, connectorLabel, spotKind, safeUrl } from '../stations.js';
+import { loadPublicStations, loadStationDetails, routeUrl, statusLabel, attribution, connectorLabel, spotKind, safeUrl } from '../stations.js';
 
 // Тайли OpenStreetMap; світлу й темну (блекаут) тему дає CSS-фільтр на .leaflet-tile-pane.
 export const TILES = {
@@ -217,7 +217,7 @@ export function render(_params, root, store, session, userHistory) {
 
   if (window.L) {
     map = L.map(mapEl, { zoomControl: true, scrollWheelZoom: true, maxZoom: 19 }).setView(VINNYTSIA_CENTER, 13);
-    stationLayer = (L.markerClusterGroup ? L.markerClusterGroup({ maxClusterRadius: 50, disableClusteringAtZoom: 18 }) : L.layerGroup()).addTo(map);
+    stationLayer = (L.markerClusterGroup ? L.markerClusterGroup({ maxClusterRadius: 50, disableClusteringAtZoom: 18, chunkedLoading: true }) : L.layerGroup()).addTo(map);
     const tiles = L.tileLayer(TILES.url, { attribution: TILES.attribution, maxZoom: 19 }).addTo(map);
     tiles.on('load', () => { tilesLoaded = true; fallback.hidden = true; });
     tiles.on('tileerror', () => { if (!tilesLoaded) fallback.hidden = false; });
@@ -282,14 +282,30 @@ export function render(_params, root, store, session, userHistory) {
     map.setView([st.lat, st.lng], 18, { animate: false }); // на цьому масштабі кластери вже розгорнуті
     m.marker.openPopup();
   };
-  function renderPublicMarkers(stations) {
-    if (!map) return;
+  // Знімок містить лише коротке; повну картку (адреса, оператор, джерела) довантажуємо при відкритті.
+  const details = new Map();
+  function lazyPopup(st) {
+    const box = h('div', {}, stationPopup(details.get(st.id) ?? st, session));
+    if (st.compact && !details.has(st.id)) {
+      box.append(h('p', { class: 'muted st-loading' }, 'Завантаження…'));
+      loadStationDetails(st.id).then((full) => {
+        if (destroyed) return;
+        if (full) { details.set(st.id, full); box.replaceChildren(stationPopup(full, session)); }
+        else box.querySelector('.st-loading')?.remove(); // лишається коротка картка з маршрутом
+      });
+    }
+    return box;
+  }
+  let markersKey = null;
+  function renderPublicMarkers(stations, key) {
+    if (!map || key === markersKey) return; // перебудовуємо кластери лише коли змінився набір
+    markersKey = key;
     stationLayer.clearLayers();
     publicMarkers = stations.map((st) => ({ st, marker: L.marker([st.lat, st.lng], { icon: stationPin(st), zIndexOffset: -100 })
-      .bindPopup(() => stationPopup(st, session), { closeButton: false, minWidth: 240 }) }));
+      .bindPopup(() => lazyPopup(st), { closeButton: false, minWidth: 240 }) }));
     stationLayer.addLayers ? stationLayer.addLayers(publicMarkers.map((m) => m.marker)) : publicMarkers.forEach((m) => stationLayer.addLayer(m.marker));
   }
-  const MAX_STATION_CARDS = 200;
+  const MAX_STATION_CARDS = 50;
 
   // ---- Місцеположення й «найближча зарядка» ----
   async function requestLocation() {
@@ -355,8 +371,8 @@ export function render(_params, root, store, session, userHistory) {
     const visible = sortByDistance(filterSpots(spots, filters, { blackout, now })
       .filter((s) => matchSpotExtra(s, filters, { origin })), origin);
     const q = normalizeQuery(filters.query);
-    const stations = sortByDistance(publicStations.filter((st) => matchStation(st, filters, { origin, blackout })
-      && (!q || normalizeQuery([st.name, st.address, st.operator].filter(Boolean).join(' ')).includes(q))), origin);
+    const stations = publicStations.filter((st) => matchStation(st, filters, { origin, blackout })
+      && (!q || normalizeQuery([st.name, st.address, st.operator].filter(Boolean).join(' ')).includes(q)));
     current = { spots: visible, stations };
 
     renderFilters(filters, demoMode);
@@ -364,8 +380,11 @@ export function render(_params, root, store, session, userHistory) {
     banner.hidden = !blackout;
     count.textContent = resultsLabel(visible.length, stations.length);
 
-    const stationCards = stations.slice(0, MAX_STATION_CARDS).map((st) => stationCard(st, () => showStation(st), origin, session));
-    if (stations.length > MAX_STATION_CARDS) stationCards.push(h('p', { class: 'muted' }, `Показано перші ${MAX_STATION_CARDS} — уточніть фільтри.`));
+    // У списку — до 50 найближчих до мого місця або до центру карти (по всій Україні їх тисячі).
+    const center = origin ?? (map ? map.getCenter() : null);
+    const shown = nearestN(stations, center && { lat: center.lat, lng: center.lng }, MAX_STATION_CARDS);
+    const stationCards = shown.map((st) => stationCard(details.get(st.id) ?? st, () => showStation(st), origin, session));
+    if (stations.length > MAX_STATION_CARDS) stationCards.push(h('p', { class: 'muted' }, `Показано ${MAX_STATION_CARDS} найближчих із ${stations.length}.`));
     list.replaceChildren(...(visible.length || stationCards.length
       ? [...visible.map((spot) => {
         const card = spotCard(spot, { blackout, now, origin });
@@ -380,7 +399,7 @@ export function render(_params, root, store, session, userHistory) {
         h('button', { type: 'button', class: 'btn btn-primary', onclick: () => store.resetFilters() }, 'Скинути фільтри'))]));
 
     renderMarkers(visible, blackout, spots);
-    renderPublicMarkers(stations);
+    renderPublicMarkers(stations, `${publicStations.length}|${stations.length}|${JSON.stringify(filters)}|${blackout}|${origin?.lat},${origin?.lng}`);
     if (lastDemo !== null && lastDemo !== demoMode) fitAll();
     lastDemo = demoMode;
   }
@@ -394,7 +413,11 @@ export function render(_params, root, store, session, userHistory) {
     update();
   });
   const unsubscribe = store.subscribe(update);
+  // Список найближчих станцій іде за центром карти; маркери при цьому не перебудовуються.
+  let moveTimer = null;
+  map?.on('moveend', () => { clearTimeout(moveTimer); moveTimer = setTimeout(() => { if (!destroyed && !origin) update(); }, 250); });
   return () => {
+    clearTimeout(moveTimer);
     destroyed = true;
     unsubscribe();
     search.destroy();
