@@ -1,6 +1,7 @@
 // Точка входу для GitHub Actions: node scripts/sync-stations/run.js
 // Потрібні змінні середовища: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, OCM_API_KEY (лише секрети CI).
 import { syncStations } from './sync.js';
+import { fetchAllPages } from './paging.js';
 
 const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, OCM_API_KEY } = process.env;
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !OCM_API_KEY) {
@@ -23,7 +24,9 @@ const supabase = {
         headers: { Prefer: 'resolution=merge-duplicates,return=minimal' } });
     }
   },
-  listActive: () => rest(`${T}?select=id,source,external_id,sources,missed_runs&is_active=eq.true&limit=100000`),
+  // Порціями по 1000: інакше PostgREST мовчки обрізає відповідь, і деактивація не бачить частини станцій.
+  listActive: () => fetchAllPages((from, to) => rest(`${T}?select=id,source,external_id,sources,missed_runs&is_active=eq.true&order=id`,
+    { headers: { 'Range-Unit': 'items', Range: `${from}-${to}` } })),
   async markMissed(items) {
     for (const { id, missed_runs } of items) await rest(`${T}?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ missed_runs }) });
   },

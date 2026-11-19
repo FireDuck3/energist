@@ -37,7 +37,7 @@ test('sync: OSM 503 тричі → помилка в run, OCM записано, 
 });
 
 test('sync: записи без координат чи поза BBOX рахуються в skipped', async () => {
-  const far = { type: 'node', id: 9, lat: 50.45, lon: 30.52, tags: {} }; // Київ
+  const far = { type: 'node', id: 9, lat: 52.23, lon: 21.01, tags: {} }; // Варшава — поза Україною
   const db = fakeDb();
   const out = await run({ fetchImpl: fakeFetch({ ocm: res(200, [OCM_POI, OCM_NO_COORDS]), osm: res(200, { elements: [far] }) }), supabase: db });
   eq(out.results.ocm.skipped, 1); eq(out.results.osm.skipped, 1); eq(db.upserts.length, 1);
@@ -96,4 +96,21 @@ test('sync: запити до Overpass і OCM мають описовий User-A
   await run({ fetchImpl, supabase: fakeDb() });
   for (const c of calls) eq(/WattWay/.test(c.init?.headers?.['User-Agent'] ?? ''), true, c.url.slice(0, 30));
   eq(calls.find((c) => c.url.includes('overpass')).init.headers.Accept, 'application/json');
+});
+
+test('sync: уся Україна — OCM за кодом країни без прямокутника, Overpass по території UA', async () => {
+  const calls = [];
+  const fetchImpl = async (url, init) => { calls.push({ url: String(url), body: String(init?.body ?? '') }); return String(url).includes('openchargemap') ? res(200, [OCM_POI]) : res(200, { elements: [OSM_NODE] }); };
+  await run({ fetchImpl, supabase: fakeDb() });
+  const ocm = calls.find((c) => c.url.includes('openchargemap')).url;
+  eq([ocm.includes('countrycode=UA'), ocm.includes('boundingbox')], [true, false]);
+  eq(decodeURIComponent(calls.find((c) => c.url.includes('overpass')).body).includes('area["ISO3166-1"="UA"]'), true);
+});
+
+test('fetchAllPages: читає сторінки, доки остання неповна', async () => {
+  const { fetchAllPages } = await import('../scripts/sync-stations/paging.js');
+  const sizes = [1000, 1000, 3];
+  const ranges = [];
+  const rows = await fetchAllPages(async (from, to) => { ranges.push([from, to]); return Array(sizes[ranges.length - 1]).fill(0); });
+  eq([rows.length, ranges], [2003, [[0, 999], [1000, 1999], [2000, 2999]]]);
 });

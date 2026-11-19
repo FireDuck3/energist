@@ -48,3 +48,35 @@ test('ланцюжок ocm+osm+osm дає одну станцію, а не ко�
   const out = mergeStations([a, b, c]);
   eq(out.length, 1); eq(out[0].sources.length, 3);
 });
+
+test('сітка: сусіди по різні боки межі клітинки зливаються', () => {
+  // 0.0006° — розмір клітинки за широтою; ставимо точки по обидва боки межі.
+  const a = st({ operator: 'ЕКО', lat: 49.23999, lng: 28.4682 });
+  const b = st({ source: 'osm', external_id: 'node/9', operator: 'ЕКО', lat: 49.24001 + dLat(20), lng: 28.4682 });
+  eq(mergeStations([a, b]).length, 1);
+});
+
+// Старий алгоритм (повний перебір) — еталон для порівняння.
+function bruteGroups(list) {
+  const parent = list.map((_, i) => i);
+  const find = (i) => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) if (isSameStation(list[i], list[j])) parent[find(j)] = find(i);
+  return new Set(list.map((_, i) => find(i))).size;
+}
+let seed = 7;
+const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+const randomStations = (n, spreadDeg) => Array.from({ length: n }, (_, i) => st({
+  source: i % 2 ? 'osm' : 'ocm', external_id: String(i), operator: ['ЕКО', 'ОККО', 'Toka', 'Yasno'][i % 4], name: `S${i % 50}`,
+  lat: 48.5 + rand() * spreadDeg, lng: 30 + rand() * spreadDeg * 1.5 }));
+
+test('сітка: той самий результат, що й повний перебір', () => {
+  const list = randomStations(500, 0.02); // щільно — багато сусідів
+  eq(mergeStations(list).length, bruteGroups(list));
+});
+
+test('сітка: кількість порівнянь лінійна, а не квадратична', () => {
+  const list = randomStations(5000, 4);
+  const stats = { comparisons: 0 };
+  mergeStations(list, stats);
+  eq(stats.comparisons > 0 && stats.comparisons < 100000, true); // повний перебір — 12,5 млн
+});

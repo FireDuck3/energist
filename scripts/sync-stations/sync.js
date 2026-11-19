@@ -3,8 +3,9 @@
 import { normalizeOcm, normalizeOsm } from './normalize.js';
 import { mergeStations } from './dedupe.js';
 
-// Прямокутник, що охоплює Вінницьку область (старт; далі розширюємо на всю Україну).
-export const BBOX = { south: 47.9, west: 27.2, north: 49.8, east: 30.2 };
+// Межі України для перевірки координат (сам відбір — за кодом країни в OCM і територією UA в OSM).
+export const UKRAINE_BBOX = { south: 44.3, west: 22.1, north: 52.4, east: 40.3 };
+export const BBOX = UKRAINE_BBOX;
 export const MAX_MISSED_RUNS = 3;
 
 const inBox = (s, b) => s.lat >= b.south && s.lat <= b.north && s.lng >= b.west && s.lng <= b.east;
@@ -31,14 +32,13 @@ async function fetchJson(fetchImpl, url, init, sleep, tries = 3) {
   throw new Error(last);
 }
 
-export function fetchOcm({ fetchImpl, apiKey, bbox, sleep = defaultSleep }) {
-  const box = `(${bbox.south},${bbox.west}),(${bbox.north},${bbox.east})`;
-  const url = `https://api.openchargemap.io/v3/poi/?output=json&countrycode=UA&maxresults=5000&compact=false&verbose=false&boundingbox=${encodeURIComponent(box)}&key=${encodeURIComponent(apiKey)}`;
+export function fetchOcm({ fetchImpl, apiKey, sleep = defaultSleep }) {
+  const url = `https://api.openchargemap.io/v3/poi/?output=json&countrycode=UA&maxresults=20000&compact=false&verbose=false&key=${encodeURIComponent(apiKey)}`;
   return fetchJson(fetchImpl, url, { headers: HEADERS }, sleep);
 }
 
-export async function fetchOsm({ fetchImpl, bbox, sleep = defaultSleep }) {
-  const q = `[out:json][timeout:60];nwr["amenity"="charging_station"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});out center tags;`;
+export async function fetchOsm({ fetchImpl, sleep = defaultSleep }) {
+  const q = '[out:json][timeout:180];area["ISO3166-1"="UA"][admin_level=2]->.ua;nwr["amenity"="charging_station"](area.ua);out center tags;';
   const body = await fetchJson(fetchImpl, 'https://overpass-api.de/api/interpreter',
     { method: 'POST', body: `data=${encodeURIComponent(q)}`, headers: { ...HEADERS, 'Content-Type': 'application/x-www-form-urlencoded' } }, sleep);
   // Overpass при перевантаженні відповідає 200 із remark і порожнім списком — це не успіх.
