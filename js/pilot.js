@@ -1,6 +1,5 @@
 import { h } from './ui.js';
 import { notifications as bellList, notify } from './notifications.js';
-import { openConversation } from './views/conversation.js';
 import { photoPath } from './photos.js';
 import { formatLastMessage, sortChats, totalUnread, unreadLabel } from './chats.js';
 
@@ -16,9 +15,8 @@ export function createPilot(session, store, { notifications = bellList } = {}) {
   const uid = () => session.getState().status === 'signedIn' ? session.getState().user.uid : null;
 
   function openBooking(id) {
-    const booking = bookings.find(b => b.id === id);
-    if (booking) openConversation(booking, session, refresh);
-    else location.hash = '#/profile';
+    // Сповіщення ведуть одразу в розмову на вкладці «Чати».
+    location.hash = `#/chats/${id}`;
   }
 
   function syncNotices(rows) {
@@ -169,7 +167,7 @@ export function createPilot(session, store, { notifications = bellList } = {}) {
               `${b.last_message_mine ? 'Ви' : 'Останнє повідомлення'} · ${formatLastMessage(b.last_message_at, now)}`),
             h('span', {}, byId.get(b.spot_id)?.title || 'Точка зарядки'),
             h('small', {}, b.slot.replace(/["\[\]()]/g, '').replaceAll('T', ' ').split(',').map(s => s.slice(0, 16)).join(' — ') + ' (Київ)')),
-          h('button', { type: 'button', class: 'btn btn-primary btn-sm', onclick: () => openConversation(b, session, refresh) },
+          h('a', { class: 'btn btn-primary btn-sm', href: `#/chats/${b.id}` },
             b.status === 'completed' ? 'Відкрити чат і відгуки' : 'Відкрити чат')))));
     },
     panel(host = false) {
@@ -192,7 +190,7 @@ export function createPilot(session, store, { notifications = bellList } = {}) {
             h('span', {}, b.slot.replace(/["\[\]()]/g, '').replaceAll('T', ' ').split(',').map(s => s.slice(0, 16)).join(' — ') + ' (Київ)'),
             h('b', {}, names[b.status])),
           h('div', { class: 'booking-actions' },
-            h('button', { type: 'button', class: 'btn btn-secondary btn-sm', onclick: () => openConversation(b, session, refresh) }, b.status === 'completed' ? 'Чат і відгук' : 'Чат'),
+            h('a', { class: 'btn btn-secondary btn-sm', href: `#/chats/${b.id}` }, b.status === 'completed' ? 'Чат і відгук' : 'Чат'),
             b.status === 'confirmed' && button(b, 'completed', 'Завершити співпрацю'),
             host && b.status === 'pending' && button(b, 'confirmed', 'Підтвердити'),
             host && b.status === 'pending' && button(b, 'declined', 'Відхилити'),

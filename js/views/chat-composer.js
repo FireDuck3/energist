@@ -36,7 +36,7 @@ export function createComposer({ onSend, onTyping, now = () => Date.now() }) {
   const el = h('form', { class: 'composer', onsubmit: (e) => { e.preventDefault(); send(); textarea.focus(); } }, textarea, button);
   return {
     el,
-    focus: () => textarea.focus(),
+    focus: () => textarea.focus({ preventScroll: true }),
     setDisabled(on) { textarea.disabled = on; button.disabled = on; },
   };
 }

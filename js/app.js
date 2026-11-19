@@ -1,4 +1,6 @@
 import { createPilot } from './pilot.js';
+import * as chats from './views/chats.js';
+import { unreadLabel } from './chats.js';
 // Точка входу: store, сесія, шапка, маршрути.
 import { createStore, safeLocalStorage, memoryStorage } from './store.js';
 import { createSession } from './auth.js';
@@ -22,6 +24,8 @@ export const session = createSession(loadSupabase);
 export const userHistory = createUserHistory(session, { onReset: () => store.setFilters({ query: '' }) });
 
 const pilot = createPilot(session, store);
+// Бейджі непрочитаних у шапці й нижніх вкладках оновлюються разом із чатами.
+pilot.subscribe(() => { renderHeader(); renderTabbar(); });
 const view = (mod) => (params, root) => mod.render(params, root, store, session, userHistory, pilot);
 
 const signIn = () => session.requireAuth(() => {}, '');
@@ -70,6 +74,11 @@ function renderHeader() {
         roleBtn('Я ділюсь енергією', isHost, '#/host')),
       h('div', { class: 'header-right' },
         session.getState().status === 'signedIn' && h('a', {
+          class: `nav-link${path.startsWith('/chats') ? ' active' : ''}`,
+          href: '#/chats',
+          'aria-current': path.startsWith('/chats') ? 'page' : null,
+        }, 'Чати', pilot.totalUnread() > 0 && h('span', { class: 'unread-badge' }, unreadLabel(pilot.totalUnread()))),
+        session.getState().status === 'signedIn' && h('a', {
           class: `nav-link${path === '/profile' ? ' active' : ''}`,
           href: '#/profile',
           'aria-current': path === '/profile' ? 'page' : null,
@@ -98,6 +107,7 @@ session.onNeedAuth((reason) => openAuthModal(session, { reason }));
 const TABS = [
   ['#/map', '🔌', 'Зарядка', (p) => p.startsWith('/map') || p.startsWith('/spot')],
   ['#/host', '☀️', 'Господар', (p) => p.startsWith('/host')],
+  ['#/chats', '💬', 'Чати', (p) => p.startsWith('/chats')],
   ['#/profile', '👤', 'Профіль', (p) => p.startsWith('/profile')],
 ];
 const tabbar = h('nav', { class: 'tabbar', 'aria-label': 'Розділи' });
@@ -106,7 +116,8 @@ function renderTabbar() {
   const path = currentPath();
   tabbar.replaceChildren(...TABS.map(([href, icon, label, isActive]) =>
     h('a', { class: `tab${isActive(path) ? ' active' : ''}`, href, 'aria-current': isActive(path) ? 'page' : null },
-      h('span', { class: 'tab-icon', 'aria-hidden': 'true' }, icon),
+      h('span', { class: 'tab-icon', 'aria-hidden': 'true' }, icon,
+        href === '#/chats' && pilot.totalUnread() > 0 && h('span', { class: 'tab-badge' }, unreadLabel(pilot.totalUnread()))),
       h('span', { class: 'tab-label' }, label))));
 }
 
@@ -120,6 +131,8 @@ startRouter({
   '/spot/:id': view(spot),
   '/host': view(host),
   '/profile': view(profile),
+  '/chats': view(chats),
+  '/chats/:id': view(chats),
   '/login': view({ render: loginPage }),
   '/signup': view({ render: signupPage }),
 }, appRoot, {
