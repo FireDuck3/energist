@@ -209,6 +209,21 @@ export function render(_params, root, store, session, userHistory) {
 
   // ---- Карта ----
   let map = null;
+  function fitPopup(popup) {
+    if (!map) return;
+    popup.options.maxHeight = Math.max(160, map.getSize().y - 60);
+    popup.update();
+    // Зсуваємо карту рівно настільки, наскільки popup вилазить за її край (з відступом 10 px).
+    const el = popup.getElement();
+    if (!el) return;
+    const p = el.getBoundingClientRect();
+    const m = map.getContainer().getBoundingClientRect();
+    const pad = 10;
+    const shift = (start, end, min, max) => (start < min + pad ? start - min - pad : end > max - pad ? end - max + pad : 0);
+    const dx = shift(p.left, p.right, m.left, m.right);
+    const dy = shift(p.top, p.bottom, m.top, m.bottom);
+    if (dx || dy) map.panBy([dx, dy], { animate: false });
+  }
   let stationLayer = null;
   let fitAll = () => {};
   let resizeObserver = null;
@@ -218,6 +233,10 @@ export function render(_params, root, store, session, userHistory) {
   if (window.L) {
     map = L.map(mapEl, { zoomControl: true, scrollWheelZoom: true, maxZoom: 19 }).setView(VINNYTSIA_CENTER, 13);
     stationLayer = (L.markerClusterGroup ? L.markerClusterGroup({ maxClusterRadius: 50, disableClusteringAtZoom: 18, chunkedLoading: true }) : L.layerGroup()).addTo(map);
+    // На телефоні карта низька: popup не вищий за карту (довгий текст прокручується всередині),
+    // і карта зсувається так, щоб popup було видно повністю. Інакше, щоб дочитати текст, людина
+    // тягла карту — і popup виїжджав за її край, ніби закривався.
+    map.on('popupopen', (e) => fitPopup(e.popup));
     const tiles = L.tileLayer(TILES.url, { attribution: TILES.attribution, maxZoom: 19 }).addTo(map);
     tiles.on('load', () => { tilesLoaded = true; fallback.hidden = true; });
     tiles.on('tileerror', () => { if (!tilesLoaded) fallback.hidden = false; });
@@ -294,7 +313,8 @@ export function render(_params, root, store, session, userHistory) {
         if (destroyed) return;
         if (full) { details.set(st.id, full); box.replaceChildren(stationPopup(full, session)); }
         else box.querySelector('.st-loading')?.remove(); // лишається коротка картка з маршрутом
-        marker?.getPopup()?.update(); // новий розмір → Leaflet перераховує положення й автопрокрутку
+        const popup = marker?.getPopup();
+        if (popup?.isOpen()) fitPopup(popup); // картка виросла — знову вписуємо її в карту
       });
     }
     return box;
