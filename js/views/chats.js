@@ -101,16 +101,21 @@ export function render({ id }, root, _store, session, _history, pilot) {
       onSend: (text) => send({ id: crypto.randomUUID(), body: text }),
       onTyping: () => typingChannel?.sendTyping(me()),
     });
-    composer.setDisabled(['declined', 'cancelled'].includes(booking.status));
+    const headName = h('b', {});
+    const headSub = h('span', { class: 'chat-head-sub muted' });
+    // Шапка й поле вводу залежать від стану бронювання — перемальовуються при кожній його зміні.
+    function drawHead() {
+      headName.textContent = t.booking.counterpart_name || 'Учасник бронювання';
+      headSub.textContent = `${t.booking.spot_title || 'Точка зарядки'} · ${slotLabel(t.booking.slot)} · ${STATUS[t.booking.status] ?? ''}`;
+      composer.setDisabled(['declined', 'cancelled'].includes(t.booking.status));
+    }
 
     threadPane.replaceChildren(
       h('header', { class: 'chat-head' },
         h('a', { class: 'chat-back', href: '#/chats', 'aria-label': 'До списку чатів' }, '←'),
         h('span', { class: 'chat-avatar', 'aria-hidden': 'true' }, initial(booking.counterpart_name)),
         h('div', { class: 'chat-head-main' },
-          h('b', {}, booking.counterpart_name || 'Учасник бронювання'),
-          h('span', { class: 'chat-head-sub muted' },
-            `${booking.spot_title || 'Точка зарядки'} · ${slotLabel(booking.slot)} · ${STATUS[booking.status] ?? ''}`), typing),
+          headName, headSub, typing),
         h('details', { class: 'chat-menu' },
           h('summary', { 'aria-label': 'Меню чату' }, '⋮'),
           h('div', { class: 'chat-menu-list card' },
@@ -164,6 +169,7 @@ export function render({ id }, root, _store, session, _history, pilot) {
         btn.disabled = true;
         try {
           await service.sendReview({ booking_id: t.booking.id, author_id: me(), rating: Number(rating.value), body: body.value.trim() });
+          e.target.remove(); // інакше drawFeed збереже стару форму замість показати відгук
           await load();
           void pilot.refresh();
         } catch { status.textContent = 'Не вдалося зберегти відгук. Можливо, він уже надісланий.'; }
@@ -250,7 +256,14 @@ export function render({ id }, root, _store, session, _history, pilot) {
       }) ?? (() => {}));
     } catch { /* опитування */ }
     t.timer = setInterval(() => { void load(); }, POLL_MS);
-    t.refreshBooking = (b) => { t.booking = b; drawActions(); };
+    t.refreshBooking = (b) => {
+      const prev = t.booking;
+      t.booking = b;
+      drawActions();
+      if (['status', 'status_changed_at', 'counterpart_name', 'spot_title'].some((k) => prev[k] !== b[k])) { drawHead(); drawFeed(); }
+      if (b.counterpart_last_read_at && b.counterpart_last_read_at !== t.counterpartReadAt) { t.counterpartReadAt = b.counterpart_last_read_at; drawFeed(); }
+    };
+    drawHead();
     drawActions();
     drawFeed();
     void load();
@@ -271,12 +284,13 @@ export function render({ id }, root, _store, session, _history, pilot) {
     if (state.status === 'loading') { listItems.replaceChildren(h('p', { class: 'muted chats-empty' }, 'Завантаження…')); return; }
     if (state.status !== 'signedIn') {
       closeThread();
-      document.body.classList.remove('chat-open');
+      document.body.classList.remove('chat-open', 'on-chats'); // екран входу має прокручуватися
       root.replaceChildren(signInPrompt({ title: 'Чати', text: 'Увійдіть, щоб бачити чати', reason: 'Увійдіть, щоб бачити чати' }, session));
       return;
     }
     // Після входу з екрана «Увійдіть…» повертаємо розмітку чатів.
     if (!root.contains(layout)) root.replaceChildren(h('div', { class: 'chats-page' }, layout));
+    document.body.classList.add('on-chats');
     if (id) document.body.classList.add('chat-open');
     drawList();
     if (!id) { drawEmptyThread('Оберіть розмову'); return; }

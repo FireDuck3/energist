@@ -25,7 +25,7 @@ export function createComposer({ onSend, onTyping, now = () => Date.now() }) {
   }
 
   textarea.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); }
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); send(); }
   });
   textarea.addEventListener('input', () => {
     resize();

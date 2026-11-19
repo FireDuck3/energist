@@ -1104,6 +1104,5 @@ body.on-chats .site-footer { display: none; }
   .chat-back { display: inline-block; }
   body.chat-open .tabbar { display: none; }
   body.chat-open { padding-bottom: 0; } /* у відкритій розмові нижніх вкладок немає */
-  body.on-chats:not(.chat-open) .chats-items { padding-bottom: 72px; } /* місце під нижніми вкладками */
   body.chat-open .site-footer { display: none; }
 }
