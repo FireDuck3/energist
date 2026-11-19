@@ -3,6 +3,7 @@ import { h, stars, spotCover, plural } from '../ui.js';
 import { filterSpots, spotRating, isLiveInBlackout, isOpenAt, normalizeQuery } from '../filters.js';
 import { RADII, POWER_BANDS, CONNECTOR_FILTERS, distanceKm, matchSpotExtra, matchStation, sortByDistance, nearest, resultsLabel } from '../map-filters.js';
 import { locate, geoMessage } from '../geolocate.js';
+import { openReport } from './report.js';
 import { formatUAH } from '../pricing.js';
 import { DEVICES, SOURCES, CONNECTORS, VINNYTSIA_CENTER } from '../data.js';
 import { searchBox } from './search-box.js';
@@ -42,7 +43,8 @@ function spotCard(spot, { blackout, now, origin }) {
       h('div', { class: 'spot-top' },
         h('span', { class: `source-badge source-${spot.source}` }, `${SOURCES[spot.source].icon} ${SOURCES[spot.source].label}`),
         stars(spotRating(spot), spot.reviews.length)),
-      h('h3', { class: 'spot-title' }, spot.title, spot.pilot ? ' · Пілот' : ''),
+      h('h3', { class: 'spot-title' }, spot.title, spot.pilot ? ' · Пілот' : '',
+        spot.verified ? h('span', { class: 'verified-badge verified-sm', title: 'WattWay перевірив точку на місці' }, '✓') : ''),
       h('p', { class: 'spot-meta' }, `${spot.district} · ${String(spot.powerKw).replace('.', ',')} кВт · ${CONNECTORS[spot.connector]}${distanceLabel(spot, origin)}`),
       h('div', { class: 'spot-bottom' },
         h('span', { class: 'spot-price' }, h('b', {}, formatUAH(spot.pricePerKwh)), ' / кВт·год'),
@@ -91,31 +93,33 @@ function stationDetails(st) {
   ].filter(Boolean);
 }
 
-const stationActions = (st) => h('div', { class: 'st-actions' },
+const stationActions = (st, session) => h('div', { class: 'st-actions' },
   h('a', { class: 'btn btn-primary btn-sm', href: routeUrl(st), target: '_blank', rel: 'noopener' }, 'Прокласти маршрут'),
-  safeUrl(st.operator_url) && h('a', { class: 'btn btn-secondary btn-sm', href: safeUrl(st.operator_url), target: '_blank', rel: 'noopener' }, 'Відкрити в застосунку оператора'));
+  safeUrl(st.operator_url) && h('a', { class: 'btn btn-secondary btn-sm', href: safeUrl(st.operator_url), target: '_blank', rel: 'noopener' }, 'Відкрити в застосунку оператора'),
+  session && h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: (e) => { e.stopPropagation();
+    openReport({ targetType: 'station', targetId: st.id, title: st.name ?? st.operator ?? 'Зарядна станція' }, session); } }, 'Повідомити про проблему'));
 
-function stationPopup(st) {
+function stationPopup(st, session) {
   return h('div', { class: 'popup station-popup' },
     h('div', { class: 'popup-body' },
       h('span', { class: 'source-badge source-public' }, '🔌 Публічна станція'),
       h('b', {}, st.name ?? st.operator ?? 'Зарядна станція'),
-      ...stationDetails(st), stationActions(st)));
+      ...stationDetails(st), stationActions(st, session)));
 }
 
-function stationCard(st, onShow, origin) {
+function stationCard(st, onShow, origin, session) {
   return h('div', { class: 'spot-card card station-card', role: 'button', tabindex: '0', onclick: onShow,
     onkeydown: (e) => { if (e.key === 'Enter') onShow(); } },
     h('div', { class: 'spot-info' },
       h('span', { class: 'source-badge source-public' }, '🔌 Публічна станція'),
       h('h3', { class: 'spot-title' }, st.name ?? st.operator ?? 'Зарядна станція', distanceLabel(st, origin)),
-      ...stationDetails(st)));
+      ...stationDetails(st), stationActions(st, session)));
 }
 
 const chip = (label, active, onclick) =>
   h('button', { type: 'button', class: `chip${active ? ' active' : ''}`, 'aria-pressed': String(active), onclick }, label);
 
-export function render(_params, root, store, _session, userHistory) {
+export function render(_params, root, store, session, userHistory) {
   const search = searchBox(store, userHistory);
   const list = h('div', { class: 'spot-list' });
   const count = h('p', { class: 'result-count' });
@@ -280,7 +284,7 @@ export function render(_params, root, store, _session, userHistory) {
     if (!map) return;
     stationLayer.clearLayers();
     publicMarkers = stations.map((st) => ({ st, marker: L.marker([st.lat, st.lng], { icon: stationPin(st), zIndexOffset: -100 })
-      .bindPopup(() => stationPopup(st), { closeButton: false, minWidth: 240 }) }));
+      .bindPopup(() => stationPopup(st, session), { closeButton: false, minWidth: 240 }) }));
     stationLayer.addLayers ? stationLayer.addLayers(publicMarkers.map((m) => m.marker)) : publicMarkers.forEach((m) => stationLayer.addLayer(m.marker));
   }
   const MAX_STATION_CARDS = 200;
@@ -358,7 +362,7 @@ export function render(_params, root, store, _session, userHistory) {
     banner.hidden = !blackout;
     count.textContent = resultsLabel(visible.length, stations.length);
 
-    const stationCards = stations.slice(0, MAX_STATION_CARDS).map((st) => stationCard(st, () => showStation(st), origin));
+    const stationCards = stations.slice(0, MAX_STATION_CARDS).map((st) => stationCard(st, () => showStation(st), origin, session));
     if (stations.length > MAX_STATION_CARDS) stationCards.push(h('p', { class: 'muted' }, `Показано перші ${MAX_STATION_CARDS} — уточніть фільтри.`));
     list.replaceChildren(...(visible.length || stationCards.length
       ? [...visible.map((spot) => {

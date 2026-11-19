@@ -1,5 +1,7 @@
 // Картка точки — шлях Саші, частина 2.
 import { h, stars, spotCover, formatDate, plural } from '../ui.js';
+import { hostRating, ratingLabel } from '../trust.js';
+import { openReport } from './report.js';
 import { spotRating, isLiveInBlackout, isOpenAt } from '../filters.js';
 import { formatUAH, sessionCost } from '../pricing.js';
 import { DEVICES, SOURCES, CONNECTORS, COMMERCIAL_PRICE } from '../data.js';
@@ -11,7 +13,7 @@ function fact(label, value) {
   return h('div', { class: 'fact' }, h('span', { class: 'fact-label' }, label), h('span', { class: 'fact-value' }, value));
 }
 
-function renderSpot(spot, host, { blackout }, store, session, userHistory, pilot) {
+function renderSpot(spot, host, { blackout, spots }, store, session, userHistory, pilot) {
   const hostName = spot.hostName ?? host.name;
   const now = spot.pilot
     ? new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Kyiv' }))
@@ -29,8 +31,9 @@ function renderSpot(spot, host, { blackout }, store, session, userHistory, pilot
     h('div', { class: 'spot-head' },
       h('div', {},
         h('h1', { class: 'spot-name' }, spot.title),
+        spot.verified && h('span', { class: 'verified-badge', title: 'WattWay перевірив точку на місці' }, '✓ Перевірена точка'),
         h('p', { class: 'spot-sub' },
-          stars(rating, spot.reviews.length), ' · ', spot.district, ' · ',
+          spot.reviews.length ? stars(rating, spot.reviews.length) : h('span', { class: 'new-badge' }, ratingLabel(null, 0, 'spot')), ' · ', spot.district, ' · ',
           h('span', { class: `source-badge source-${spot.source}` }, `${SOURCES[spot.source].icon} ${SOURCES[spot.source].label}`)))),
     h('img', { class: 'spot-hero', src: spotCover(spot), alt: '' }),
 
@@ -40,6 +43,7 @@ function renderSpot(spot, host, { blackout }, store, session, userHistory, pilot
           h('span', { class: 'avatar' }, hostName[0].toUpperCase()),
           h('div', {},
             h('b', {}, `Господар — ${hostName}`),
+            spot.pilot && h('div', { class: 'muted' }, (() => { const r = hostRating(spots, spot.ownerId); return `${ratingLabel(r.avg, r.count, 'host')}${r.count ? ' про господаря' : ''}`; })()),
             host && h('div', { class: 'muted' },
               `${host.chargesCount} ${plural(host.chargesCount, ['зарядка', 'зарядки', 'зарядок'])} · на WattWay з ${host.sinceYear} року`))),
 
@@ -75,7 +79,9 @@ function renderSpot(spot, host, { blackout }, store, session, userHistory, pilot
             isOpenAt(spot, now) ? `Відчинено до ${spot.schedule.to}` : `Зачинено · відкриється о ${spot.schedule.from}`),
         h('button', { type: 'button', class: 'btn btn-primary btn-lg btn-block', disabled: dark || own,
           onclick: book }, own ? 'Ваша точка' : 'Забронювати'),
-        h('p', { class: 'book-note muted' }, spot.pilot ? 'Пілот: запит підтверджує господар. Онлайн-оплати немає.' : '🔒 Гроші заморожуються і списуються лише за фактично отриману енергію'))),
+        h('p', { class: 'book-note muted' }, spot.pilot ? 'Пілот: запит підтверджує господар. Онлайн-оплати немає.' : '🔒 Гроші заморожуються і списуються лише за фактично отриману енергію'),
+        spot.pilot && !own && h('button', { type: 'button', class: 'btn btn-ghost btn-sm report-link',
+          onclick: () => openReport({ targetType: 'spot', targetId: spot.id, title: spot.title }, session) }, 'Повідомити про проблему'))),
 
     // На телефоні — закріплена над вкладками смужка замість картки бронювання.
     h('div', { class: 'book-bar' },

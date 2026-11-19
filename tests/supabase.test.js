@@ -50,3 +50,10 @@ test('toPilotSpot: порожні шляхи фото відкидаються, 
   const s = toPilotSpot(row, [], (p) => { if (typeof p !== 'string') throw new TypeError('bad path'); return `https://cdn/${p}`; });
   eq([s.photoPaths, s.photos], [['u/p1/a.jpg'], ['https://cdn/u/p1/a.jpg']]);
 });
+
+test('toPilotSpot: verified лише коли є verified_at', async () => {
+  const { toPilotSpot } = await import('../js/supabase.js');
+  const row = { id: 'p1', title: 'Т', district: 'Д', lat: 1, lng: 1, power_kw: 1, price_per_kwh: 10, devices: ['ev'], opens: '08:00:00', closes: '20:00:00' };
+  eq(toPilotSpot({ ...row, verified_at: '2026-11-19T10:00:00Z' }, [], (p) => p).verified, true);
+  eq(toPilotSpot(row, [], (p) => p).verified, false);
+});

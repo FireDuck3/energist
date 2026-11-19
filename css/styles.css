@@ -1016,3 +1016,11 @@ input.input { height: 44px; }
   background: var(--orange, #F07C1E); color: #fff; font-size: .75rem; font-weight: 700; text-align: center; vertical-align: middle; }
 .chat-unread .booking-main b { font-weight: 800; }
 .push-card { margin-top: 16px; display: grid; gap: 8px; justify-items: start; }
+
+/* Довіра: перевірена точка, нова точка, скарги */
+.verified-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 999px;
+  background: #E3F5EA; color: #1A7F37; font-size: .82rem; font-weight: 700; }
+.verified-sm { margin-left: 6px; padding: 0 6px; font-size: .75rem; vertical-align: middle; }
+.new-badge { color: var(--muted); font-weight: 600; }
+.report-link { margin-top: 8px; color: var(--muted); }
+.report-reasons { margin: 4px 0; }

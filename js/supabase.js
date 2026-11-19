@@ -40,7 +40,8 @@ async function call(request) {
   let res;
   try { res = await request; } catch (e) { throw fail(e); }
   // 23P01 — перетин бронювань, WW429 — ліміт повідомлень: їх показуємо користувачу окремо.
-  if (res.error) throw fail(res.error, ['23P01', 'WW429'].includes(res.error.code) ? res.error.code : responseCode(res));
+  // 23P01 — перетин бронювань, WW429 — ліміт, 23505 — дубль, 22023 — перевірка сервера: показуємо окремо.
+  if (res.error) throw fail(res.error, ['23P01', 'WW429', '23505', '22023'].includes(res.error.code) ? res.error.code : responseCode(res));
   return res.data;
 }
 
@@ -63,6 +64,7 @@ export function toPilotSpot(row, feedback, photoUrl, reviewsUnavailable = false)
     schedule: { from: row.opens.slice(0, 5), to: row.closes.slice(0, 5) },
     paused: Boolean(row.paused), closedWeekdays: row.closed_weekdays ?? [],
     photoPaths, photos: photoPaths.map(photoUrl),
+    verified: Boolean(row.verified_at),
   };
 }
 
@@ -108,6 +110,9 @@ export async function loadSupabase() {
       },
       setPilotSpotPhotos: (id, paths) => call(client.rpc('set_pilot_spot_photos', { point_id: id, paths })),
       listMyChats: () => call(client.rpc('list_my_chats')),
+      submitReport: ({ targetType, targetId, reason, details, bookingId }) => call(client.rpc('submit_report', {
+        target_type: targetType, target_id: String(targetId), reason, details: details ?? '', booking_id: bookingId ?? null,
+      })),
       markBookingRead: id => call(client.rpc('mark_booking_read', { booking: id })),
       // Realtime: RLS гарантує, що подію отримають лише учасники. Повертає функцію відписки.
       subscribeToChat(bookingId, onInsert) {

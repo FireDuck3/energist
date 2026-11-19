@@ -1,4 +1,5 @@
 import { h, openModal } from '../ui.js';
+import { openReport } from './report.js';
 
 export function openConversation(booking, session, refresh) {
   const account = session.getState().user?.uid;
@@ -35,8 +36,13 @@ export function openConversation(booking, session, refresh) {
       } catch { status.textContent = 'Перевірте інтернет і повторіть надсилання.'; }
     } finally { sending = false; send.disabled = false; }
   } }, h('label', {}, 'Ваше повідомлення', input), send);
+  // Інша сторона бронювання: для гостя — господар, для господаря — гість.
+  const counterpartId = account === booking.guest_id ? booking.owner_id : booking.guest_id;
+  const complain = counterpartId && h('button', { type: 'button', class: 'btn btn-ghost btn-sm report-link',
+    onclick: () => openReport({ targetType: 'user', targetId: counterpartId, bookingId: booking.id,
+      title: booking.counterpart_name || 'учасник бронювання' }, session) }, 'Поскаржитися на співрозмовника');
   const content = h('section', { class: 'conversation' },
-    h('h2', {}, 'Чат із ', booking.counterpart_name || 'учасником бронювання'),
+    h('h2', {}, 'Чат із ', booking.counterpart_name || 'учасником бронювання'), complain,
     messages, status, form, reviews);
   const modal = openModal(content, { onClose: () => { closed = true; clearInterval(timer); off(); offRealtime(); void refresh?.(); } });
   const off = session.subscribe(() => {
