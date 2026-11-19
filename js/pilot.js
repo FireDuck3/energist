@@ -144,6 +144,11 @@ export function createPilot(session, store, { notifications = bellList } = {}) {
     removePhoto: path => session.service.removeSpotPhoto(path),
     ownSpots: () => spots.filter(spot => !spot.archivedAt && spot.ownerId === uid()),
     totalUnread: () => totalUnread(chats ?? []),
+    // Чати для вкладки «Чати»: з list_my_chats, а без міграції — з бронювань (без прев'ю й лічильників).
+    chats: () => (chats ?? sortChats(bookings)).filter(b => uid() && [b.owner_id, b.guest_id].includes(uid())),
+    chatsReady: () => chats !== null || bookings.length > 0 || !uid(),
+    // Дії бронювання з чату: ті самі серверні виклики, що й у кабінеті.
+    act: (id, action) => change(id, { confirm: 'confirmed', decline: 'declined', cancel: 'cancelled', complete: 'completed' }[action]),
     chatsPanel() {
       const byId = new Map(spots.map(spot => [spot.id, spot]));
       const rows = (chats ?? bookings).filter(b => uid() && [b.owner_id, b.guest_id].includes(uid()));

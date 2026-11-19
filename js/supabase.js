@@ -122,6 +122,25 @@ export async function loadSupabase() {
           .subscribe();
         return () => { client.removeChannel(channel); };
       },
+      // ✓✓: подія, коли хтось у цьому чаті позначив його прочитаним (RLS — лише учасники).
+      subscribeToReads(bookingId, onChange) {
+        const channel = client.channel(`reads-${bookingId}-${crypto.randomUUID()}`)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'booking_reads', filter: `booking_id=eq.${bookingId}` },
+            payload => onChange(payload.new))
+          .subscribe();
+        return () => { client.removeChannel(channel); };
+      },
+      // «Друкує…»: приватний broadcast-канал chat:<id>, без запису в базу.
+      openTypingChannel(bookingId, onTyping) {
+        const channel = client.channel(`chat:${bookingId}`, { config: { private: true, broadcast: { self: false } } })
+          .on('broadcast', { event: 'typing' }, ({ payload }) => onTyping(payload?.user_id))
+          .subscribe();
+        return {
+          sendTyping: userId => { channel.send({ type: 'broadcast', event: 'typing', payload: { user_id: userId } }).catch?.(() => {}); },
+          close: () => { client.removeChannel(channel); },
+        };
+      },
+      listChatReads: id => call(client.from('booking_reads').select('user_id,last_read_at').eq('booking_id', id)),
       subscribeToNotifications(userId, onInsert) {
         const channel = client.channel(`notices-${userId}-${crypto.randomUUID()}`)
           .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'booking_notifications', filter: `recipient_id=eq.${userId}` },
