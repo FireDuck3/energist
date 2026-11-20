@@ -41,9 +41,11 @@ export function matchSpotExtra(spot, f, { origin = null } = {}) {
     inRadius(spot, f, origin);
 }
 
-// Публічна станція не має підтвердженої автономності — у блекаут її не показуємо.
-export function matchStation(st, f, { origin = null, blackout = false } = {}) {
-  if (blackout || f.blackoutReady) return false;
+// Публічна станція не має підтвердженої автономності, тож її ховає лише явний фільтр
+// «Доступна під час блекауту». Темний режим (перемикач «Блекаут») станції не ховає —
+// інакше вони просто зникали з карти.
+export function matchStation(st, f, { origin = null } = {}) {
+  if (f.blackoutReady) return false;
   return (!f.connectors?.length || stationConnectors(st).some((t) => f.connectors.includes(t))) &&
     (!f.power || inBand(f.power, st.max_power_kw)) &&
     (f.maxPrice >= 25 || (st.price_verified && st.price_per_kwh != null && st.price_per_kwh <= f.maxPrice)) &&

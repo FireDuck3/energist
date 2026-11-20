@@ -45,7 +45,7 @@ test('matchStation: ціна, цілодобово, блекаут', () => {
   eq(matchStation(st({ opening_hours: 'Цілодобово' }), F({ only24h: true }), {}), true);
   eq(matchStation(st(), F({ only24h: true }), {}), false);
   eq(matchStation(st(), F({ blackoutReady: true }), {}), false);
-  eq(matchStation(st(), F(), { blackout: true }), false);
+  eq(matchStation(st(), F(), { blackout: true }), true); // темний режим не ховає станції — лише фільтр «Доступна під час блекауту»
 });
 
 test('matchStation: радіус діє лише з origin', () => {
