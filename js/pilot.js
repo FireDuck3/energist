@@ -133,6 +133,8 @@ export function createPilot(session, store, { notifications = bellList } = {}) {
     },
     // Картка господаря для сторінки точки; null — сервер ще без міграції або точку не видно.
     async hostCard(id) {
+      // Сторінка точки може відкритися раніше, ніж підвантажився Supabase: чекаємо, інакше картки не буде.
+      await session.ready;
       if (!session.service?.pilotSpotHostCard) return null;
       try { return await session.service.pilotSpotHostCard(id); } catch { return null; }
     },

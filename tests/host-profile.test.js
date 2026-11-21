@@ -2,6 +2,7 @@ import { test, eq } from './runner.js';
 import { detailsFromRow, detailsToColumns, detailFacts, hostSince, sessionsLabel, toHostCard } from '../js/host-profile.js';
 import { validateSpotDetails, validatePhone, normalizePhone } from '../js/validate.js';
 import { toPilotSpot } from '../js/supabase.js';
+import { createPilot } from '../js/pilot.js';
 
 test('опис станції: рядок бази ↔ форма, порожнє стає null', () => {
   const row = { install_year: 2023, voltage_v: 380, inverter: ' Huawei SUN2000 ', storage_kwh: '10.5', charging_terms: '  ',
@@ -55,4 +56,17 @@ test('телефон: нормалізація й перевірка як у pro
   eq(validatePhone('067 123 45 67'), { ok: true, phone: '0671234567', error: null });
   eq(validatePhone(''), { ok: true, phone: null, error: null });
   eq([validatePhone('12345').ok, validatePhone('+38067abc4567').ok, validatePhone('+1234567890123456').ok], [false, false, false]);
+});
+
+test('картка господаря чекає, поки підвантажиться Supabase (відвідувач без входу)', async () => {
+  let ready;
+  const session = {
+    service: null, ready: new Promise((r) => { ready = r; }),
+    getState: () => ({ status: 'loading', user: null }), subscribe: () => () => {},
+  };
+  const pilot = createPilot(session, { getState: () => ({ pilotReady: true }), setPilotSpots() {} });
+  const pending = pilot.hostCard('p1');
+  session.service = { pilotSpotHostCard: async (id) => ({ name: 'Ірина', id }) };
+  ready();
+  eq(await pending, { name: 'Ірина', id: 'p1' });
 });
