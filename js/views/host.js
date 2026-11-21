@@ -2,9 +2,9 @@
 import { h, openModal, formatDate, stars, spotCover, plural } from '../ui.js';
 import { notify } from '../notifications.js';
 import { hostSummary, bookingHostAmount } from '../stats.js';
-import { validateSpotInput } from '../validate.js';
+import { validateSpotInput, validateSpotDetails } from '../validate.js';
 import { formatUAH, formatKwh } from '../pricing.js';
-import { DEMO_HOST_ID, DEVICES, SOURCES, CONNECTORS, VINNYTSIA_CENTER, SPOTS } from '../data.js';
+import { DEMO_HOST_ID, DEVICES, SOURCES, CONNECTORS, VINNYTSIA_CENTER, SPOTS, VOLTAGES, TERRITORIES } from '../data.js';
 import { spotRating } from '../filters.js';
 import { TILES } from './map.js';
 import { signInPrompt } from './auth-modal.js';
@@ -78,10 +78,11 @@ export function openAddSpot(store, hostName, publish, existing = null) {
   const input = existing
     ? { title: existing.title, district: existing.district, lat: existing.lat, lng: existing.lng, source: existing.source,
       connector: existing.connector, powerKw: existing.powerKw, pricePerKwh: existing.pricePerKwh,
-      devices: [...existing.devices], schedule: { ...existing.schedule } }
+      devices: [...existing.devices], schedule: { ...existing.schedule }, details: { ...existing.details } }
     : {
       title: '', district: 'Вишенька', lat: null, lng: null, source: 'solar', connector: 'type2',
       powerKw: 7.4, pricePerKwh: 11, devices: ['ev', 'ecoflow', 'gadget'], schedule: { from: '08:00', to: '20:00' },
+      details: {},
     };
   const districts = existing && !DISTRICTS.includes(existing.district) ? [existing.district, ...DISTRICTS] : DISTRICTS;
   const errorEls = {};
@@ -104,6 +105,32 @@ export function openAddSpot(store, hostName, publish, existing = null) {
     oninput: (e) => { input[key] = e.target.value === '' ? NaN : Number(e.target.value); } });
   const time = (key) => h('input', { class: 'input', type: 'time', step: 3600, value: input.schedule[key],
     oninput: (e) => { input.schedule = { ...input.schedule, [key]: e.target.value }; } });
+  // ---- Обладнання й умови (поля зі спринту; усі необов'язкові) ----
+  const d = input.details;
+  const setDetail = (key, value) => { input.details = { ...input.details, [key]: value }; };
+  const detailNum = (key, attrs) => h('input', { class: 'input', type: 'number', value: d[key] ?? '', ...attrs,
+    oninput: (e) => setDetail(key, e.target.value === '' ? null : Number(e.target.value)) });
+  const detailSelect = (key, options, parse = (v) => v) => h('select', { class: 'input',
+    onchange: (e) => setDetail(key, e.target.value === '' ? null : parse(e.target.value)) },
+  h('option', { value: '' }, 'Не вказано'),
+  Object.entries(options).map(([v, label]) => h('option', { value: v, selected: String(d[key]) === v }, label)));
+  const yesNo = { true: 'Так', false: 'Ні' };
+  const detailsBox = h('fieldset', { class: 'details-fieldset' },
+    h('legend', {}, 'Обладнання й умови'),
+    h('p', { class: 'hint' }, "Необов'язково, але з описом гостям простіше обрати точку. Зміна обладнання знімає позначку «Перевірена точка»."),
+    h('div', { class: 'form-grid' },
+      field('Рік встановлення СЕС', detailNum('installYear', { min: 1990, max: new Date().getFullYear(), step: 1, placeholder: 'Напр.: 2023' }), 'installYear'),
+      field('Напруга', detailSelect('voltageV', VOLTAGES, Number), 'voltageV'),
+      field('Інвертор', h('input', { class: 'input', type: 'text', maxlength: 100, value: d.inverter ?? '',
+        placeholder: 'Напр.: Huawei SUN2000, 10 кВт', oninput: (e) => setDetail('inverter', e.target.value) }), 'inverter'),
+      field('Акумулятори, кВт·год', detailNum('storageKwh', { min: 0, max: 500, step: 0.1, placeholder: '0 — без акумуляторів' }), 'storageKwh'),
+      field('Wi-Fi для гостей', detailSelect('wifi', yesNo, (v) => v === 'true')),
+      field('Територія', detailSelect('territory', TERRITORIES), 'territory'),
+      field('Можна залишити авто на час зарядки', detailSelect('canLeaveCar', yesNo, (v) => v === 'true'))),
+    field('Умови зарядки', h('textarea', { class: 'input', rows: 3, maxlength: 500,
+      placeholder: 'Напр.: оплата готівкою або на картку; кабель Type 2 є; заїзд через ворота з вулиці',
+      oninput: (e) => setDetail('terms', e.target.value) }, d.terms ?? ''), 'terms'));
+
   // Помилка відправки — у самій формі: дзвіночок у шапці закритий модалкою.
   const submitError = h('p', { class: 'field-error form-error', role: 'alert', hidden: true });
 
@@ -133,6 +160,7 @@ export function openAddSpot(store, hostName, publish, existing = null) {
         input.devices = input.devices.includes(v) ? input.devices.filter((x) => x !== v) : [...input.devices, v];
       }),
       err('devices')),
+    detailsBox,
     submitError,
     h('div', { class: 'wizard-actions' },
       h('button', { type: 'button', class: 'btn btn-ghost', onclick: () => modal.close() }, 'Скасувати'),
@@ -168,7 +196,10 @@ export function openAddSpot(store, hostName, publish, existing = null) {
   async function submit(e) {
     e.preventDefault();
     submitError.hidden = true;
-    const { ok, errors } = validateSpotInput(input);
+    const main = validateSpotInput(input);
+    const more = validateSpotDetails(input.details);
+    const ok = main.ok && more.ok;
+    const errors = { ...main.errors, ...more.errors };
     for (const [key, el] of Object.entries(errorEls)) {
       el.hidden = !errors[key];
       el.textContent = errors[key] ?? '';

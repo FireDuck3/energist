@@ -29,6 +29,15 @@ export const CONNECTORS = {
   usb: 'USB',
 };
 
+// Опис станції господаря (supabase/migrations/202611200001_host_profile_data.sql).
+export const VOLTAGES = { 220: '220 В (однофазна мережа)', 380: '380 В (трифазна мережа)' };
+export const TERRITORIES = {
+  guarded: 'Під охороною',
+  fenced: 'Закрита територія',
+  cctv: 'Відеонагляд',
+  open: 'Відкрита територія',
+};
+
 export const VINNYTSIA_CENTER = [49.2331, 28.4682];
 export const VINNYTSIA_BOUNDS = [[49.17, 28.35], [49.29, 28.60]];
 

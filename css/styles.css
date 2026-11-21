@@ -1106,3 +1106,14 @@ body.on-chats .site-footer { display: none; }
   body.chat-open { padding-bottom: 0; } /* у відкритій розмові нижніх вкладок немає */
   body.chat-open .site-footer { display: none; }
 }
+
+/* ---------- Дані господаря: опис станції, умови, контакти ---------- */
+.details-fieldset { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 14px 16px 16px; margin: 0; display: grid; gap: 12px; min-width: 0; }
+.details-fieldset legend { font-weight: 700; padding: 0 6px; }
+.details-fieldset .hint { margin: 0; }
+.details-fieldset textarea { resize: vertical; }
+.host-row > div { display: grid; gap: 4px; min-width: 0; }
+.verified-host { justify-self: start; }
+.host-contacts { overflow-wrap: anywhere; }
+.spot-terms { padding: 22px 0 0; display: grid; gap: 6px; }
+.spot-terms p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }

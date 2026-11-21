@@ -1,5 +1,5 @@
 // Перевірка форми «Додати розетку». Повертає помилки по полях українською.
-import { SOURCES, CONNECTORS } from './data.js';
+import { SOURCES, CONNECTORS, TERRITORIES } from './data.js';
 
 const inRange = (x, min, max) => typeof x === 'number' && Number.isFinite(x) && x >= min && x <= max;
 
@@ -24,4 +24,32 @@ export function validateSpotInput(input) {
   }
 
   return { ok: Object.keys(errors).length === 0, errors };
+}
+
+// Опис станції: усі поля необов'язкові (порожнє — null), але заповнені мають бути коректні.
+// Межі ті самі, що в перевірках таблиці pilot_spots.
+export function validateSpotDetails(d = {}, { year = new Date().getFullYear() } = {}) {
+  const errors = {};
+  const empty = (x) => x == null || (typeof x === 'number' && Number.isNaN(x));
+  if (!empty(d.installYear) && !(Number.isInteger(d.installYear) && d.installYear >= 1990 && d.installYear <= year)) {
+    errors.installYear = `Рік від 1990 до ${year}`;
+  }
+  if (!empty(d.voltageV) && !inRange(d.voltageV, 100, 1000)) errors.voltageV = 'Напруга від 100 до 1000 В';
+  if ((d.inverter ?? '').trim().length > 100) errors.inverter = 'До 100 символів';
+  if (!empty(d.storageKwh) && !inRange(d.storageKwh, 0, 500)) errors.storageKwh = 'Ємність від 0 до 500 кВт·год';
+  if ((d.terms ?? '').trim().length > 500) errors.terms = 'До 500 символів';
+  if (d.territory != null && !(d.territory in TERRITORIES)) errors.territory = 'Оберіть варіант зі списку';
+  return { ok: Object.keys(errors).length === 0, errors };
+}
+
+// '+380 (67) 123-45-67' → '+380671234567'; порожнє — null. Формат як у перевірці profiles.phone.
+export function normalizePhone(raw) {
+  const s = String(raw ?? '').replace(/[\s()\-.]/g, '');
+  return s === '' ? null : s;
+}
+
+export function validatePhone(raw) {
+  const phone = normalizePhone(raw);
+  if (phone !== null && !/^\+?[0-9]{7,15}$/.test(phone)) return { ok: false, phone, error: 'Номер з 7–15 цифр, напр. +380 67 123 45 67' };
+  return { ok: true, phone, error: null };
 }

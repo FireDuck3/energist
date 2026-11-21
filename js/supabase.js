@@ -1,5 +1,6 @@
 import { signInWithGoogle, finishGoogleOAuth } from './oauth.js';
 import { checkedCredentials } from './credentials.js';
+import { detailsFromRow, detailsToColumns, toHostCard } from './host-profile.js';
 // Адаптер до Supabase — єдиний модуль, що знає про supabase-js.
 // Решта коду бачить лише AuthService (контракт описано в js/auth.js).
 const SDK_URL = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
@@ -65,6 +66,7 @@ export function toPilotSpot(row, feedback, photoUrl, reviewsUnavailable = false)
     paused: Boolean(row.paused), closedWeekdays: row.closed_weekdays ?? [],
     photoPaths, photos: photoPaths.map(photoUrl),
     verified: Boolean(row.verified_at),
+    details: detailsFromRow(row),
   };
 }
 
@@ -159,7 +161,19 @@ export async function loadSupabase() {
         owner_id: uid, title: input.title, district: input.district, lat: input.lat, lng: input.lng,
         source: input.source, connector: input.connector, power_kw: input.powerKw,
         price_per_kwh: input.pricePerKwh, devices: input.devices, opens: input.schedule.from, closes: input.schedule.to,
+        // Лише заповнені поля опису: без них точка додається й на базі до міграції 202611200001.
+        ...Object.fromEntries(Object.entries(detailsToColumns(input.details)).filter(([, v]) => v !== null)),
       })),
+      updatePilotSpotDetails: (id, details) => {
+        const c = detailsToColumns(details);
+        return call(client.rpc('update_pilot_spot_details', {
+          point_id: id, new_install_year: c.install_year, new_voltage_v: c.voltage_v, new_inverter: c.inverter,
+          new_storage_kwh: c.storage_kwh, new_charging_terms: c.charging_terms, new_has_wifi: c.has_wifi,
+          new_territory: c.territory, new_can_leave_car: c.can_leave_car,
+        }));
+      },
+      // Картка господаря: контакти сервер віддає лише власнику й гостю з підтвердженим бронюванням.
+      pilotSpotHostCard: async id => toHostCard((await call(client.rpc('pilot_spot_host_card', { point_id: id })))[0]),
       listPilotBookings: () => call(client.rpc('list_my_pilot_bookings')),
       listNotifications: () => call(client.from('booking_notifications').select('*').order('created_at', { ascending: false }).limit(100)),
       readNotification: id => call(client.from('booking_notifications').update({ read_at: new Date().toISOString() }).eq('id', id)),
@@ -215,7 +229,9 @@ export async function loadSupabase() {
         await call(auth.updateUser({ password: newPassword }));
       },
       signOut: () => call(auth.signOut()),
-      loadProfile: (uid) => call(client.from('profiles').select('name, role').eq('id', uid).maybeSingle()),
+      // select('*'): телефон з'являється після міграції 202611200001, вхід працює і без неї.
+      loadProfile: (uid) => call(client.from('profiles').select('*').eq('id', uid).maybeSingle()),
+      savePhone: (uid, phone) => call(client.from('profiles').update({ phone }).eq('id', uid)),
       saveProfile: (uid, { name, role }) => call(client.from('profiles').upsert({ id: uid, name, role })),
 
       // Історія: по 50 останніх, новіші першими. Postgres віддає numeric рядком — перетворюємо на числа.

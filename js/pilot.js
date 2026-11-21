@@ -1,4 +1,5 @@
 import { h } from './ui.js';
+import { detailsToColumns } from './host-profile.js';
 import { notifications as bellList, notify } from './notifications.js';
 import { photoPath } from './photos.js';
 import { formatLastMessage, sortChats, totalUnread, unreadLabel } from './chats.js';
@@ -121,7 +122,20 @@ export function createPilot(session, store, { notifications = bellList } = {}) {
       await refresh();
     },
     // Керування власною точкою: кожна зміна після успіху оновлює дані.
-    async update(id, input) { await session.service.updatePilotSpot(id, input); await refresh(); },
+    async update(id, input) {
+      await session.service.updatePilotSpot(id, input);
+      // Опис станції (рік, напруга, умови…) — окремий виклик: старий update_pilot_spot його не знає.
+      // Порожній опис, якого й не було, не надсилаємо — тоді редагування працює й без міграції.
+      const filled = (d) => Object.values(detailsToColumns(d)).some((v) => v !== null);
+      const before = spots.find((s) => s.id === id)?.details;
+      if (input.details && (filled(input.details) || filled(before))) await session.service.updatePilotSpotDetails(id, input.details);
+      await refresh();
+    },
+    // Картка господаря для сторінки точки; null — сервер ще без міграції або точку не видно.
+    async hostCard(id) {
+      if (!session.service?.pilotSpotHostCard) return null;
+      try { return await session.service.pilotSpotHostCard(id); } catch { return null; }
+    },
     async setPaused(id, on) { await session.service.setPilotSpotPaused(id, on); await refresh(); },
     async setSchedule(id, schedule) { await session.service.setPilotSpotSchedule(id, schedule); await refresh(); },
     async setPhotos(id, paths) { await session.service.setPilotSpotPhotos(id, paths); await refresh(); },

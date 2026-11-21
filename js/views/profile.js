@@ -1,6 +1,7 @@
 // Профіль: ім'я, email, роль, вихід; «Мої зарядки»; очистка історії пошуку; скидання демо-даних.
 import { h, formatDate } from '../ui.js';
 import { notify } from '../notifications.js';
+import { validatePhone } from '../validate.js';
 import { formatUAH, formatKwh } from '../pricing.js';
 import { isoDay } from '../data.js';
 import { signInPrompt } from './auth-modal.js';
@@ -47,6 +48,7 @@ function when(iso) {
 
 export function render(_params, root, store, session, userHistory, pilot) {
   let draft = null; // незбережені зміни переживають перемальовування від сесії
+  let phoneSaved; // телефон після збереження: сесія тримає профіль без нього
   let activeSection = 'account';
 
   // Для репетицій пітчу: скидає демо-дані, але не виходить з акаунта.
@@ -111,6 +113,7 @@ export function render(_params, root, store, session, userHistory, pilot) {
     }
     if (status !== 'signedIn') {
       draft = null;
+      phoneSaved = undefined;
       activeSection = 'account';
       const gate = signInPrompt({
         title: 'Профіль доступний після входу',
@@ -122,7 +125,7 @@ export function render(_params, root, store, session, userHistory, pilot) {
       return;
     }
 
-    draft ??= { name: profile.name, role: profile.role };
+    draft ??= { name: profile.name, role: profile.role, phone: phoneSaved ?? profile.phone ?? '' };
     let errors = {};
     let busy = false;
     const box = h('div');
@@ -138,6 +141,11 @@ export function render(_params, root, store, session, userHistory, pilot) {
           h('input', { class: 'input', type: 'text', maxlength: 60, value: draft.name, disabled: busy,
             oninput: (e) => { draft.name = e.target.value; } }),
           errors.name && h('span', { class: 'field-error' }, errors.name)),
+        h('label', { class: 'form-field' }, h('span', { class: 'field-label' }, 'Телефон'),
+          h('input', { class: 'input', type: 'tel', autocomplete: 'tel', maxlength: 25, value: draft.phone ?? '', disabled: busy,
+            placeholder: '+380 67 123 45 67', oninput: (e) => { draft.phone = e.target.value; } }),
+          h('span', { class: 'hint' }, 'Бачать лише гості з підтвердженим бронюванням ваших точок.'),
+          errors.phone && h('span', { class: 'field-error' }, errors.phone)),
         h('div', { class: 'form-field' }, h('span', { class: 'field-label' }, 'Для чого вам WattWay?'),
           h('div', { class: 'role-choice' }, ROLES.map(([value, label]) =>
             h('button', { type: 'button', class: `chip${draft.role === value ? ' active' : ''}`, disabled: busy,
@@ -153,6 +161,15 @@ export function render(_params, root, store, session, userHistory, pilot) {
       errors = {};
       draw();
       try {
+        const phone = validatePhone(draft.phone);
+        if (!phone.ok) {
+          errors = { phone: phone.error };
+          return;
+        }
+        if (phone.phone !== (phoneSaved ?? profile.phone ?? null)) {
+          await session.service.savePhone(user.uid, phone.phone);
+          phoneSaved = phone.phone;
+        }
         await session.saveProfile(draft);
         draft = null;
         notify('Профіль збережено');

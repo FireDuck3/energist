@@ -6,6 +6,7 @@ import { spotRating, isLiveInBlackout, isOpenAt } from '../filters.js';
 import { formatUAH, sessionCost } from '../pricing.js';
 import { DEVICES, SOURCES, CONNECTORS, COMMERCIAL_PRICE } from '../data.js';
 import { openBooking } from './booking.js';
+import { detailFacts, hostSince, sessionsLabel } from '../host-profile.js';
 
 const EXAMPLE_KWH = 30;
 
@@ -13,8 +14,21 @@ function fact(label, value) {
   return h('div', { class: 'fact' }, h('span', { class: 'fact-label' }, label), h('span', { class: 'fact-value' }, value));
 }
 
-function renderSpot(spot, host, { blackout, spots }, store, session, userHistory, pilot) {
-  const hostName = spot.hostName ?? host.name;
+// Картка господаря реальної точки: верифікація, стаж, останні сесії й контакти (лише після підтвердження бронювання).
+function hostCardLines(card, own) {
+  if (!card) return [];
+  const contacts = [card.phone && h('a', { href: `tel:${card.phone}` }, card.phone), card.email && h('span', {}, card.email)].filter(Boolean);
+  return [
+    card.verified && h('span', { class: 'verified-badge verified-host', title: 'WattWay перевірив особу господаря' }, '✓ Перевірений господар'),
+    h('div', { class: 'muted' }, [hostSince(card.since), sessionsLabel(card.sessions, card.recentHours)].filter(Boolean).join(' · ')),
+    contacts.length
+      ? h('div', { class: 'host-contacts' }, h('b', {}, own ? 'Ваші контакти для гостей: ' : 'Контакти: '), ...contacts.flatMap((c, i) => (i ? [' · ', c] : [c])))
+      : !own && h('div', { class: 'hint' }, "Телефон і email господаря з'являться після підтвердження бронювання."),
+  ];
+}
+
+function renderSpot(spot, host, { blackout, spots }, store, session, userHistory, pilot, card) {
+  const hostName = card?.name ?? spot.hostName ?? host.name;
   const now = spot.pilot
     ? new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Kyiv' }))
     : new Date();
@@ -45,7 +59,8 @@ function renderSpot(spot, host, { blackout, spots }, store, session, userHistory
             h('b', {}, `Господар — ${hostName}`),
             spot.pilot && !spot.reviewsUnavailable && h('div', { class: 'muted' }, (() => { const r = hostRating(spots, spot.ownerId); return `${ratingLabel(r.avg, r.count, 'host')}${r.count ? ' про господаря' : ''}`; })()),
             host && h('div', { class: 'muted' },
-              `${host.chargesCount} ${plural(host.chargesCount, ['зарядка', 'зарядки', 'зарядок'])} · на WattWay з ${host.sinceYear} року`))),
+              `${host.chargesCount} ${plural(host.chargesCount, ['зарядка', 'зарядки', 'зарядок'])} · на WattWay з ${host.sinceYear} року`),
+            ...hostCardLines(card, own))),
 
         h('div', { class: 'facts' },
           fact('Джерело енергії', `${SOURCES[spot.source].icon} ${SOURCES[spot.source].label}`),
@@ -53,7 +68,9 @@ function renderSpot(spot, host, { blackout, spots }, store, session, userHistory
           fact('Підключення', CONNECTORS[spot.connector]),
           fact('Пристрої', deviceLabels),
           fact('Графік', `щодня ${spot.schedule.from}–${spot.schedule.to}`),
-          fact('Під час блекауту', spot.pilot ? 'Уточніть у господаря' : isLiveInBlackout(spot) ? `працює ще ~${spot.blackoutHours} год` : 'не працює без світла')),
+          fact('Під час блекауту', spot.pilot ? 'Уточніть у господаря' : isLiveInBlackout(spot) ? `працює ще ~${spot.blackoutHours} год` : 'не працює без світла'),
+          ...detailFacts(spot.details).map(([label, value]) => fact(label, value))),
+        spot.details?.terms && h('div', { class: 'spot-terms' }, h('h2', { class: 'reviews-title' }, 'Умови зарядки'), h('p', {}, spot.details.terms)),
 
         h('h2', { class: 'reviews-title' }, 'Відгуки'),
         spot.reviewsUnavailable && h('p', { role: 'status' }, 'Не вдалося завантажити відгуки. Повторна спроба відбудеться автоматично.'),
@@ -92,6 +109,16 @@ function renderSpot(spot, host, { blackout, spots }, store, session, userHistory
 }
 
 export function render({ id }, root, store, session, userHistory, pilot) {
+  let card = null;
+  let gone = false;
+  // Картку господаря тягнемо окремо: контакти залежать від того, хто дивиться (і чи є бронювання).
+  async function loadCard() {
+    if (!pilot?.hostCard || !/^[0-9a-f-]{36}$/i.test(id)) return;
+    const next = await pilot.hostCard(id);
+    if (gone) return;
+    card = next;
+    update();
+  }
   function update() {
     const state = store.getState();
     const spot = state.spots.find((s) => s.id === id);
@@ -104,12 +131,18 @@ export function render({ id }, root, store, session, userHistory, pilot) {
       return;
     }
     const host = state.hosts.find((x) => x.id === spot.hostId);
-    root.replaceChildren(renderSpot(spot, host, state, store, session, userHistory, pilot));
+    root.replaceChildren(renderSpot(spot, host, state, store, session, userHistory, pilot, card));
   }
   update();
+  void loadCard();
   if (store.getState().spots.some((s) => s.id === id)) userHistory?.recordSpot(id);
   const offStore = store.subscribe(update);
-  const offSession = session.subscribe(update);
-  return () => { offStore(); offSession(); };
+  // Увійшли чи вийшли — контакти могли стати доступними або навпаки.
+  let account = session.getState().user?.uid;
+  const offSession = session.subscribe(() => {
+    if (session.getState().user?.uid !== account) { account = session.getState().user?.uid; card = null; void loadCard(); }
+    update();
+  });
+  return () => { gone = true; offStore(); offSession(); };
 }
 
