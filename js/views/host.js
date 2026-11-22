@@ -2,11 +2,13 @@
 import { h, openModal, formatDate, stars, spotCover, plural } from '../ui.js';
 import { notify } from '../notifications.js';
 import { hostSummary, bookingHostAmount } from '../stats.js';
-import { validateSpotInput, validateSpotDetails } from '../validate.js';
+import { validateSpotForm, validatePhone } from '../validate.js';
 import { formatUAH, formatKwh } from '../pricing.js';
-import { DEMO_HOST_ID, DEVICES, SOURCES, CONNECTORS, VINNYTSIA_CENTER, SPOTS, VOLTAGES, TERRITORIES } from '../data.js';
+import { DEMO_HOST_ID, DEVICES, SOURCES, CONNECTORS, VINNYTSIA_CENTER, SPOTS, VOLTAGES, TERRITORIES,
+  SES_TYPES, PARKING_TYPES, EVSE_CONNECTORS, SOCKET_CONNECTORS } from '../data.js';
 import { spotRating } from '../filters.js';
-import { TILES } from './map.js';
+import { TILES, spotPin } from './map.js';
+import { hostRating, ratingLabel } from '../trust.js';
 import { signInPrompt } from './auth-modal.js';
 import { kyivNow, addDays, isoWeekday } from '../calendar.js';
 import { checkPhotos, resizeImage, PHOTO_LIMITS } from '../photos.js';
@@ -72,95 +74,209 @@ function ownSpotCard(spot) {
       h('span', { class: 'muted' }, `${formatUAH(spot.pricePerKwh)} / кВт·год · `, stars(spotRating(spot), spot.reviews.length))));
 }
 
-// ---- Форма «Додати розетку» ----
-// existing — точка для редагування: форма заповнюється її значеннями, а publish зберігає зміни.
-export function openAddSpot(store, hostName, publish, existing = null) {
+// ---- Анкета точки «Додати точку» / «Редагувати точку» (15 полів, docs/host-data.md) ----
+// existing — точка для редагування. publish зберігає (для нової точки повертає її id).
+// pilot і session — лише для реального акаунта: контакти й фото господаря, фото об'єкта, робочі дні.
+let savedContact = null; // збережені контакти: сесія тримає їх старими до наступного входу
+
+export function openAddSpot(store, hostName, publish, existing = null, { pilot = null, session = null } = {}) {
+  const live = Boolean(publish && pilot && session);
+  const creating = !existing;
+  const ed = existing?.details ?? {};
   const input = existing
     ? { title: existing.title, district: existing.district, lat: existing.lat, lng: existing.lng, source: existing.source,
       connector: existing.connector, powerKw: existing.powerKw, pricePerKwh: existing.pricePerKwh,
-      devices: [...existing.devices], schedule: { ...existing.schedule }, details: { ...existing.details } }
+      devices: [...existing.devices], schedule: { ...existing.schedule }, details: { ...ed } }
     : {
-      title: '', district: 'Вишенька', lat: null, lng: null, source: 'solar', connector: 'type2',
-      powerKw: 7.4, pricePerKwh: 11, devices: ['ev', 'ecoflow', 'gadget'], schedule: { from: '08:00', to: '20:00' },
+      title: '', district: '', lat: null, lng: null, source: 'solar', connector: null,
+      powerKw: NaN, pricePerKwh: 11, devices: ['ev', 'ecoflow', 'gadget'], schedule: { from: '08:00', to: '20:00' },
       details: {},
     };
-  const districts = existing && !DISTRICTS.includes(existing.district) ? [existing.district, ...DISTRICTS] : DISTRICTS;
+  input.hasBattery = ed.storageKwh > 0 ? true : ed.storageKwh === 0 ? false : null;
+  let closed = []; // неробочі дні тижня (1 — пн … 7 — нд); лише для нової точки, далі — кнопка «Графік»
+  let photoFiles = [];
+
+  // ---- Господар ----
+  const { user, profile } = session?.getState() ?? {};
+  const initialContact = savedContact ?? {
+    firstName: user?.firstName ?? '', lastName: user?.lastName ?? '',
+    phone: profile?.phone ?? '', avatarPath: profile?.avatar_path ?? null,
+  };
+  const contact = { ...initialContact };
+  let avatarBlob = null;
+
   const errorEls = {};
   const err = (key) => (errorEls[key] = h('span', { class: 'field-error', hidden: true }));
+  const req = (label) => [label, h('span', { class: 'req', 'aria-hidden': 'true' }, ' *')];
   const field = (label, control, key, hint) =>
     h('label', { class: 'form-field' }, h('span', { class: 'field-label' }, label), control,
       hint && h('span', { class: 'hint' }, hint), key && err(key));
+  const group = (label, control, key, hint) =>
+    h('div', { class: 'form-field' }, h('span', { class: 'field-label' }, label), control,
+      hint && h('span', { class: 'hint' }, hint), key && err(key));
 
-  const choiceGroup = (options, isActive, onPick) => {
+  // Чипи з перемальовуванням: варіанти можуть залежати від інших полів (напр., конектори від EVSE).
+  const chips = (options, isActive, onPick) => {
     const box = h('div', { class: 'chips' });
-    const draw = () => box.replaceChildren(...options.map(([value, label]) =>
-      h('button', { type: 'button', class: `chip${isActive(value) ? ' active' : ''}`, onclick: () => { onPick(value); draw(); } }, label)));
+    const draw = () => box.replaceChildren(...options().map(([value, label]) =>
+      h('button', { type: 'button', class: `chip${isActive(value) ? ' active' : ''}`, 'aria-pressed': String(isActive(value)),
+        onclick: () => { onPick(value); draw(); } }, label)));
     draw();
-    return box;
+    return { el: box, draw };
   };
+  const setDetail = (key, value) => { input.details = { ...input.details, [key]: value }; };
+  const d = input.details;
+  const numInput = (value, onValue, attrs) => h('input', { class: 'input', type: 'number', value: value ?? '', ...attrs,
+    oninput: (e) => onValue(e.target.value === '' ? NaN : Number(e.target.value)) });
+  const textInput = (value, onValue, attrs) => h('input', { class: 'input', type: 'text', value: value ?? '', ...attrs,
+    oninput: (e) => onValue(e.target.value) });
+  const textArea = (value, onValue, attrs) => h('textarea', { class: 'input', rows: 3, ...attrs,
+    oninput: (e) => onValue(e.target.value) }, value ?? '');
+  const yesNo = (get, set) => chips(() => [[true, 'Є'], [false, 'Немає']], (v) => get() === v, set);
 
+  // 1. Про вас: ім'я, прізвище, телефон, фото
+  const avatarImg = h('img', { class: 'avatar-preview', alt: 'Ваше фото', hidden: !contact.avatarPath });
+  if (contact.avatarPath) avatarImg.src = pilot.photoUrl(contact.avatarPath);
+  const avatarInput = h('input', { type: 'file', accept: PHOTO_LIMITS.types.join(','), hidden: true,
+    async onchange(e) {
+      const file = e.target.files[0];
+      e.target.value = '';
+      if (!file) return;
+      const { ok, errors } = checkPhotos([file], 0, { beforeResize: true });
+      errorEls.avatar.hidden = Boolean(ok.length);
+      errorEls.avatar.textContent = errors.join(' ');
+      if (!ok.length) return;
+      try {
+        avatarBlob = await resizeImage(file);
+        avatarImg.src = URL.createObjectURL(avatarBlob);
+        avatarImg.hidden = false;
+      } catch {
+        errorEls.avatar.textContent = 'Не вдалося прочитати фото. Спробуйте інше.';
+        errorEls.avatar.hidden = false;
+      }
+    } });
+  const aboutYou = live && h('fieldset', { class: 'form-section' },
+    h('legend', {}, '1. Про вас'),
+    h('p', { class: 'hint' }, "Ім'я та фото бачать гості в картці точки. Телефон — лише гості з підтвердженим бронюванням."),
+    h('div', { class: 'avatar-row' }, avatarImg,
+      group(req('Ваше фото'), h('button', { type: 'button', class: 'btn btn-secondary btn-sm', onclick: () => avatarInput.click() },
+        contact.avatarPath ? 'Змінити фото' : 'Вибрати фото'), 'avatar', 'JPEG, PNG або WebP'),
+      avatarInput),
+    h('div', { class: 'form-grid' },
+      field(req("Ім'я"), textInput(contact.firstName, (v) => { contact.firstName = v; }, { maxlength: 60, autocomplete: 'given-name' }), 'firstName'),
+      field(req('Прізвище'), textInput(contact.lastName, (v) => { contact.lastName = v; }, { maxlength: 60, autocomplete: 'family-name' }), 'lastName'),
+      field(req('Телефон'), h('input', { class: 'input', type: 'tel', autocomplete: 'tel', maxlength: 25, value: contact.phone ?? '',
+        placeholder: '+380 67 123 45 67', oninput: (e) => { contact.phone = e.target.value; } }), 'phone')));
+
+  // 2. Станція
   const mapEl = h('div', { class: 'mini-map' });
-  const coordsNote = h('span', { class: 'hint' }, 'Клікніть на карті, де знаходиться розетка');
-  const num = (key, attrs) => h('input', { class: 'input', type: 'number', value: input[key], ...attrs,
-    oninput: (e) => { input[key] = e.target.value === '' ? NaN : Number(e.target.value); } });
+  const coordsNote = h('span', { class: 'hint' }, 'Клікніть на карті, де знаходиться станція');
+  const capacityField = field(req('Ємність акумулятора, кВт·год'),
+    numInput(d.storageKwh > 0 ? d.storageKwh : null, (v) => setDetail('storageKwh', v), { min: 0.1, max: 500, step: 0.1 }), 'storageKwh');
+  capacityField.hidden = input.hasBattery !== true;
+  const battery = yesNo(() => input.hasBattery, (v) => {
+    input.hasBattery = v;
+    capacityField.hidden = !v;
+    if (!v) setDetail('storageKwh', 0);
+    else if (!(input.details.storageKwh > 0)) setDetail('storageKwh', NaN);
+  });
+  const station = h('fieldset', { class: 'form-section' },
+    h('legend', {}, live ? '2. Станція' : 'Станція'),
+    h('div', { class: 'form-grid' },
+      field(req('Назва'), textInput(input.title, (v) => { input.title = v; }, { maxlength: 100, placeholder: 'Напр.: Сонячний дах на Вишеньці' }), 'title'),
+      field(req('Населений пункт'), textInput(input.district, (v) => { input.district = v; },
+        { maxlength: 60, list: 'district-list', placeholder: 'Напр.: Вінниця, Вишенька' }), 'district'),
+      h('datalist', { id: 'district-list' }, DISTRICTS.map((x) => h('option', { value: x })))),
+    field(req('Короткий опис СЕС'), textArea(d.description, (v) => setDetail('description', v),
+      { maxlength: 500, placeholder: 'Напр.: панелі на даху приватного будинку, працює з 2023 року' }), 'description'),
+    group(req('Координати'), [mapEl, coordsNote], 'location'),
+    group(req('Тип СЕС'), chips(() => Object.entries(SES_TYPES), (v) => input.details.sesType === v, (v) => setDetail('sesType', v)).el, 'sesType'),
+    h('div', { class: 'form-grid' },
+      field(req('Встановлена потужність СЕС, кВт'), numInput(d.sesPowerKw, (v) => setDetail('sesPowerKw', v), { min: 0.1, max: 1000, step: 0.1, placeholder: 'Напр.: 10' }), 'sesPowerKw'),
+      field('Виробник і потужність інвертора', textInput(d.inverter, (v) => setDetail('inverter', v),
+        { maxlength: 100, placeholder: 'Напр.: Huawei SUN2000, 10 кВт' }), 'inverter', 'Бажано')),
+    group(req('Акумулятор'), battery.el, 'hasBattery'),
+    capacityField);
+
+  // 3. Заряджання
+  const connectorOptions = () => {
+    const keys = input.details.hasEvse === true ? EVSE_CONNECTORS : input.details.hasEvse === false ? SOCKET_CONNECTORS : [];
+    return keys.map((k) => [k, CONNECTORS[k]]);
+  };
+  const connectorChips = chips(connectorOptions, (v) => input.connector === v, (v) => { input.connector = v; });
+  const connectorHint = h('span', { class: 'hint' }, 'Спершу вкажіть, чи є зарядна станція');
+  const syncConnector = () => {
+    if (!connectorOptions().some(([k]) => k === input.connector)) input.connector = null;
+    connectorHint.hidden = input.details.hasEvse != null;
+    connectorChips.draw();
+  };
+  const evse = yesNo(() => input.details.hasEvse, (v) => { setDetail('hasEvse', v); syncConnector(); });
   const time = (key) => h('input', { class: 'input', type: 'time', step: 3600, value: input.schedule[key],
     oninput: (e) => { input.schedule = { ...input.schedule, [key]: e.target.value }; } });
-  // ---- Обладнання й умови (поля зі спринту; усі необов'язкові) ----
-  const d = input.details;
-  const setDetail = (key, value) => { input.details = { ...input.details, [key]: value }; };
-  const detailNum = (key, attrs) => h('input', { class: 'input', type: 'number', value: d[key] ?? '', ...attrs,
-    oninput: (e) => setDetail(key, e.target.value === '' ? null : Number(e.target.value)) });
-  const detailSelect = (key, options, parse = (v) => v) => h('select', { class: 'input',
+  const workdays = chips(() => WEEKDAY_NAMES.map((n, i) => [i + 1, n]), (v) => !closed.includes(v),
+    (v) => { closed = closed.includes(v) ? closed.filter((x) => x !== v) : [...closed, v].sort(); });
+  const charging = h('fieldset', { class: 'form-section' },
+    h('legend', {}, live ? '3. Заряджання' : 'Заряджання'),
+    group(req('Зарядна станція (EVSE)'), evse.el, 'hasEvse', 'Немає — гість заряджається від звичайної розетки або USB'),
+    group(req('Тип конектора'), [connectorChips.el, connectorHint], 'connector'),
+    h('div', { class: 'form-grid' },
+      field(req('Максимальна потужність заряджання, кВт'), numInput(input.powerKw, (v) => { input.powerKw = v; },
+        { min: 0.5, max: 150, step: 0.1, placeholder: 'Напр.: 7,4' }), 'powerKw', 'Розетка — до 22 кВт, зарядна станція — до 150 кВт'),
+      field(req('Вартість, грн за кВт·год'), numInput(input.pricePerKwh, (v) => { input.pricePerKwh = v; }, { min: 5, max: 25, step: 0.5 }),
+        'pricePerKwh', '8–15 грн — середня ціна в місті')),
+    group(req('Тип паркування'), chips(() => Object.entries(PARKING_TYPES), (v) => input.details.parkingType === v, (v) => setDetail('parkingType', v)).el, 'parkingType'),
+    group(req('Графік доступності'), [h('div', { class: 'time-row' }, time('from'), h('span', {}, '—'), time('to')),
+      live && creating && h('div', { class: 'workdays' }, h('span', { class: 'hint' }, 'Робочі дні'), workdays.el)],
+    'schedule', live && !creating ? 'Робочі дні й вихідні — кнопка «Графік» на картці точки' : null),
+    live && creating && err('workdays'),
+    group(req('Які пристрої можна заряджати'), chips(() => DEVICES.map((x) => [x.id, x.label]), (v) => input.devices.includes(v), (v) => {
+      input.devices = input.devices.includes(v) ? input.devices.filter((x) => x !== v) : [...input.devices, v];
+    }).el, 'devices'));
+  syncConnector();
+
+  // 4. Фото й умови
+  const photoList = h('div', { class: 'photo-names hint' });
+  const photoInput = h('input', { type: 'file', accept: PHOTO_LIMITS.types.join(','), multiple: true, hidden: true,
+    onchange: (e) => {
+      const { ok, errors } = checkPhotos([...e.target.files], 0, { beforeResize: true });
+      e.target.value = '';
+      photoFiles = ok.slice(0, PHOTO_LIMITS.max);
+      photoList.textContent = photoFiles.length ? `Обрано: ${photoFiles.map((f) => f.name).join(', ')}` : '';
+      errorEls.photos.textContent = errors.join(' ');
+      errorEls.photos.hidden = !errors.length;
+    } });
+  const photosAndTerms = h('fieldset', { class: 'form-section' },
+    h('legend', {}, live ? '4. Фото й умови' : 'Умови'),
+    live && (creating
+      ? group("Фотографії об'єкта", [h('button', { type: 'button', class: 'btn btn-secondary btn-sm', onclick: () => photoInput.click() }, '+ Вибрати фото'), photoList, photoInput],
+        'photos', `Бажано. До ${PHOTO_LIMITS.max} фото, перше — обкладинка на карті.`)
+      : h('p', { class: 'hint' }, "Фото об'єкта — кнопка «Фото» на картці точки.")),
+    field('Короткий опис умов', textArea(d.terms, (v) => setDetail('terms', v),
+      { maxlength: 500, placeholder: 'Напр.: оплата готівкою або на картку; кабель є; заїзд через ворота з вулиці' }), 'terms', 'Бажано'));
+
+  // Додатково — поля з попереднього спринту, необов'язкові
+  const select = (key, options, parse = (v) => v) => h('select', { class: 'input',
     onchange: (e) => setDetail(key, e.target.value === '' ? null : parse(e.target.value)) },
   h('option', { value: '' }, 'Не вказано'),
   Object.entries(options).map(([v, label]) => h('option', { value: v, selected: String(d[key]) === v }, label)));
-  const yesNo = { true: 'Так', false: 'Ні' };
-  const detailsBox = h('fieldset', { class: 'details-fieldset' },
-    h('legend', {}, 'Обладнання й умови'),
-    h('p', { class: 'hint' }, "Необов'язково, але з описом гостям простіше обрати точку. Зміна обладнання знімає позначку «Перевірена точка»."),
+  const yesNoOptions = { true: 'Так', false: 'Ні' };
+  const more = h('details', { class: 'form-section form-more' },
+    h('summary', {}, "Додатково (необов'язково)"),
     h('div', { class: 'form-grid' },
-      field('Рік встановлення СЕС', detailNum('installYear', { min: 1990, max: new Date().getFullYear(), step: 1, placeholder: 'Напр.: 2023' }), 'installYear'),
-      field('Напруга', detailSelect('voltageV', VOLTAGES, Number), 'voltageV'),
-      field('Інвертор', h('input', { class: 'input', type: 'text', maxlength: 100, value: d.inverter ?? '',
-        placeholder: 'Напр.: Huawei SUN2000, 10 кВт', oninput: (e) => setDetail('inverter', e.target.value) }), 'inverter'),
-      field('Акумулятори, кВт·год', detailNum('storageKwh', { min: 0, max: 500, step: 0.1, placeholder: '0 — без акумуляторів' }), 'storageKwh'),
-      field('Wi-Fi для гостей', detailSelect('wifi', yesNo, (v) => v === 'true')),
-      field('Територія', detailSelect('territory', TERRITORIES), 'territory'),
-      field('Можна залишити авто на час зарядки', detailSelect('canLeaveCar', yesNo, (v) => v === 'true'))),
-    field('Умови зарядки', h('textarea', { class: 'input', rows: 3, maxlength: 500,
-      placeholder: 'Напр.: оплата готівкою або на картку; кабель Type 2 є; заїзд через ворота з вулиці',
-      oninput: (e) => setDetail('terms', e.target.value) }, d.terms ?? ''), 'terms'));
+      field('Рік встановлення СЕС', numInput(d.installYear, (v) => setDetail('installYear', v), { min: 1990, max: new Date().getFullYear(), step: 1 }), 'installYear'),
+      field('Напруга', select('voltageV', VOLTAGES, Number), 'voltageV'),
+      field('Wi-Fi для гостей', select('wifi', yesNoOptions, (v) => v === 'true')),
+      field('Територія', select('territory', TERRITORIES), 'territory'),
+      field('Можна залишити авто на час зарядки', select('canLeaveCar', yesNoOptions, (v) => v === 'true'))));
 
   // Помилка відправки — у самій формі: дзвіночок у шапці закритий модалкою.
   const submitError = h('p', { class: 'field-error form-error', role: 'alert', hidden: true });
-
   const form = h('form', { class: 'wizard add-form', novalidate: true, onsubmit: submit },
     h('p', { class: 'eyebrow' }, 'Кабінет господаря'),
-    h('h2', {}, existing ? 'Редагувати точку' : 'Додати розетку'),
-    publish && h('p', {}, existing
-      ? 'Зміни побачать гості на карті. Уже створені бронювання не зміняться.'
-      : 'Назва й координати точки будуть видимі на карті всім відвідувачам.'),
-    h('div', { class: 'form-field' }, h('span', { class: 'field-label' }, 'Де вона?'), mapEl, coordsNote, err('location')),
-    h('div', { class: 'form-grid' },
-      field('Назва', h('input', { class: 'input', type: 'text', maxlength: 100, placeholder: 'Напр.: Гараж з розеткою 220 В', value: input.title,
-        oninput: (e) => { input.title = e.target.value; } }), 'title'),
-      field('Район', h('select', { class: 'input', onchange: (e) => { input.district = e.target.value; } },
-        districts.map((d) => h('option', { value: d, selected: d === input.district }, d)))),
-      field('Потужність, кВт', num('powerKw', { min: 0.5, max: 22, step: 0.1 }), 'powerKw'),
-      field('Ціна, грн за кВт·год', num('pricePerKwh', { min: 5, max: 25, step: 0.5 }), 'pricePerKwh', '8–15 грн — середня ціна в місті'),
-      field('Підключення', h('select', { class: 'input', onchange: (e) => { input.connector = e.target.value; } },
-        Object.entries(CONNECTORS).map(([v, label]) => h('option', { value: v, selected: v === input.connector }, label))), 'connector'),
-      h('div', { class: 'form-field' }, h('span', { class: 'field-label' }, 'Графік'),
-        h('div', { class: 'time-row' }, time('from'), h('span', {}, '—'), time('to')), err('schedule'))),
-    h('div', { class: 'form-field' }, h('span', { class: 'field-label' }, 'Джерело енергії'),
-      choiceGroup(Object.entries(SOURCES).map(([v, s]) => [v, `${s.icon} ${s.label}`]), (v) => input.source === v, (v) => { input.source = v; }),
-      err('source')),
-    h('div', { class: 'form-field' }, h('span', { class: 'field-label' }, 'Які пристрої можна заряджати'),
-      choiceGroup(DEVICES.map((d) => [d.id, d.label]), (v) => input.devices.includes(v), (v) => {
-        input.devices = input.devices.includes(v) ? input.devices.filter((x) => x !== v) : [...input.devices, v];
-      }),
-      err('devices')),
-    detailsBox,
+    h('h2', {}, existing ? 'Редагувати точку' : 'Додати точку'),
+    h('p', { class: 'muted' }, 'Поля з ', h('span', { class: 'req' }, '*'), " — обов'язкові. ",
+      existing ? 'Уже створені бронювання не зміняться.' : 'Назву й координати точки побачать усі на карті.'),
+    aboutYou, station, charging, photosAndTerms, more,
     submitError,
     h('div', { class: 'wizard-actions' },
       h('button', { type: 'button', class: 'btn btn-ghost', onclick: () => modal.close() }, 'Скасувати'),
@@ -193,36 +309,91 @@ export function openAddSpot(store, hostName, publish, existing = null) {
       h('button', { type: 'button', class: 'btn btn-secondary btn-sm', onclick: () => setPoint(...VINNYTSIA_CENTER) }, 'Поставити в центр Вінниці')));
   }
 
-  async function submit(e) {
-    e.preventDefault();
-    submitError.hidden = true;
-    const main = validateSpotInput(input);
-    const more = validateSpotDetails(input.details);
-    const ok = main.ok && more.ok;
-    const errors = { ...main.errors, ...more.errors };
+  function showErrors(errors) {
     for (const [key, el] of Object.entries(errorEls)) {
+      // Помилки вибору файлів показуються одразу при виборі — не стираємо їх тут.
+      if ((key === 'photos' || key === 'avatar') && !errors[key]) continue;
       el.hidden = !errors[key];
       el.textContent = errors[key] ?? '';
     }
-    if (!ok) {
-      form.querySelector('.field-error:not([hidden])')?.closest('.form-field')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const first = form.querySelector('.field-error:not([hidden])');
+    first?.closest('details')?.setAttribute('open', '');
+    first?.closest('.form-field')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  async function submit(e) {
+    e.preventDefault();
+    submitError.hidden = true;
+    // Джерело для карти й фільтра блекауту: з акумулятором точка працює і без світла.
+    input.source = input.hasBattery ? 'battery' : existing && !input.details.sesType ? existing.source : 'solar';
+    const check = validateSpotForm({ ...input, contact: { ...contact, hasPhoto: Boolean(avatarBlob || contact.avatarPath) } },
+      { needContact: live });
+    const errors = { ...check.errors };
+    if (live && creating && closed.length >= 7) errors.workdays = 'Залиште хоча б один робочий день';
+    if (Object.keys(errors).length) { showErrors(errors); return; }
+    showErrors({});
+
+    const data = { ...input, title: input.title.trim(), district: input.district.trim(), hostName };
+    if (!publish) {
+      store.addSpot(data);
+      modal.close();
+      notify('Точку додано — її вже видно на карті гостей');
       return;
     }
-    const data = { ...input, title: input.title.trim(), hostName };
-    if (publish) {
-      const button = form.querySelector('[type=submit]');
-      if (button.disabled) return;
-      button.disabled = true;
-      try { await publish(data); }
+    const button = form.querySelector('[type=submit]');
+    if (button.disabled) return;
+    button.disabled = true;
+    const warnings = [];
+    try {
+      if (live) {
+        const phone = validatePhone(contact.phone).phone;
+        const changed = avatarBlob || ['firstName', 'lastName'].some((k) => (contact[k] ?? '').trim() !== (initialContact[k] ?? '').trim())
+          || phone !== validatePhone(initialContact.phone).phone;
+        if (changed) {
+          try {
+            const avatarPath = await pilot.saveHostContact({ firstName: contact.firstName.trim(), lastName: contact.lastName.trim(),
+              phone, avatarPath: contact.avatarPath }, avatarBlob);
+            savedContact = { firstName: contact.firstName.trim(), lastName: contact.lastName.trim(), phone: contact.phone, avatarPath };
+            Object.assign(initialContact, savedContact);
+            contact.avatarPath = avatarPath;
+            avatarBlob = null;
+          } catch {
+            submitError.textContent = 'Не вдалося зберегти ваші контакти й фото. Спробуйте ще раз.';
+            submitError.hidden = false;
+            return;
+          }
+        }
+      }
+      let id;
+      try { id = await publish(data); }
       catch {
         submitError.textContent = existing ? 'Не вдалося зберегти зміни. Спробуйте ще раз.' : 'Не вдалося опублікувати точку. Спробуйте ще раз.';
         submitError.hidden = false;
         return;
       }
-      finally { button.disabled = false; }
-    } else store.addSpot(data);
+      // Точка вже на карті; фото й робочі дні — окремими кроками, їхні збої не скасовують точку.
+      if (live && creating && id) {
+        if (photoFiles.length) {
+          const paths = [];
+          for (const file of photoFiles) {
+            try {
+              const blob = await resizeImage(file);
+              if (blob.size > PHOTO_LIMITS.bytes) continue;
+              paths.push(await pilot.uploadPhoto({ id }, blob, blob.type));
+            } catch { /* решта фото все одно збережеться */ }
+          }
+          try { if (paths.length) await pilot.setPhotos(id, paths); } catch { paths.length = 0; }
+          if (paths.length < photoFiles.length) warnings.push('не всі фото вдалося завантажити — додайте їх кнопкою «Фото»');
+        }
+        if (closed.length) {
+          try { await pilot.setSchedule(id, { weekdays: closed, days: [] }); }
+          catch { warnings.push('робочі дні не збереглися — налаштуйте їх кнопкою «Графік»'); }
+        }
+      }
+    } finally { button.disabled = false; }
     modal.close();
-    notify(existing ? 'Зміни збережено' : 'Розетку додано — її вже видно на карті гостей');
+    notify(existing ? 'Зміни збережено' : 'Точку додано — її вже видно на карті гостей');
+    if (warnings.length) notify(`Точку збережено, але ${warnings.join('; ')}.`, { kind: 'error' });
   }
   if (existing) coordsNote.textContent = `📍 ${input.lat}, ${input.lng}`;
 }
@@ -363,7 +534,43 @@ export function openPhotos(spot, pilot) {
   draw();
 }
 
+// Карта точок господаря. Створюється один раз і лише переставляється при перемальовуванні сторінки,
+// щоб опитування бронювань кожні 20 с не перезавантажувало тайли.
+function createSpotsMap() {
+  const el = h('div', { class: 'host-map card', role: 'region', 'aria-label': 'Мої точки на карті' });
+  let map = null;
+  let layer = null;
+  let lastKey = '';
+  return {
+    el,
+    update(spots) {
+      if (!window.L) {
+        el.replaceChildren(h('div', { class: 'map-fallback' }, h('b', {}, 'Карта недоступна — перевірте інтернет')));
+        return;
+      }
+      if (!map) {
+        map = L.map(el, { scrollWheelZoom: false }).setView(VINNYTSIA_CENTER, 12);
+        L.tileLayer(TILES.url, { attribution: TILES.attribution, maxZoom: 19 }).addTo(map);
+        layer = L.layerGroup().addTo(map);
+      }
+      map.invalidateSize();
+      const key = JSON.stringify(spots.map((s) => [s.id, s.lat, s.lng, s.pricePerKwh, s.source]));
+      if (key === lastKey) return;
+      lastKey = key;
+      layer.clearLayers();
+      for (const spot of spots) {
+        L.marker([spot.lat, spot.lng], { icon: spotPin(spot), title: spot.title })
+          .on('click', () => { location.hash = `#/spot/${spot.id}`; })
+          .addTo(layer);
+      }
+      if (spots.length) map.fitBounds(L.latLngBounds(spots.map((s) => [s.lat, s.lng])), { padding: [36, 36], maxZoom: 15, animate: false });
+    },
+    destroy() { map?.remove(); map = null; },
+  };
+}
+
 export function render(_params, root, store, session, _history, pilot) {
+  const spotsMap = createSpotsMap();
   let grown = false; // стовпчики «виростають» лише при першому показі, не після кожної дії
   function update() {
     const { status } = session.getState();
@@ -380,20 +587,18 @@ export function render(_params, root, store, session, _history, pilot) {
       return;
     }
     const signedIn = status === 'signedIn';
-    const addSpot = () => openAddSpot(store, undefined, signedIn ? pilot.publish : undefined);
+    const addSpot = () => openAddSpot(store, undefined, signedIn ? pilot.publish : undefined, null, signedIn ? { pilot, session } : {});
     if (signedIn) {
-      root.replaceChildren(h('div', { class: 'container host-page' },
-        h('div', { class: 'host-head' },
-          h('h1', {}, 'Кабінет господаря'),
-          h('button', { type: 'button', class: 'btn btn-primary', onclick: addSpot }, '+ Додати розетку')),
-        pilot.panel(true),
-        h('h2', { class: 'own-title' }, 'Мої точки'),
-        h('div', { class: 'own-spots' }, pilot.ownSpots().map(spot =>
+      const own = pilot.ownSpots();
+      const paused = own.filter((sp) => sp.paused).length;
+      const stats = pilot.hostStats();
+      const rating = hostRating(store.getState().spots, session.getState().user?.uid);
+      const ownSpotBlock = (spot) =>
           h('div', { class: 'own-spot-wrap' }, ownSpotCard(spot),
             spot.paused && h('span', { class: 'badge badge-warn' }, 'На паузі — гості не бачать точку'),
             h('div', { class: 'own-spot-actions' },
               h('button', { type: 'button', class: 'btn btn-secondary btn-sm',
-                onclick: () => openAddSpot(store, undefined, (data) => pilot.update(spot.id, data), spot) }, 'Редагувати'),
+                onclick: () => openAddSpot(store, undefined, (data) => pilot.update(spot.id, data), spot, { pilot, session }) }, 'Редагувати'),
               h('button', { type: 'button', class: 'btn btn-secondary btn-sm', onclick: () => openSchedule(spot, pilot) }, 'Графік'),
               h('button', { type: 'button', class: 'btn btn-secondary btn-sm', onclick: () => openPhotos(spot, pilot) }, 'Фото'),
               h('button', { type: 'button', class: 'btn btn-secondary btn-sm', async onclick(e) {
@@ -410,7 +615,31 @@ export function render(_params, root, store, session, _history, pilot) {
                 catch { notify('Не вдалося видалити точку. Спробуйте ще раз.', { kind: 'error' }); }
                 finally { button.disabled = false; }
               },
-            }, 'Видалити точку'))))));
+            }, 'Видалити точку'));
+      root.replaceChildren(h('div', { class: 'container host-page' },
+        h('div', { class: 'host-head' },
+          h('div', {},
+            h('h1', {}, 'Мої точки'),
+            h('p', { class: 'muted' }, 'Ваші точки на карті, запити гостей, графік і фото.')),
+          h('button', { type: 'button', class: 'btn btn-primary btn-lg', onclick: addSpot }, '+ Додати точку')),
+        h('div', { class: 'stats host-stats' },
+          tile('Точок на карті', String(own.length - paused), paused ? `${paused} на паузі` : 'усі видно гостям'),
+          h('a', { class: `stat card stat-link${stats.pending ? ' stat-attention' : ''}`, href: '#/host/bookings' },
+            h('span', { class: 'stat-label' }, 'Нові запити'),
+            h('b', { class: 'stat-value' }, String(stats.pending)),
+            h('span', { class: 'stat-note' }, stats.pending ? 'Переглянути й підтвердити →' : 'Усі запити оброблено')),
+          tile('Підтверджені бронювання', String(stats.confirmed), 'чекають на зарядку'),
+          tile('Рейтинг', rating.count ? `★ ${rating.avg.toFixed(1).replace('.', ',')}` : '—', ratingLabel(rating.avg, rating.count, 'host'))),
+        own.length
+          ? h('div', { class: 'host-overview' },
+            spotsMap.el,
+            h('div', { class: 'own-spots own-spots-list' }, own.map(ownSpotBlock)))
+          : h('div', { class: 'card host-empty' },
+            h('span', { class: 'gate-icon' }, '📍'),
+            h('h2', {}, 'У вас ще немає точок'),
+            h('p', { class: 'muted' }, 'Додайте свою СЕС: потужність, акумулятор, конектор, графік і ціну. Після цього її побачать гості на карті.'),
+            h('button', { type: 'button', class: 'btn btn-primary btn-lg', onclick: addSpot }, '+ Додати першу точку'))));
+      if (own.length) spotsMap.update(own);
       return;
     }
     const state = store.getState();
@@ -460,5 +689,5 @@ export function render(_params, root, store, session, _history, pilot) {
   const offStore = store.subscribe(update);
   const offSession = session.subscribe(update);
   const offPilot = pilot.subscribe(update);
-  return () => { offStore(); offSession(); offPilot(); };
+  return () => { offStore(); offSession(); offPilot(); spotsMap.destroy(); };
 }

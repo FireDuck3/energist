@@ -54,7 +54,9 @@ function renderSpot(spot, host, { blackout, spots }, store, session, userHistory
     h('div', { class: 'spot-grid' },
       h('div', { class: 'spot-main' },
         h('div', { class: 'host-row' },
-          h('span', { class: 'avatar' }, hostName[0].toUpperCase()),
+          card?.photo
+            ? h('img', { class: 'avatar avatar-photo', src: card.photo, alt: `Фото господаря ${hostName}` })
+            : h('span', { class: 'avatar' }, hostName[0].toUpperCase()),
           h('div', {},
             h('b', {}, `Господар — ${hostName}`),
             spot.pilot && !spot.reviewsUnavailable && h('div', { class: 'muted' }, (() => { const r = hostRating(spots, spot.ownerId); return `${ratingLabel(r.avg, r.count, 'host')}${r.count ? ' про господаря' : ''}`; })()),
@@ -70,6 +72,7 @@ function renderSpot(spot, host, { blackout, spots }, store, session, userHistory
           fact('Графік', `щодня ${spot.schedule.from}–${spot.schedule.to}`),
           fact('Під час блекауту', spot.pilot ? 'Уточніть у господаря' : isLiveInBlackout(spot) ? `працює ще ~${spot.blackoutHours} год` : 'не працює без світла'),
           ...detailFacts(spot.details).map(([label, value]) => fact(label, value))),
+        spot.details?.description && h('div', { class: 'spot-terms' }, h('h2', { class: 'reviews-title' }, 'Про станцію'), h('p', {}, spot.details.description)),
         spot.details?.terms && h('div', { class: 'spot-terms' }, h('h2', { class: 'reviews-title' }, 'Умови зарядки'), h('p', {}, spot.details.terms)),
 
         h('h2', { class: 'reviews-title' }, 'Відгуки'),

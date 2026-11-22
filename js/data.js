@@ -25,8 +25,26 @@ export const SOURCES = {
 
 export const CONNECTORS = {
   type2: 'Type 2 (для авто)',
+  ccs2: 'CCS2 (швидка, для авто)',
+  chademo: 'CHAdeMO (швидка, для авто)',
   socket220: 'Розетка 220 В',
   usb: 'USB',
+};
+// Конектори зарядної станції (EVSE) і звичайної розетки — у формі точки показуємо лише відповідні.
+export const EVSE_CONNECTORS = ['type2', 'ccs2', 'chademo'];
+export const SOCKET_CONNECTORS = ['socket220', 'usb'];
+
+// Анкета точки (supabase/migrations/202611220001_spot_form.sql).
+export const SES_TYPES = {
+  on_grid: 'Мережева',
+  off_grid: 'Автономна',
+  hybrid: 'Гібридна',
+};
+export const PARKING_TYPES = {
+  street: "На вулиці біля об'єкта",
+  yard: "У дворі / на подвір'ї",
+  garage: 'У гаражі',
+  lot: 'Паркувальний майданчик',
 };
 
 // Опис станції господаря (supabase/migrations/202611200001_host_profile_data.sql).

@@ -14,6 +14,8 @@ import * as map from './views/map.js';
 import * as spot from './views/spot.js';
 import * as host from './views/host.js';
 import * as profile from './views/profile.js';
+import * as bookings from './views/bookings.js';
+import { MODES, navFor, homeFor, modeForPath, chooseMode } from './mode.js';
 import { openAuthModal } from './views/auth-modal.js';
 import { loginPage, signupPage, logOut } from './views/auth-page.js';
 import { createBell } from './views/bell.js';
@@ -57,32 +59,31 @@ function accountArea() {
         demo ? 'Вийти з демо-режиму' : 'Вийти')));
 }
 
+// Перемикання режиму: інший набір розділів і своя головна.
+function switchMode(mode) {
+  location.hash = chooseMode(mode, { store, session });
+}
+
 function renderHeader() {
-  const { blackout } = store.getState();
+  const { blackout, mode } = store.getState();
   const path = currentPath();
-  const isHost = path.startsWith('/host');
-  const isGuest = path.startsWith('/map') || path.startsWith('/spot');
-  const roleBtn = (label, active, href) =>
-    h('a', { class: `segment${active ? ' active' : ''}`, href }, label);
+  const signedIn = session.getState().status === 'signedIn';
+  const unread = pilot.totalUnread();
+  // Профіль — у меню акаунта; чати й бронювання мають сенс лише після входу.
+  const links = !mode ? [] : navFor(mode).filter(([href]) => href !== '#/profile' && (signedIn || href === '#/map' || href === '#/host'));
 
   document.getElementById('site-header').replaceChildren(
     h('div', { class: 'container header-inner' },
-      h('a', { class: 'logo', href: '#/' },
+      h('a', { class: 'logo', href: homeFor(mode) },
         h('span', { class: 'logo-mark' }, '⚡'), h('span', {}, 'Watt', h('b', {}, 'Way'))),
-      h('nav', { class: 'segmented', 'aria-label': 'Роль' },
-        roleBtn('Я шукаю зарядку', isGuest, '#/map'),
-        roleBtn('Я ділюсь енергією', isHost, '#/host')),
+      mode && h('nav', { class: 'segmented mode-switch', 'aria-label': 'Режим' },
+        ['guest', 'host'].map((m) => h('button', { type: 'button', class: `segment${mode === m ? ' active' : ''}`,
+          'aria-pressed': String(mode === m), 'aria-label': MODES[m].label, title: MODES[m].label, onclick: () => switchMode(m) },
+        h('span', { 'aria-hidden': 'true' }, MODES[m].icon), ' ', h('span', { class: 'mode-label' }, MODES[m].short)))),
       h('div', { class: 'header-right' },
-        session.getState().status === 'signedIn' && h('a', {
-          class: `nav-link${path.startsWith('/chats') ? ' active' : ''}`,
-          href: '#/chats',
-          'aria-current': path.startsWith('/chats') ? 'page' : null,
-        }, 'Чати', pilot.totalUnread() > 0 && h('span', { class: 'unread-badge' }, unreadLabel(pilot.totalUnread()))),
-        session.getState().status === 'signedIn' && h('a', {
-          class: `nav-link${path === '/profile' ? ' active' : ''}`,
-          href: '#/profile',
-          'aria-current': path === '/profile' ? 'page' : null,
-        }, 'Кабінет'),
+        h('nav', { class: 'header-nav', 'aria-label': 'Розділи' }, links.map(([href, , label, isActive]) =>
+          h('a', { class: `nav-link${isActive(path) ? ' active' : ''}`, href, 'aria-current': isActive(path) ? 'page' : null },
+            label, href === '#/chats' && unread > 0 && h('span', { class: 'unread-badge' }, unreadLabel(unread))))),
         h('label', { class: 'switch', title: 'Режим блекауту' },
           h('input', { type: 'checkbox', checked: blackout, 'aria-label': 'Режим блекауту', onchange: (e) => store.setBlackout(e.target.checked) }),
           h('span', { class: 'switch-track' }, h('span', { class: 'switch-thumb' })),
@@ -99,22 +100,27 @@ function applyTheme() {
 store.subscribe(() => {
   applyTheme();
   renderHeader();
+  renderTabbar();
 });
-session.subscribe(renderHeader);
+session.subscribe(() => {
+  // Режим ще не обрано, а в профілі є роль із реєстрації — беремо її.
+  const { status, profile: saved } = session.getState();
+  if (status === 'signedIn' && !store.getState().mode && (saved?.role === 'host' || saved?.role === 'guest')) store.setMode(saved.role);
+  renderHeader();
+  renderTabbar();
+});
 session.onNeedAuth((reason) => openAuthModal(session, { reason }));
 
-// Нижня панель вкладок — лише на телефоні (CSS ховає її на ширших екранах).
-const TABS = [
-  ['#/map', '🔌', 'Зарядка', (p) => p.startsWith('/map') || p.startsWith('/spot')],
-  ['#/host', '☀️', 'Господар', (p) => p.startsWith('/host')],
-  ['#/chats', '💬', 'Чати', (p) => p.startsWith('/chats')],
-  ['#/profile', '👤', 'Профіль', (p) => p.startsWith('/profile')],
-];
+// Нижня панель вкладок — лише на телефоні (CSS ховає її на ширших екранах). Набір залежить від режиму;
+// на екрані вибору режиму панелі немає.
 const tabbar = h('nav', { class: 'tabbar', 'aria-label': 'Розділи' });
 document.body.append(tabbar);
 function renderTabbar() {
   const path = currentPath();
-  tabbar.replaceChildren(...TABS.map(([href, icon, label, isActive]) =>
+  const { mode } = store.getState();
+  tabbar.hidden = !mode || path === '/';
+  document.body.classList.toggle('no-tabbar', tabbar.hidden);
+  tabbar.replaceChildren(...navFor(mode).map(([href, icon, label, isActive]) =>
     h('a', { class: `tab${isActive(path) ? ' active' : ''}`, href, 'aria-current': isActive(path) ? 'page' : null },
       h('span', { class: 'tab-icon', 'aria-hidden': 'true' }, icon,
         href === '#/chats' && pilot.totalUnread() > 0 && h('span', { class: 'tab-badge' }, unreadLabel(pilot.totalUnread()))),
@@ -123,6 +129,9 @@ function renderTabbar() {
 
 applyTheme();
 installRipple();
+// Повторний візит: режим уже обрано — одразу його головна, без екрана вибору.
+// replaceState не шле hashchange, тож роутер нижче одразу відкриє потрібну сторінку один раз.
+if (currentPath() === '/' && store.getState().mode) history.replaceState(null, '', homeFor(store.getState().mode));
 const appRoot = document.getElementById('app');
 const calm = window.matchMedia('(prefers-reduced-motion: reduce)');
 startRouter({
@@ -130,6 +139,8 @@ startRouter({
   '/map': view(map),
   '/spot/:id': view(spot),
   '/host': view(host),
+  '/host/bookings': view({ render: bookings.renderHost }),
+  '/bookings': view(bookings),
   '/profile': view(profile),
   '/chats': view(chats),
   '/chats/:id': view(chats),
@@ -139,10 +150,9 @@ startRouter({
   onChange(path) {
     // Нова сторінка плавно проявляється. Лише прозорість: transform зсунув би fixed-панелі всередині.
     if (!calm.matches) appRoot.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 280, easing: 'ease-out' });
-    renderTabbar();
-    const role = path.startsWith('/host') ? 'host' : (path.startsWith('/map') || path.startsWith('/spot')) ? 'guest' : null;
-    if (role && role !== store.getState().role) store.setRole(role);
-    else renderHeader();
+    const mode = modeForPath(path);
+    if (mode && mode !== store.getState().mode) store.setMode(mode); // перемалює шапку й вкладки
+    else { renderHeader(); renderTabbar(); }
   },
 });
 

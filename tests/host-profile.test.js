@@ -8,9 +8,11 @@ test('опис станції: рядок бази ↔ форма, порожн�
   const row = { install_year: 2023, voltage_v: 380, inverter: ' Huawei SUN2000 ', storage_kwh: '10.5', charging_terms: '  ',
     has_wifi: true, territory: 'cctv', can_leave_car: false };
   const d = detailsFromRow(row);
-  eq(d, { installYear: 2023, voltageV: 380, inverter: 'Huawei SUN2000', storageKwh: 10.5, terms: null, wifi: true, territory: 'cctv', canLeaveCar: false });
+  eq(d, { installYear: 2023, voltageV: 380, inverter: 'Huawei SUN2000', storageKwh: 10.5, terms: null, wifi: true, territory: 'cctv', canLeaveCar: false,
+    description: null, sesType: null, sesPowerKw: null, hasEvse: null, parkingType: null });
   eq(detailsToColumns({ ...d, storageKwh: NaN, territory: undefined }), { install_year: 2023, voltage_v: 380, inverter: 'Huawei SUN2000',
-    storage_kwh: null, charging_terms: null, has_wifi: true, territory: null, can_leave_car: false });
+    storage_kwh: null, charging_terms: null, has_wifi: true, territory: null, can_leave_car: false,
+    description: null, ses_type: null, ses_power_kw: null, has_evse: null, parking_type: null });
   eq(detailsFromRow({ territory: 'castle' }).territory, null);
   eq(Object.values(detailsFromRow({})).every((v) => v === null), true); // стара база без нових колонок
 });
@@ -24,7 +26,7 @@ test('toPilotSpot: опис станції з нових колонок', () => 
 
 test('detailFacts: лише заповнені характеристики, 0 кВт·год — «немає»', () => {
   eq(detailFacts({ installYear: 2023, voltageV: 220, storageKwh: 0, wifi: false, territory: null, canLeaveCar: true }), [
-    ['Рік встановлення', '2023'], ['Напруга', '220 В (однофазна мережа)'], ['Накопичувач', 'немає'],
+    ['Накопичувач', 'немає'], ['Рік встановлення', '2023'], ['Напруга', '220 В (однофазна мережа)'],
     ['Wi-Fi', 'немає'], ['Залишити авто', 'можна на час зарядки']]);
   eq(detailFacts({ storageKwh: 10.5 }), [['Накопичувач', 'акумулятори 10,5 кВт·год']]);
   eq([detailFacts(undefined), detailFacts({})], [[], []]);
@@ -37,7 +39,8 @@ test('картка господаря: стаж, сесії, контакти', 
     ['Завершених зарядок ще немає', 'Завершених зарядок: 3 · останні: 2 год, 1,5 год, 3 год', 'Завершених зарядок: 1']);
   const card = toHostCard({ host_name: '', registered_at: 'x', host_verified: true, phone: null, email: 'a@b.ua',
     completed_sessions: '4', recent_hours: ['2.0', '1.5'] });
-  eq(card, { name: 'Господар точки', since: 'x', verified: true, phone: null, email: 'a@b.ua', sessions: 4, recentHours: [2, 1.5] });
+  eq(card, { name: 'Господар точки', since: 'x', verified: true, phone: null, email: 'a@b.ua', sessions: 4, recentHours: [2, 1.5], photo: null });
+  eq(toHostCard({ avatar_path: 'u/avatar/a.jpg' }, (p) => `https://cdn/${p}`).photo, 'https://cdn/u/avatar/a.jpg');
   eq(toHostCard(undefined), null);
 });
 
@@ -69,4 +72,12 @@ test('картка господаря чекає, поки підвантажи�
   session.service = { pilotSpotHostCard: async (id) => ({ name: 'Ірина', id }) };
   ready();
   eq(await pending, { name: 'Ірина', id: 'p1' });
+});
+
+test('анкета точки: нові поля з бази й факти для картки', () => {
+  const d = detailsFromRow({ description: ' Дах будинку ', ses_type: 'hybrid', ses_power_kw: '10', has_evse: true, parking_type: 'yard', storage_kwh: 0 });
+  eq([d.description, d.sesType, d.sesPowerKw, d.hasEvse, d.parkingType], ['Дах будинку', 'hybrid', 10, true, 'yard']);
+  eq(detailsFromRow({ ses_type: 'nuclear', parking_type: 'roof' }).sesType, null);
+  eq(detailFacts(d), [['Тип СЕС', 'Гібридна'], ['Встановлена потужність СЕС', '10 кВт'], ['Накопичувач', 'немає'],
+    ['Зарядна станція', 'є (EVSE)'], ['Паркування', "У дворі / на подвір'ї"]]);
 });

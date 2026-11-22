@@ -1,5 +1,10 @@
 // Опис станції й «паспорт» господаря (поля зі спринту, docs/host-data.md). Чисті функції без DOM.
-import { VOLTAGES, TERRITORIES } from './data.js';
+import { VOLTAGES, TERRITORIES, SES_TYPES, PARKING_TYPES } from './data.js';
+
+// Колонки, які зберігає update_pilot_spot_details (202611200001) і update_pilot_spot_form (202611220001).
+export const DETAIL_COLUMNS = ['install_year', 'voltage_v', 'inverter', 'storage_kwh', 'charging_terms', 'has_wifi', 'territory', 'can_leave_car'];
+export const FORM_COLUMNS = ['description', 'ses_type', 'ses_power_kw', 'has_evse', 'parking_type'];
+export const anyFilled = (columns, keys) => keys.some((k) => columns[k] != null);
 
 const num = (x) => (x == null || x === '' ? null : Number(x));
 const text = (x) => (typeof x === 'string' && x.trim() ? x.trim() : null);
@@ -11,6 +16,9 @@ export function detailsFromRow(row = {}) {
     installYear: num(row.install_year), voltageV: num(row.voltage_v), inverter: text(row.inverter),
     storageKwh: num(row.storage_kwh), terms: text(row.charging_terms), wifi: bool(row.has_wifi),
     territory: row.territory in TERRITORIES ? row.territory : null, canLeaveCar: bool(row.can_leave_car),
+    description: text(row.description), sesType: row.ses_type in SES_TYPES ? row.ses_type : null,
+    sesPowerKw: num(row.ses_power_kw), hasEvse: bool(row.has_evse),
+    parkingType: row.parking_type in PARKING_TYPES ? row.parking_type : null,
   };
 }
 
@@ -21,6 +29,8 @@ export function detailsToColumns(d = {}) {
     install_year: n(d.installYear), voltage_v: n(d.voltageV), inverter: text(d.inverter),
     storage_kwh: n(d.storageKwh), charging_terms: text(d.terms), has_wifi: bool(d.wifi),
     territory: d.territory ?? null, can_leave_car: bool(d.canLeaveCar),
+    description: text(d.description), ses_type: d.sesType ?? null, ses_power_kw: n(d.sesPowerKw),
+    has_evse: bool(d.hasEvse), parking_type: d.parkingType ?? null,
   };
 }
 
@@ -31,10 +41,14 @@ const decimal = (x) => String(x).replace('.', ',');
 export function detailFacts(d) {
   if (!d) return [];
   return [
-    ['Рік встановлення', d.installYear && String(d.installYear)],
-    ['Напруга', d.voltageV && (VOLTAGES[d.voltageV] ?? `${d.voltageV} В`)],
+    ['Тип СЕС', d.sesType && SES_TYPES[d.sesType]],
+    ['Встановлена потужність СЕС', d.sesPowerKw && `${decimal(d.sesPowerKw)} кВт`],
     ['Інвертор', d.inverter],
     ['Накопичувач', d.storageKwh === 0 ? 'немає' : d.storageKwh && `акумулятори ${decimal(d.storageKwh)} кВт·год`],
+    ['Зарядна станція', yesNo(d.hasEvse, 'є (EVSE)', 'немає — підключення до розетки')],
+    ['Паркування', d.parkingType && PARKING_TYPES[d.parkingType]],
+    ['Рік встановлення', d.installYear && String(d.installYear)],
+    ['Напруга', d.voltageV && (VOLTAGES[d.voltageV] ?? `${d.voltageV} В`)],
     ['Wi-Fi', yesNo(d.wifi, 'є для гостей', 'немає')],
     ['Територія', d.territory && TERRITORIES[d.territory]],
     ['Залишити авто', yesNo(d.canLeaveCar, 'можна на час зарядки', 'лише поруч з авто')],
@@ -59,11 +73,13 @@ export function sessionsLabel(count, hours = []) {
 }
 
 // Відповідь pilot_spot_host_card → картка господаря (або null, якщо точку не видно).
-export function toHostCard(row) {
+// photoUrl перетворює шлях фото в Storage на публічну адресу.
+export function toHostCard(row, photoUrl = (p) => p) {
   if (!row) return null;
   return {
     name: row.host_name || 'Господар точки', since: row.registered_at, verified: Boolean(row.host_verified),
     phone: row.phone || null, email: row.email || null,
     sessions: Number(row.completed_sessions) || 0, recentHours: (row.recent_hours ?? []).map(Number),
+    photo: row.avatar_path ? photoUrl(row.avatar_path) : null,
   };
 }

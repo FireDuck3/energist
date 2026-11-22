@@ -1,5 +1,5 @@
 import { h } from './ui.js';
-import { detailsToColumns } from './host-profile.js';
+import { detailsToColumns, DETAIL_COLUMNS, FORM_COLUMNS, anyFilled } from './host-profile.js';
 import { notifications as bellList, notify } from './notifications.js';
 import { photoPath } from './photos.js';
 import { formatLastMessage, sortChats, totalUnread, unreadLabel } from './chats.js';
@@ -107,11 +107,27 @@ export function createPilot(session, store, { notifications = bellList } = {}) {
   return {
     refresh,
     subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+    // Повертає id нової точки (для фото й робочих днів, які зберігаються окремими викликами).
     publish: async (input) => {
       if (!uid()) throw new Error('Sign-in required');
-      await session.service.publishPilotSpot(input, uid());
+      const id = await session.service.publishPilotSpot(input, uid());
       await refresh();
+      return id;
     },
+    // Контакти й фото господаря. avatarBlob — нове фото (стиснуте), інакше лишається avatarPath.
+    async saveHostContact({ firstName, lastName, phone, avatarPath = null }, avatarBlob = null) {
+      if (!uid()) throw new Error('Sign-in required');
+      let path = avatarPath;
+      if (avatarBlob) {
+        path = photoPath(uid(), 'avatar', avatarBlob.type);
+        await session.service.uploadSpotPhoto(path, avatarBlob);
+      }
+      await session.service.setMyHostContact({ firstName, lastName, phone, avatarPath: path });
+      // Старе фото більше не потрібне; збій видалення не критичний.
+      if (avatarBlob && avatarPath && avatarPath !== path) session.service.removeSpotPhoto(avatarPath).catch(() => {});
+      return path;
+    },
+    photoUrl: (path) => session.service?.photoUrl?.(path) ?? null,
     request: async (point, selection) => {
       if (!uid()) throw new Error('Sign-in required');
       await session.service.requestPilotBooking(point, selection);
@@ -126,9 +142,11 @@ export function createPilot(session, store, { notifications = bellList } = {}) {
       await session.service.updatePilotSpot(id, input);
       // Опис станції (рік, напруга, умови…) — окремий виклик: старий update_pilot_spot його не знає.
       // Порожній опис, якого й не було, не надсилаємо — тоді редагування працює й без міграції.
-      const filled = (d) => Object.values(detailsToColumns(d)).some((v) => v !== null);
-      const before = spots.find((s) => s.id === id)?.details;
-      if (input.details && (filled(input.details) || filled(before))) await session.service.updatePilotSpotDetails(id, input.details);
+      const now = detailsToColumns(input.details);
+      const before = detailsToColumns(spots.find((s) => s.id === id)?.details);
+      const touched = (keys) => input.details && (anyFilled(now, keys) || anyFilled(before, keys));
+      if (touched(DETAIL_COLUMNS)) await session.service.updatePilotSpotDetails(id, input.details);
+      if (touched(FORM_COLUMNS)) await session.service.updatePilotSpotForm(id, input.details);
       await refresh();
     },
     // Картка господаря для сторінки точки; null — сервер ще без міграції або точку не видно.
@@ -157,6 +175,11 @@ export function createPilot(session, store, { notifications = bellList } = {}) {
     },
     removePhoto: path => session.service.removeSpotPhoto(path),
     ownSpots: () => spots.filter(spot => !spot.archivedAt && spot.ownerId === uid()),
+    // Для кабінету господаря: скільки запитів чекає рішення і скільки бронювань підтверджено.
+    hostStats() {
+      const mine = bookings.filter(b => b.owner_id === uid());
+      return { pending: mine.filter(b => b.status === 'pending').length, confirmed: mine.filter(b => b.status === 'confirmed').length };
+    },
     totalUnread: () => totalUnread(chats ?? []),
     // Чати для вкладки «Чати»: з list_my_chats, а без міграції — з бронювань (без прев'ю й лічильників).
     chats: () => (chats ?? sortChats(bookings)).filter(b => uid() && [b.owner_id, b.guest_id].includes(uid())),

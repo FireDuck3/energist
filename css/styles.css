@@ -1117,3 +1117,97 @@ body.on-chats .site-footer { display: none; }
 .host-contacts { overflow-wrap: anywhere; }
 .spot-terms { padding: 22px 0 0; display: grid; gap: 6px; }
 .spot-terms p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* ---------- Режими: вибір на вході, перемикач у шапці ---------- */
+button.segment { border: 0; background: none; font: inherit; cursor: pointer; }
+.header-nav { display: flex; align-items: center; gap: 18px; }
+.header-nav .nav-link { white-space: nowrap; }
+/* Середні екрани: шапка з перемикачем режиму й розділами не влазить в один рядок */
+@media (max-width: 1240px) {
+  .switch-label, .account-name { display: none; }
+  .header-right, .header-nav { gap: 14px; }
+}
+@media (min-width: 769px) and (max-width: 1100px) {
+  .header-inner { flex-wrap: wrap; height: auto; padding-block: 10px; row-gap: 10px; }
+  .segmented.mode-switch { order: 3; width: 100%; margin: 0; justify-content: center; }
+  .mode-switch .segment { flex: 1; text-align: center; }
+  .header-inner > .header-right { margin-left: auto; }
+}
+.hero-choice { padding: 56px 0 48px; }
+.choice-inner { display: grid; justify-items: center; text-align: center; gap: 8px; }
+.choice-inner .lead { max-width: 60ch; }
+.mode-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; width: 100%; max-width: 920px; margin-top: 16px; }
+.mode-card {
+  display: grid; gap: 10px; align-content: start; justify-items: start; text-align: left; padding: 28px;
+  border-radius: var(--radius); border: 2px solid var(--line); background: var(--surface); color: var(--text);
+  font: inherit; cursor: pointer; box-shadow: var(--shadow); position: relative; overflow: hidden; isolation: isolate;
+  transition: transform .3s var(--spring), border-color .2s, box-shadow .3s var(--ease);
+}
+.mode-card::after { content: ''; position: absolute; inset: auto -20% -60% auto; width: 260px; height: 260px; border-radius: 50%; z-index: -1; opacity: .55; }
+.mode-card-host::after { background: radial-gradient(closest-side, var(--orange-soft), transparent); }
+.mode-card-guest::after { background: radial-gradient(closest-side, var(--indigo-soft), transparent); }
+.mode-card:hover, .mode-card:focus-visible { transform: translateY(-4px); border-color: var(--indigo); box-shadow: var(--shadow-hover); }
+.mode-card.current { border-color: var(--indigo); }
+.mode-card-icon { font-size: 2.6rem; line-height: 1; }
+.mode-card-title { font-size: clamp(1.35rem, 2.4vw, 1.75rem); font-weight: 800; letter-spacing: -.01em; }
+.mode-card-lead { color: var(--muted); }
+.mode-card-perks { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.mode-card-cta { margin-top: 6px; font-weight: 700; color: var(--indigo); }
+.hero-choice .hero-auth { justify-content: center; margin-top: 12px; }
+.how-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; margin-top: 24px; }
+.how-col { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.how-title { margin: 0; }
+.steps-compact { grid-template-columns: 1fr 1fr; margin: 0; gap: 14px; }
+
+/* ---------- Кабінет господаря: карта точок і статистика ---------- */
+.host-stats .stat-link { text-decoration: none; color: inherit; }
+.stat-attention { border: 2px solid var(--orange); }
+.stat-attention .stat-value { color: #B85A12; }
+body.blackout .stat-attention .stat-value { color: var(--sun); }
+.host-overview { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.host-map { height: 460px; overflow: hidden; isolation: isolate; position: sticky; top: calc(var(--header-h) + 16px); }
+.own-spots-list { grid-template-columns: 1fr; }
+.host-empty { padding: 32px; display: grid; justify-items: center; text-align: center; gap: 10px; }
+.host-empty h2 { margin: 0; }
+.bookings-page { padding: 32px 16px 56px; display: grid; gap: 20px; }
+.page-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.page-head h1 { margin: 0 0 6px; font-size: clamp(1.6rem, 3vw, 2.2rem); }
+.page-head p { margin: 0; }
+
+/* ---------- Анкета точки ---------- */
+.form-section { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 14px 16px 16px; margin: 0; display: grid; gap: 14px; min-width: 0; }
+.form-section legend { font-weight: 800; padding: 0 6px; }
+.form-section > .hint { margin: 0; }
+.form-section textarea { resize: vertical; }
+.form-more > summary { cursor: pointer; font-weight: 700; }
+.form-more[open] > summary { margin-bottom: 4px; }
+.req { color: var(--danger); font-weight: 700; }
+.avatar-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.avatar-preview[hidden] { display: none; }
+.avatar-preview { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 2px solid var(--line); }
+.avatar-photo { object-fit: cover; padding: 0; }
+.workdays { display: grid; gap: 6px; margin-top: 8px; }
+.photo-names { overflow-wrap: anywhere; }
+
+@media (max-width: 900px) {
+  .host-overview { grid-template-columns: 1fr; }
+  .host-map { position: relative; top: 0; height: 320px; }
+}
+@media (max-width: 768px) {
+  .mode-cards, .how-grid { grid-template-columns: 1fr; }
+  .mode-card { padding: 22px 20px; }
+  .header-nav { display: none; }
+  /* На телефоні перемикач режиму лишається, але лише з іконками */
+  .segmented.mode-switch { display: flex; order: 0; width: auto; margin: 0; padding: 3px; }
+  .mode-switch .segment { padding: 6px 10px; font-size: 1.05rem; flex: none; }
+  .mode-switch .mode-label { display: none; }
+  /* Місце для перемикача режиму: лишаємо тільки знак логотипа й сам перемикач блекауту */
+  .logo > span:not(.logo-mark), .switch-icon { display: none; }
+  .header-inner { gap: 8px; }
+  .header-right { gap: 8px; }
+  body.no-tabbar { padding-bottom: 0; }
+}
+.tabbar[hidden] { display: none !important; }
+@media (max-width: 560px) {
+  .steps-compact { grid-template-columns: 1fr; }
+}

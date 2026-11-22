@@ -157,13 +157,26 @@ export async function loadSupabase() {
         (await call(client.from('push_subscriptions').select('id').eq('endpoint', endpoint).limit(1))).length > 0,
       deletePushSubscription: endpoint => call(client.rpc('delete_push_subscription', { sub_endpoint: endpoint })),
       archivePilotSpot: id => call(client.rpc('archive_pilot_spot', { point_id: id })),
-      publishPilotSpot: (input, uid) => call(client.from('pilot_spots').insert({
+      // Повертає id нової точки: форма одразу додає до неї фото й робочі дні.
+      publishPilotSpot: async (input, uid) => (await call(client.from('pilot_spots').insert({
         owner_id: uid, title: input.title, district: input.district, lat: input.lat, lng: input.lng,
         source: input.source, connector: input.connector, power_kw: input.powerKw,
         price_per_kwh: input.pricePerKwh, devices: input.devices, opens: input.schedule.from, closes: input.schedule.to,
         // Лише заповнені поля опису: без них точка додається й на базі до міграції 202611200001.
         ...Object.fromEntries(Object.entries(detailsToColumns(input.details)).filter(([, v]) => v !== null)),
+      }).select('id').single()))?.id,
+      updatePilotSpotForm: (id, details) => {
+        const c = detailsToColumns(details);
+        return call(client.rpc('update_pilot_spot_form', {
+          point_id: id, new_description: c.description, new_ses_type: c.ses_type, new_ses_power_kw: c.ses_power_kw,
+          new_has_evse: c.has_evse, new_parking_type: c.parking_type,
+        }));
+      },
+      // Ім'я, прізвище, телефон і фото господаря (users змінює лише ця серверна функція).
+      setMyHostContact: ({ firstName, lastName, phone, avatarPath }) => call(client.rpc('set_my_host_contact', {
+        new_first_name: firstName, new_last_name: lastName, new_phone: phone, new_avatar_path: avatarPath,
       })),
+      photoUrl: path => client.storage.from(PHOTO_BUCKET).getPublicUrl(path).data.publicUrl,
       updatePilotSpotDetails: (id, details) => {
         const c = detailsToColumns(details);
         return call(client.rpc('update_pilot_spot_details', {
@@ -173,7 +186,8 @@ export async function loadSupabase() {
         }));
       },
       // Картка господаря: контакти сервер віддає лише власнику й гостю з підтвердженим бронюванням.
-      pilotSpotHostCard: async id => toHostCard((await call(client.rpc('pilot_spot_host_card', { point_id: id })))[0]),
+      pilotSpotHostCard: async id => toHostCard((await call(client.rpc('pilot_spot_host_card', { point_id: id })))[0],
+        path => client.storage.from(PHOTO_BUCKET).getPublicUrl(path).data.publicUrl),
       listPilotBookings: () => call(client.rpc('list_my_pilot_bookings')),
       listNotifications: () => call(client.from('booking_notifications').select('*').order('created_at', { ascending: false }).limit(100)),
       readNotification: id => call(client.from('booking_notifications').update({ read_at: new Date().toISOString() }).eq('id', id)),
