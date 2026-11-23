@@ -15,6 +15,7 @@ import * as spot from './views/spot.js';
 import * as host from './views/host.js';
 import * as profile from './views/profile.js';
 import * as bookings from './views/bookings.js';
+import * as admin from './views/admin.js';
 import { MODES, navFor, homeFor, modeForPath, chooseMode } from './mode.js';
 import { openAuthModal } from './views/auth-modal.js';
 import { loginPage, signupPage, logOut } from './views/auth-page.js';
@@ -55,6 +56,8 @@ function accountArea() {
     h('div', { class: 'account-menu card' },
       !demo && h('span', { class: 'account-email muted' }, user.email),
       h('a', { href: '#/profile', onclick: (e) => e.target.closest('details').open = false }, demo ? 'Профіль' : 'Профіль і зарядки'),
+      // Лише посилання: доступ до даних адмінки перевіряє сервер.
+      !demo && user?.isAdmin && h('a', { href: '#/admin', onclick: (e) => e.target.closest('details').open = false }, '🛡️ Адмінпанель'),
       h('button', { type: 'button', onclick: () => (demo ? location.reload() : logOut(session)) },
         demo ? 'Вийти з демо-режиму' : 'Вийти')));
 }
@@ -144,6 +147,8 @@ startRouter({
   '/profile': view(profile),
   '/chats': view(chats),
   '/chats/:id': view(chats),
+  '/admin': view(admin),
+  '/admin/:tab': view(admin),
   '/login': view({ render: loginPage }),
   '/signup': view({ render: signupPage }),
 }, appRoot, {

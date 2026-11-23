@@ -68,6 +68,18 @@ test('PILOT_SPOT_COLUMNS: без точних lat/lng, з усіма полям�
   eq(['description', 'ses_type', 'ses_power_kw', 'has_evse', 'parking_type', 'inverter', 'storage_kwh', 'charging_terms']
     .filter((c) => !cols.includes(c)), []);
   eq(new Set(cols).size, cols.length);
+  // Модерація: господар бачить, що точку приховано, і причину. owner_blocked клієнту не потрібен.
+  eq([cols.includes('hidden_at'), cols.includes('hidden_reason'), cols.includes('owner_blocked')], [true, true, false]);
+});
+
+test('toPilotSpot: прихована модератором точка несе дату й причину', async () => {
+  const { toPilotSpot } = await import('../js/supabase.js');
+  const row = { id: 'p1', title: 'Т', district: 'Д', area_lat: 49.2, area_lng: 28.4, power_kw: 1, price_per_kwh: 10,
+    devices: ['ev'], opens: '08:00:00', closes: '20:00:00' };
+  const shown = toPilotSpot(row, [], (p) => p);
+  eq([shown.hiddenAt, shown.hiddenReason], [null, null]);
+  const hidden = toPilotSpot({ ...row, hidden_at: '2026-11-24T10:00:00Z', hidden_reason: 'Адреса не існує' }, [], (p) => p);
+  eq([hidden.hiddenAt, hidden.hiddenReason], ['2026-11-24T10:00:00Z', 'Адреса не існує']);
 });
 
 test('toPilotSpot: verified лише коли є verified_at', async () => {

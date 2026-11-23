@@ -595,11 +595,16 @@ export function render(_params, root, store, session, _history, pilot) {
     const addSpot = () => openAddSpot(store, undefined, signedIn ? pilot.publish : undefined, null, signedIn ? { pilot, session } : {});
     if (signedIn) {
       const own = pilot.ownSpots();
-      const paused = own.filter((sp) => sp.paused).length;
+      const paused = own.filter((sp) => sp.paused && !sp.hiddenAt).length;
+      const hidden = own.filter((sp) => sp.hiddenAt).length;
       const stats = pilot.hostStats();
       const rating = hostRating(store.getState().spots, session.getState().user?.uid);
       const ownSpotBlock = (spot) =>
           h('div', { class: 'own-spot-wrap' }, ownSpotCard(spot),
+            spot.hiddenAt && h('p', { class: 'own-spot-hidden', role: 'note' },
+              h('b', {}, '🚫 Точку приховав модератор — гості її не бачать.'),
+              spot.hiddenReason && h('span', {}, ` Причина: ${spot.hiddenReason}`),
+              h('span', { class: 'muted' }, ' Виправте дані через «Редагувати» й напишіть у підтримку, щоб точку повернули.')),
             spot.paused && h('span', { class: 'badge badge-warn' }, 'На паузі — гості не бачать точку'),
             h('div', { class: 'own-spot-actions' },
               h('button', { type: 'button', class: 'btn btn-secondary btn-sm',
@@ -628,7 +633,8 @@ export function render(_params, root, store, session, _history, pilot) {
             h('p', { class: 'muted' }, 'Ваші точки на карті, запити гостей, графік і фото.')),
           h('button', { type: 'button', class: 'btn btn-primary btn-lg', onclick: addSpot }, '+ Додати точку')),
         h('div', { class: 'stats host-stats' },
-          tile('Точок на карті', String(own.length - paused), paused ? `${paused} на паузі` : 'усі видно гостям'),
+          tile('Точок на карті', String(own.length - paused - hidden),
+            [paused && `${paused} на паузі`, hidden && `${hidden} приховано модератором`].filter(Boolean).join(' · ') || 'усі видно гостям'),
           h('a', { class: `stat card stat-link${stats.pending ? ' stat-attention' : ''}`, href: '#/host/bookings' },
             h('span', { class: 'stat-label' }, 'Нові запити'),
             h('b', { class: 'stat-value' }, String(stats.pending)),

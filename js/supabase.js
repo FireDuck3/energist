@@ -54,7 +54,7 @@ const PHOTO_BUCKET = 'spot-photos';
 // усі бачать центр зони area_lat/area_lng, а точне місце — лише господар і гість з підтвердженим бронюванням.
 export const PILOT_SPOT_COLUMNS = ['id', 'owner_id', 'title', 'district', 'area_lat', 'area_lng', 'source', 'connector',
   'power_kw', 'price_per_kwh', 'devices', 'opens', 'closes', 'archived_at', 'paused', 'closed_weekdays', 'photos',
-  'verified_at', ...DETAIL_COLUMNS, ...FORM_COLUMNS].join(',');
+  'verified_at', 'hidden_at', 'hidden_reason', ...DETAIL_COLUMNS, ...FORM_COLUMNS].join(',');
 
 // Рядок pilot_spots → точка для карти. photoUrl перетворює шлях у Storage на публічну адресу.
 // exact — точне місце {lat, lng}, якщо цьому користувачу його можна знати; інакше точка стоїть у центрі зони.
@@ -76,6 +76,8 @@ export function toPilotSpot(row, feedback, photoUrl, reviewsUnavailable = false,
     paused: Boolean(row.paused), closedWeekdays: row.closed_weekdays ?? [],
     photoPaths, photos: photoPaths.map(photoUrl),
     verified: Boolean(row.verified_at),
+    // Сховав адміністратор (міграція 202611240001): такий рядок сервер віддає лише власнику.
+    hiddenAt: row.hidden_at ?? null, hiddenReason: row.hidden_reason ?? null,
     details: detailsFromRow(row),
   };
 }
@@ -206,6 +208,22 @@ export async function loadSupabase() {
       pilotSpotHostCard: async id => toHostCard((await call(client.rpc('pilot_spot_host_card', { point_id: id })))[0],
         path => client.storage.from(PHOTO_BUCKET).getPublicUrl(path).data.publicUrl),
       listPilotBookings: () => call(client.rpc('list_my_pilot_bookings')),
+      // Адмінпанель: кожна функція admin_* на сервері спершу перевіряє, що викликає адміністратор.
+      admin: {
+        overview: () => call(client.rpc('admin_overview')),
+        listReports: (includeClosed = false) => call(client.rpc('admin_list_reports', { include_closed: includeClosed })),
+        resolveReport: (id, decision, note = '') => call(client.rpc('admin_resolve_report', { report_id: id, decision, note })),
+        listSpots: () => call(client.rpc('admin_list_spots')),
+        setSpotHidden: (id, hide, reason = '') => call(client.rpc('admin_set_spot_hidden', { point_id: id, hide, reason })),
+        setSpotVerified: (id, verified) => call(client.rpc('admin_set_spot_verified', { point_id: id, verified })),
+        listUsers: (search = '') => call(client.rpc('admin_list_users', { search })),
+        setUserStatus: (id, status, note = '') => call(client.rpc('admin_set_user_status', { target: id, new_status: status, note })),
+        setHostVerified: (id, verified) => call(client.rpc('admin_set_host_verified', { target: id, verified })),
+        listBookings: (problemsOnly = true) => call(client.rpc('admin_list_bookings', { problems_only: problemsOnly })),
+        cancelBooking: (id, note = '') => call(client.rpc('admin_cancel_booking', { booking_id: id, note })),
+        listSyncRuns: () => call(client.rpc('admin_list_sync_runs')),
+        listActions: () => call(client.rpc('admin_list_actions')),
+      },
       listNotifications: () => call(client.from('booking_notifications').select('*').order('created_at', { ascending: false }).limit(100)),
       readNotification: id => call(client.from('booking_notifications').update({ read_at: new Date().toISOString() }).eq('id', id)),
       listMessages: async id => (await call(client.from('booking_messages').select('*').eq('booking_id', id).order('created_at', { ascending: false }).limit(500))).reverse(),
@@ -242,14 +260,18 @@ export async function loadSupabase() {
       async verifyUser() {
         const { user } = await call(auth.getUser());
         if (!user) throw fail(null, 'auth/invalid-credential');
-        const account = await call(client.from('users')
-          .select('status, first_name, last_name, email').eq('id', user.id).single());
+        const [account, isAdmin] = await Promise.all([
+          call(client.from('users').select('status, first_name, last_name, email').eq('id', user.id).single()),
+          // Лише щоб показати посилання на адмінпанель; кожну адмінську дію сервер перевіряє сам.
+          call(client.rpc('is_admin')).then(Boolean, () => false),
+        ]);
         if (account.status !== 'active') throw fail(null, 'auth/account-disabled');
         return {
           ...toUser(user),
           firstName: account.first_name,
           lastName: account.last_name,
           email: account.email ?? user.email,
+          isAdmin,
         };
       },
       sendLoginCode: (email) => call(auth.signInWithOtp({ email, options: { shouldCreateUser: true } })),

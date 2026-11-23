@@ -50,7 +50,7 @@ export function createPilot(session, store, { notifications = bellList } = {}) {
       if (points.status === 'fulfilled') {
         const changed = JSON.stringify(points.value) !== JSON.stringify(spots);
         spots = points.value;
-        if (changed || !store.getState().pilotReady) store.setPilotSpots(spots.filter(spot => !spot.archivedAt));
+        if (changed || !store.getState().pilotReady) store.setPilotSpots(spots.filter(spot => !spot.archivedAt && !spot.hiddenAt));
       }
       if (requests.status === 'fulfilled') bookings = requests.value;
       // Без міграції чатів (або при збої) список чатів будується з бронювань, без лічильників.
