@@ -1226,7 +1226,11 @@ body.blackout .stat-attention .stat-value { color: var(--sun); }
 /* ---------- Адмінпанель ---------- */
 .btn-danger { background: var(--danger); color: #fff; }
 .btn-danger:hover:not(:disabled) { filter: brightness(1.06); }
-.own-spot-hidden { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--danger-soft); font-size: .9rem; }
+.own-spot-hidden {
+  margin: 0; padding: 12px 14px; border-radius: 12px; background: var(--danger-soft); font-size: .9rem;
+  display: grid; gap: 6px; justify-items: start; overflow-wrap: anywhere;
+}
+.spot-page > .own-spot-hidden { margin-bottom: 16px; }
 .own-spot-hidden b { color: var(--danger); }
 .admin-page { padding-top: 28px; padding-bottom: 56px; display: grid; gap: 16px; }
 .admin-tabs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: thin; padding-bottom: 2px; }

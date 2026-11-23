@@ -23,6 +23,7 @@ function fakeApi(data = {}) {
       listSyncRuns: rec('listSyncRuns', data.runs ?? []),
       listReports: rec('listReports', data.reports ?? []),
       resolveReport: rec('resolveReport', null),
+      actOnReport: rec('actOnReport', null),
       listSpots: rec('listSpots', data.spots ?? []),
       setSpotHidden: rec('setSpotHidden', null),
       setSpotVerified: rec('setSpotVerified', null),
@@ -83,6 +84,9 @@ test('адмінка: фільтри точок і пошук', () => {
   eq([ids('all'), ids('unverified'), ids('reported'), ids('hidden'), ids('archived')],
     [['a', 'b', 'c', 'd'], ['a'], ['a', 'c'], ['c'], ['d']]);
   eq([ids('all', 'олег'), ids('all', 'A@X'), ids('reported', 'хмара')], [['b'], ['a'], ['c']]);
+  // «Просять перевірити» — лише приховані з запитом господаря.
+  const withRequest = [...spots, { id: 'e', title: 'Запит', hidden_at: 't', review_requested_at: 't' }, { id: 'f', title: 'Без приховування', review_requested_at: 't' }];
+  eq(filterSpots(withRequest, 'review').map((s) => s.id), ['e']);
 });
 
 test('адмінка: плитки огляду, час, причина, тексти помилок', () => {
@@ -102,6 +106,12 @@ test('адмінка: плитки огляду, час, причина, тек�
   eq(adminErrorText({ code: 'auth/network-request-failed' }).startsWith('Немає з\'єднання'), true);
   eq(/202611240001_admin\.sql/.test(adminErrorText({ message: 'Could not find the function public.admin_overview without parameters' })), true);
   eq(adminErrorText({}), 'Не вдалося виконати дію. Спробуйте ще раз.');
+  // Лише точний код: чуже повідомлення зі словом «itself» чи «not_open» усередині — загальний текст.
+  eq(adminErrorText({ message: 'relation references itself' }), 'Не вдалося виконати дію. Спробуйте ще раз.');
+  eq(adminErrorText({ message: 'column not_open_x does not exist' }), 'Не вдалося виконати дію. Спробуйте ще раз.');
+  eq(adminErrorText({ message: 'admin_target' }).startsWith('Адміністратора заблокувати не можна'), true);
+  const review = overviewTiles({ review_requests: 2, unverified_spots: 1, hidden_spots: 2 }).find((t) => t[0] === 'spots');
+  eq([review[3], review[5]], ['1 неперевірених · 2 прихованих · 2 просять перевірити знову', true]);
 });
 
 test('адмінпанель: без прав, у демо чи без входу — жодного запиту до адмінських функцій', async () => {
@@ -179,7 +189,7 @@ test('адмінпанель: скарга — «Вирішено» питає �
   } finally { m.done(); }
 });
 
-test('адмінпанель: сховати точку за скаргою — лише з причиною, потім скарга вирішена', async () => {
+test('адмінпанель: сховати точку за скаргою — лише з причиною, одним атомарним викликом', async () => {
   const { api, calls } = fakeApi({ reports: [REPORT] });
   const m = mount('reports', 'signedIn', ADMIN, api);
   try {
@@ -188,16 +198,63 @@ test('адмінпанель: сховати точку за скаргою — 
     eq(document.querySelector('.admin-note-form textarea').value, 'Неправильна адреса');
     const form = await answer('  ');
     eq(form.querySelector('.field-error').hidden, false);
-    eq(calls.some((c) => c[0] === 'setSpotHidden'), false);
+    eq(calls.some((c) => c[0] === 'actOnReport'), false);
     await answer('Адреси не існує');
-    eq(calls.filter((c) => c[0] === 'setSpotHidden' || c[0] === 'resolveReport'),
-      [['setSpotHidden', 'spot1', true, 'Адреси не існує'], ['resolveReport', 'rep1', 'resolved', 'Точку приховано: Адреси не існує']]);
+    // Сховати й закрити скаргу — одна серверна транзакція, без окремих setSpotHidden/resolveReport.
+    eq(calls.filter((c) => ['actOnReport', 'setSpotHidden', 'resolveReport'].includes(c[0])),
+      [['actOnReport', 'rep1', 'hide_spot', 'Адреси не існує']]);
+    eq(m.root.querySelector('.admin-flash').textContent, 'Точку приховано, скаргу вирішено');
     // Закрите вікно без відповіді — нічого не відбувається.
     button(m.root, 'Відхилити').click();
     document.querySelector('.admin-note-form').closest('.modal-overlay').querySelector('.modal-close').click();
     await settle();
-    eq(calls.filter((c) => c[0] === 'resolveReport').length, 1);
+    eq(calls.filter((c) => c[0] === 'resolveReport').length, 0);
   } finally { m.done(); }
+});
+
+test('адмінпанель: сервер відхилив дію за скаргою — показуємо причину, скарга лишається', async () => {
+  const { api } = fakeApi({ reports: [{ ...REPORT, target_type: 'user', target_id: 'u9', target_label: 'Олег · o@x.ua' }] });
+  api.actOnReport = () => Promise.reject({ code: '22023', message: 'admin_target' });
+  const m = mount('reports', 'signedIn', ADMIN, api);
+  try {
+    await settle();
+    button(m.root, 'Заблокувати').click();
+    await answer('Шахрайство з передоплатою');
+    eq(m.root.querySelector('.admin-flash').textContent.startsWith('Адміністратора заблокувати не можна'), true);
+    eq(m.root.querySelector('.admin-flash').classList.contains('admin-flash-error'), true);
+  } finally { m.done(); }
+});
+
+test('адмінпанель: стара відповідь не перемальовує список поверх новішої', async () => {
+  const pending = [];
+  const { api, calls } = fakeApi();
+  api.listReports = (all) => { calls.push(['listReports', all]); return new Promise((resolve) => pending.push(resolve)); };
+  const m = mount('reports', 'signedIn', ADMIN, api);
+  try {
+    pending.shift()([REPORT]);
+    await settle();
+    button(m.root, 'Усі').click(); // запит A (усі) — відповідь прийде останньою
+    button(m.root, 'Відкриті').click(); // запит B (відкриті)
+    const [slowAll, fastOpen] = pending;
+    fastOpen([REPORT]);
+    await settle();
+    slowAll([REPORT, { ...REPORT, id: 'rep2', status: 'resolved', resolution: 'ok', resolved_at: '2026-11-23T11:00:00Z' }]);
+    await settle();
+    eq([...m.root.querySelectorAll('.admin-card')].map((c) => c.dataset.id), ['rep1']);
+    eq(m.root.querySelector('.chip.active').textContent, 'Відкриті');
+  } finally { m.done(); }
+});
+
+test('адмінпанель: вікно з причиною закривається, коли йдемо зі сторінки, і дія не виконується', async () => {
+  const { api, calls } = fakeApi({ reports: [REPORT] });
+  const m = mount('reports', 'signedIn', ADMIN, api);
+  await settle();
+  button(m.root, 'Відхилити').click();
+  eq(Boolean(document.querySelector('.admin-note-form')), true);
+  m.done(); // перехід на іншу сторінку
+  await settle();
+  eq(document.querySelector('.admin-note-form'), null);
+  eq(calls.some((c) => c[0] === 'resolveReport'), false);
 });
 
 test('адмінпанель: користувачі — себе й адміністраторів не заблокувати, блок лише з причиною', async () => {

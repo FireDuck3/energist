@@ -159,6 +159,8 @@ export function createPilot(session, store, { notifications = bellList } = {}) {
     async setPaused(id, on) { await session.service.setPilotSpotPaused(id, on); await refresh(); },
     async setSchedule(id, schedule) { await session.service.setPilotSpotSchedule(id, schedule); await refresh(); },
     async setPhotos(id, paths) { await session.service.setPilotSpotPhotos(id, paths); await refresh(); },
+    // Точку приховав модератор, господар виправив дані — просить перевірити знову.
+    async requestReview(id) { await session.service.requestSpotReview(id); await refresh(); },
     async availability(id, from, to) {
       const [busy, daysOff] = await Promise.all([
         session.service.pilotAvailability(id, from, to),

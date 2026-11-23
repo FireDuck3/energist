@@ -8,6 +8,7 @@ import { DEVICES, SOURCES, CONNECTORS, COMMERCIAL_PRICE, AREA_RADIUS_M } from '.
 import { routeUrl, visibleSpots } from '../stations.js';
 import { TILES, spotPin } from './map.js';
 import { openBooking } from './booking.js';
+import { hiddenNotice } from './hidden-notice.js';
 import { detailFacts, hostSince, sessionsLabel } from '../host-profile.js';
 
 const EXAMPLE_KWH = 30;
@@ -93,7 +94,10 @@ function renderSpot(spot, host, { blackout, spots }, store, session, userHistory
   const deviceLabels = DEVICES.filter((d) => spot.devices.includes(d.id)).map((d) => d.label).join(', ');
 
   return h('div', { class: 'container spot-page' },
-    h('a', { class: 'back-link', href: '#/map' }, '← До карти'),
+    own && spot.hiddenAt
+      ? h('a', { class: 'back-link', href: '#/host' }, '← До моїх точок')
+      : h('a', { class: 'back-link', href: '#/map' }, '← До карти'),
+    own && spot.hiddenAt && hiddenNotice(spot, pilot),
     h('div', { class: 'spot-head' },
       h('div', {},
         h('h1', { class: 'spot-name' }, spot.title),
@@ -185,7 +189,8 @@ export function render({ id }, root, store, session, userHistory, pilot) {
   function update() {
     const state = store.getState();
     const { status } = session.getState();
-    const found = state.spots.find((s) => s.id === id);
+    // Приховану модератором точку на карті не показуємо, але господар відкриває її сторінку з кабінету.
+    const found = state.spots.find((s) => s.id === id) ?? pilot?.ownSpots?.().find((s) => s.id === id && s.hiddenAt);
     // Демо-точку (стару закладку чи посилання) відкриваємо лише в демо-режимі.
     const spot = found && visibleSpots([found], status).length ? found : null;
     if (!spot) {
@@ -204,12 +209,15 @@ export function render({ id }, root, store, session, userHistory, pilot) {
   void loadCard();
   if (visibleSpots(store.getState().spots, session.getState().status).some((s) => s.id === id)) userHistory?.recordSpot(id);
   const offStore = store.subscribe(update);
+  // Власні приховані точки живуть лише в pilot (у store їх немає) — оновлюємо сторінку і з нього.
+  // Лише коли точки немає в store: інакше зайві перемальовування щохвилини.
+  const offPilot = pilot?.subscribe?.(() => { if (!store.getState().spots.some((s) => s.id === id)) update(); }) ?? (() => {});
   // Увійшли чи вийшли — контакти могли стати доступними або навпаки.
   let account = session.getState().user?.uid;
   const offSession = session.subscribe(() => {
     if (session.getState().user?.uid !== account) { account = session.getState().user?.uid; card = null; void loadCard(); }
     update();
   });
-  return () => { gone = true; offStore(); offSession(); locationMap.destroy(); };
+  return () => { gone = true; offStore(); offPilot(); offSession(); locationMap.destroy(); };
 }
 

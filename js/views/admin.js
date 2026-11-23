@@ -11,9 +11,10 @@ import {
 const badge = ([label, cls]) => h('span', { class: `badge ${cls}` }, label);
 const short = (id) => String(id ?? '').slice(0, 8);
 
-// Вікно з причиною чи коментарем. Повертає текст або null, якщо закрили.
+// Вікно з причиною чи коментарем. Повертає текст або null, якщо закрили; promise.close() закриває вікно ззовні.
 export function askNote({ title, text, label = 'Коментар', placeholder = '', value = '', required = false, confirm = 'Підтвердити', danger = false }) {
-  return new Promise((resolve) => {
+  let modal = null;
+  const promise = new Promise((resolve) => {
     let done = false;
     const finish = (result) => { if (!done) { done = true; resolve(result); } };
     const error = h('span', { class: 'field-error', role: 'alert', hidden: true });
@@ -34,9 +35,11 @@ export function askNote({ title, text, label = 'Коментар', placeholder =
     h('div', { class: 'wizard-actions' },
       h('button', { type: 'button', class: 'btn btn-ghost', onclick: () => modal.close() }, 'Скасувати'),
       h('button', { type: 'submit', class: `btn ${danger ? 'btn-danger' : 'btn-primary'}` }, confirm)));
-    const modal = openModal(form, { onClose: () => finish(null) });
+    modal = openModal(form, { onClose: () => finish(null) });
     area.focus();
   });
+  promise.close = () => modal?.close();
+  return promise;
 }
 
 function gate(icon, title, text, link) {
@@ -49,6 +52,14 @@ export function render(params, root, _store, session) {
   const tab = adminTab(params.tab);
   let shownFor = null;
   let alive = true;
+  // Відкрите вікно з причиною закриваємо, коли йдемо зі сторінки: інакше дію можна підтвердити вже «наосліп».
+  let openNote = null;
+  const ask = (options) => {
+    const note = askNote(options);
+    openNote = note;
+    note.then(() => { if (openNote === note) openNote = null; });
+    return note;
+  };
 
   function update() {
     const { status, user } = session.getState();
@@ -120,17 +131,22 @@ export function render(params, root, _store, session) {
         if (!alive) return;
         counts.reports = Number(o?.open_reports ?? 0);
         counts.bookings = Number(o?.problem_bookings ?? 0);
+        counts.spots = Number(o?.review_requests ?? 0);
         drawTabs();
       }, () => {});
     }
 
+    // Кожне завантаження має номер: відповідь на старіший запит (повільна мережа, швидке перемикання
+    // фільтрів) не перемалює список поверх новішої.
+    let loadSeq = 0;
     async function load() {
+      const seq = ++loadSeq;
       if (!body.childElementCount) body.replaceChildren(h('p', { class: 'muted admin-loading' }, 'Завантаження…'));
       try {
         const view = await TABS[tab]();
-        if (alive) body.replaceChildren(view);
+        if (alive && seq === loadSeq) body.replaceChildren(view);
       } catch (err) {
-        if (!alive) return;
+        if (!alive || seq !== loadSeq) return;
         body.replaceChildren(h('div', { class: 'card admin-error' },
           h('p', { class: 'form-error' }, adminErrorText(err)),
           h('button', { type: 'button', class: 'btn btn-secondary btn-sm', onclick: () => { body.replaceChildren(); load(); } }, 'Спробувати ще раз')));
@@ -181,7 +197,7 @@ export function render(params, root, _store, session) {
         ? h('a', { href: `#/spot/${r.target_id}` }, r.target_label) : (r.target_label ?? `Об'єкт ${short(r.target_id)} не знайдено`);
       const resolve = (decision) => async (e) => {
         const button = e.currentTarget;
-        const note = await askNote(decision === 'resolved'
+        const note = await ask(decision === 'resolved'
           ? { title: 'Скаргу вирішено', text: 'Що зроблено? Скаржник цього не бачить — це для журналу.', confirm: 'Позначити вирішеною' }
           : { title: 'Відхилити скаргу', text: 'Чому скарга безпідставна? Запис піде в журнал.', confirm: 'Відхилити' });
         if (note === null) return;
@@ -189,25 +205,20 @@ export function render(params, root, _store, session) {
       };
       const hideSpot = async (e) => {
         const button = e.currentTarget;
-        const note = await askNote({ title: 'Сховати точку з карти', required: true, danger: true, label: 'Причина',
+        const note = await ask({ title: 'Сховати точку з карти', required: true, danger: true, label: 'Причина',
           text: 'Гості перестануть бачити точку, майбутні бронювання буде скасовано. Причину побачить господар. Скаргу буде позначено вирішеною.',
           value: reasonLabel('spot', r.reason), confirm: 'Сховати' });
         if (note === null) return;
-        act(button, async () => {
-          await api.setSpotHidden(r.target_id, true, note);
-          await api.resolveReport(r.id, 'resolved', `Точку приховано: ${note}`);
-        }, 'Точку приховано, скаргу вирішено');
+        // Одна транзакція на сервері: або точку сховано й скаргу закрито, або нічого не змінилось.
+        act(button, () => api.actOnReport(r.id, 'hide_spot', note), 'Точку приховано, скаргу вирішено');
       };
       const blockUser = async (e) => {
         const button = e.currentTarget;
-        const note = await askNote({ title: 'Заблокувати користувача', required: true, danger: true, label: 'Причина',
+        const note = await ask({ title: 'Заблокувати користувача', required: true, danger: true, label: 'Причина',
           text: 'Людина не зможе увійти, її майбутні бронювання буде скасовано, а точки зникнуть з карти. Скаргу буде позначено вирішеною.',
           value: reasonLabel('user', r.reason), confirm: 'Заблокувати' });
         if (note === null) return;
-        act(button, async () => {
-          await api.setUserStatus(r.target_id, 'suspended', note);
-          await api.resolveReport(r.id, 'resolved', `Користувача заблоковано: ${note}`);
-        }, 'Користувача заблоковано, скаргу вирішено');
+        act(button, () => api.actOnReport(r.id, 'block_user', note), 'Користувача заблоковано, скаргу вирішено');
       };
       return h('li', { class: 'card admin-card', dataset: { id: r.id } },
         h('div', { class: 'admin-card-head' },
@@ -257,7 +268,7 @@ export function render(params, root, _store, session) {
           act(button, () => api.setSpotHidden(s.id, false, ''), `«${s.title}» знову на карті`);
           return;
         }
-        const note = await askNote({ title: `Сховати «${s.title}»`, required: true, danger: true, label: 'Причина', confirm: 'Сховати',
+        const note = await ask({ title: `Сховати «${s.title}»`, required: true, danger: true, label: 'Причина', confirm: 'Сховати',
           text: 'Гості перестануть бачити точку, майбутні бронювання буде скасовано. Причину побачить господар у кабінеті.' });
         if (note !== null) act(button, () => api.setSpotHidden(s.id, true, note), `«${s.title}» приховано`);
       };
@@ -265,13 +276,15 @@ export function render(params, root, _store, session) {
         h('div', { class: 'admin-card-head' },
           badge([stateLabel, stateCls]),
           s.verified_at && badge(['✓ Перевірена', 'badge-ok']),
+          s.hidden_at && s.review_requested_at && badge(['Господар просить перевірити знову', 'badge-info']),
           Number(s.open_reports) > 0 && badge([`${s.open_reports} ${plural(Number(s.open_reports), ['скарга', 'скарги', 'скарг'])}`, 'badge-warn'])),
         h('h3', { class: 'admin-card-title' }, stateLabel === 'На карті' ? h('a', { href: `#/spot/${s.id}` }, s.title) : s.title,
           h('span', { class: 'muted' }, ` · ${s.district}`)),
         h('p', { class: 'admin-meta' },
           `Господар: ${s.owner_name || 'Без імені'}`, s.owner_email && h('span', { class: 'muted' }, ` · ${s.owner_email}`),
           s.owner_verified && h('span', { class: 'admin-ok' }, ' · ✓ перевірений')),
-        s.hidden_at && h('p', { class: 'admin-resolution' }, `Приховано ${dateTime(s.hidden_at)}: ${s.hidden_reason || 'без причини'}`),
+        s.hidden_at && h('p', { class: 'admin-resolution' }, `Приховано ${dateTime(s.hidden_at)}: ${s.hidden_reason || 'без причини'}`,
+          s.review_requested_at && ` · господар виправив дані й попросив перевірити ${dateTime(s.review_requested_at)}`),
         h('p', { class: 'muted admin-meta' },
           `Завершених бронювань: ${s.completed_bookings} · активних: ${s.active_bookings} · `,
           h('a', { href: mapsLink(s.lat, s.lng), target: '_blank', rel: 'noopener' }, 'точне місце на мапі ↗')),
@@ -300,11 +313,11 @@ export function render(params, root, _store, session) {
       const toggleBlock = async (e) => {
         const button = e.currentTarget;
         if (!active) {
-          const note = await askNote({ title: 'Розблокувати акаунт', text: 'Людина знову зможе увійти. Скасовані бронювання не відновляться, точки повернуться на карту.', confirm: 'Розблокувати' });
+          const note = await ask({ title: 'Розблокувати акаунт', text: 'Людина знову зможе увійти. Скасовані бронювання не відновляться, точки повернуться на карту.', confirm: 'Розблокувати' });
           if (note !== null) act(button, () => api.setUserStatus(u.id, 'active', note), 'Акаунт розблоковано');
           return;
         }
-        const note = await askNote({ title: `Заблокувати ${fullName(u.first_name, u.last_name)}`, required: true, danger: true, label: 'Причина', confirm: 'Заблокувати',
+        const note = await ask({ title: `Заблокувати ${fullName(u.first_name, u.last_name)}`, required: true, danger: true, label: 'Причина', confirm: 'Заблокувати',
           text: 'Людина не зможе увійти, її майбутні бронювання буде скасовано, а точки зникнуть з карти.' });
         if (note !== null) act(button, () => api.setUserStatus(u.id, 'suspended', note), 'Акаунт заблоковано');
       };
@@ -347,7 +360,7 @@ export function render(params, root, _store, session) {
       const cancellable = b.status === 'pending' || b.status === 'confirmed';
       const cancel = async (e) => {
         const button = e.currentTarget;
-        const note = await askNote({ title: 'Скасувати бронювання', danger: true, confirm: 'Скасувати бронювання',
+        const note = await ask({ title: 'Скасувати бронювання', danger: true, confirm: 'Скасувати бронювання',
           text: 'Гість і господар отримають сповіщення «Бронювання скасовано».' });
         if (note !== null) act(button, () => api.cancelBooking(b.id, note), 'Бронювання скасовано');
       };
@@ -394,5 +407,5 @@ export function render(params, root, _store, session) {
 
   update();
   const off = session.subscribe(update);
-  return () => { alive = false; off(); };
+  return () => { alive = false; off(); openNote?.close(); };
 }

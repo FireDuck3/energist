@@ -73,6 +73,7 @@ export function spotState(spot) {
 
 export const SPOT_FILTERS = [
   ['all', 'Усі'],
+  ['review', 'Просять перевірити'],
   ['unverified', 'Неперевірені'],
   ['reported', 'Зі скаргами'],
   ['hidden', 'Приховані'],
@@ -82,6 +83,7 @@ export const SPOT_FILTERS = [
 export function filterSpots(spots, filter = 'all', query = '') {
   const q = query.trim().toLowerCase();
   return spots.filter((s) => {
+    if (filter === 'review' && !(s.review_requested_at && s.hidden_at)) return false;
     if (filter === 'unverified' && (s.verified_at || s.hidden_at || s.archived_at)) return false;
     if (filter === 'reported' && !(Number(s.open_reports) > 0)) return false;
     if (filter === 'hidden' && (!s.hidden_at || s.archived_at)) return false;
@@ -98,7 +100,9 @@ export function overviewTiles(o) {
   return [
     ['open_reports', 'Відкриті скарги', n('open_reports'), n('open_reports') ? 'Розглянути →' : 'Усі розглянуто', 'reports', n('open_reports') > 0],
     ['problem_bookings', 'Проблемні бронювання', n('problem_bookings'), 'за 60 днів', 'bookings', n('problem_bookings') > 0],
-    ['spots', 'Точки', n('spots'), `${n('unverified_spots')} неперевірених · ${n('hidden_spots')} прихованих`, 'spots', false],
+    ['spots', 'Точки', n('spots'),
+      [`${n('unverified_spots')} неперевірених · ${n('hidden_spots')} прихованих`, n('review_requests') && `${n('review_requests')} просять перевірити знову`].filter(Boolean).join(' · '),
+      'spots', n('review_requests') > 0],
     ['users', 'Користувачі', n('users'), `${n('hosts')} господарів · ${n('blocked_users')} заблокованих`, 'users', false],
     ['bookings_30d', 'Бронювання за 30 днів', n('bookings_30d'), `${n('completed_30d')} завершено`, 'bookings', false],
     ['sync_errors_7d', 'Помилки синхронізації', n('sync_errors_7d'), 'публічні станції, 7 днів', 'overview', n('sync_errors_7d') > 0],
@@ -146,9 +150,10 @@ const ERRORS = {
 };
 
 export function adminErrorText(err) {
-  const message = String(err?.message ?? '');
-  const key = Object.keys(ERRORS).find((k) => message.includes(k));
-  if (key) return ERRORS[key];
+  // Сервер кидає голий код ('self', 'bad_reason'…) — порівнюємо повністю, щоб чуже повідомлення
+  // зі словом «itself» не стало «Власний акаунт заблокувати не можна».
+  const message = String(err?.message ?? '').trim();
+  if (Object.hasOwn(ERRORS, message)) return ERRORS[message];
   if (err?.code === 'auth/network-request-failed') return 'Немає з\'єднання. Перевірте інтернет і спробуйте ще раз.';
   if (/function .* does not exist|Could not find the function/i.test(message)) {
     return 'На сервері ще немає функцій адмінпанелі — виконайте міграцію 202611240001_admin.sql.';

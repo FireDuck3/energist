@@ -54,7 +54,7 @@ const PHOTO_BUCKET = 'spot-photos';
 // усі бачать центр зони area_lat/area_lng, а точне місце — лише господар і гість з підтвердженим бронюванням.
 export const PILOT_SPOT_COLUMNS = ['id', 'owner_id', 'title', 'district', 'area_lat', 'area_lng', 'source', 'connector',
   'power_kw', 'price_per_kwh', 'devices', 'opens', 'closes', 'archived_at', 'paused', 'closed_weekdays', 'photos',
-  'verified_at', 'hidden_at', 'hidden_reason', ...DETAIL_COLUMNS, ...FORM_COLUMNS].join(',');
+  'verified_at', 'hidden_at', 'hidden_reason', 'review_requested_at', ...DETAIL_COLUMNS, ...FORM_COLUMNS].join(',');
 
 // Рядок pilot_spots → точка для карти. photoUrl перетворює шлях у Storage на публічну адресу.
 // exact — точне місце {lat, lng}, якщо цьому користувачу його можна знати; інакше точка стоїть у центрі зони.
@@ -78,6 +78,7 @@ export function toPilotSpot(row, feedback, photoUrl, reviewsUnavailable = false,
     verified: Boolean(row.verified_at),
     // Сховав адміністратор (міграція 202611240001): такий рядок сервер віддає лише власнику.
     hiddenAt: row.hidden_at ?? null, hiddenReason: row.hidden_reason ?? null,
+    reviewRequestedAt: row.review_requested_at ?? null, // господар попросив перевірити знову (202611240002)
     details: detailsFromRow(row),
   };
 }
@@ -130,6 +131,7 @@ export async function loadSupabase() {
         if (error) throw fail(error);
       },
       setPilotSpotPhotos: (id, paths) => call(client.rpc('set_pilot_spot_photos', { point_id: id, paths })),
+      requestSpotReview: id => call(client.rpc('request_spot_review', { point_id: id })),
       listMyChats: () => call(client.rpc('list_my_chats')),
       submitReport: ({ targetType, targetId, reason, details, bookingId }) => call(client.rpc('submit_report', {
         target_type: targetType, target_id: String(targetId), reason, details: details ?? '', booking_id: bookingId ?? null,
@@ -213,6 +215,8 @@ export async function loadSupabase() {
         overview: () => call(client.rpc('admin_overview')),
         listReports: (includeClosed = false) => call(client.rpc('admin_list_reports', { include_closed: includeClosed })),
         resolveReport: (id, decision, note = '') => call(client.rpc('admin_resolve_report', { report_id: id, decision, note })),
+        // Сховати точку чи заблокувати людину за скаргою й закрити скаргу — одна транзакція на сервері.
+        actOnReport: (id, act, note) => call(client.rpc('admin_act_on_report', { report_id: id, act, note })),
         listSpots: () => call(client.rpc('admin_list_spots')),
         setSpotHidden: (id, hide, reason = '') => call(client.rpc('admin_set_spot_hidden', { point_id: id, hide, reason })),
         setSpotVerified: (id, verified) => call(client.rpc('admin_set_spot_verified', { point_id: id, verified })),

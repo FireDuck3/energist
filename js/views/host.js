@@ -12,6 +12,7 @@ import { hostRating, ratingLabel } from '../trust.js';
 import { signInPrompt } from './auth-modal.js';
 import { kyivNow, addDays, isoWeekday } from '../calendar.js';
 import { checkPhotos, resizeImage, PHOTO_LIMITS } from '../photos.js';
+import { hiddenNotice } from './hidden-notice.js';
 
 const WEEKDAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
 
@@ -598,13 +599,11 @@ export function render(_params, root, store, session, _history, pilot) {
       const paused = own.filter((sp) => sp.paused && !sp.hiddenAt).length;
       const hidden = own.filter((sp) => sp.hiddenAt).length;
       const stats = pilot.hostStats();
-      const rating = hostRating(store.getState().spots, session.getState().user?.uid);
+      // Власні точки разом із прихованими: на карті (у store) прихованих немає, а їхні відгуки теж рахуються.
+      const rating = hostRating(own, session.getState().user?.uid);
       const ownSpotBlock = (spot) =>
           h('div', { class: 'own-spot-wrap' }, ownSpotCard(spot),
-            spot.hiddenAt && h('p', { class: 'own-spot-hidden', role: 'note' },
-              h('b', {}, '🚫 Точку приховав модератор — гості її не бачать.'),
-              spot.hiddenReason && h('span', {}, ` Причина: ${spot.hiddenReason}`),
-              h('span', { class: 'muted' }, ' Виправте дані через «Редагувати» й напишіть у підтримку, щоб точку повернули.')),
+            spot.hiddenAt && hiddenNotice(spot, pilot),
             spot.paused && h('span', { class: 'badge badge-warn' }, 'На паузі — гості не бачать точку'),
             h('div', { class: 'own-spot-actions' },
               h('button', { type: 'button', class: 'btn btn-secondary btn-sm',
