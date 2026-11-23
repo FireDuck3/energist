@@ -136,12 +136,7 @@ test('сховище кидає винятки — store працює', () => {
   eq(store.getState().spots.length, 15);
 });
 
-test('деморежим: за замовчуванням вимкнений, setDemoMode зберігається і переживає скидання демо-даних', () => {
-  const storage = memoryStorage();
-  const store = createStore(storage);
-  eq(store.getState().demoMode, false);
-  store.setDemoMode(true);
-  eq(createStore(storage).getState().demoMode, true);
-  store.reset();
-  eq(store.getState().demoMode, true);
+test('перемикача «Демо-точки» більше немає: демо видно лише в демо-режимі сесії', () => {
+  const store = createStore(memoryStorage());
+  eq([typeof store.setDemoMode, 'demoMode' in store.getState()], ['undefined', false]);
 });

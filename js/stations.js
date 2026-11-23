@@ -90,3 +90,8 @@ export async function loadStationDetails(id, { fetchImpl = globalThis.fetch, con
 
 // Приватні точки користувачів WattWay (пілот у Supabase) відрізняємо від засіяних демонстраційних.
 export const spotKind = (spot) => (spot.pilot ? 'private' : 'demo');
+
+// Які точки показувати: вигадані демо-точки (з імітацією оплати) — лише в демо-режимі, коли сервер
+// недоступний. Зі справжнім сервером людина бачить тільки реальні точки господарів.
+export const visibleSpots = (spots, sessionStatus) =>
+  (sessionStatus === 'demo' ? spots : spots.filter((s) => spotKind(s) === 'private'));

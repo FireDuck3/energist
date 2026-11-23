@@ -1118,6 +1118,17 @@ body.on-chats .site-footer { display: none; }
 .spot-terms { padding: 22px 0 0; display: grid; gap: 6px; }
 .spot-terms p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 
+/* ---------- Розташування: зона замість точної адреси до підтвердження ---------- */
+.spot-location { padding: 22px 0 0; display: grid; gap: 8px; }
+.spot-location > .muted, .spot-location .hint { margin: 0; }
+.spot-location-map { height: 260px; overflow: hidden; isolation: isolate; padding: 0; }
+.location-exact { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.location-exact p { margin: 0; }
+/* CSS перекриває кольори, які Leaflet ставить атрибутами, — і для блекауту теж. */
+.leaflet-interactive.spot-zone, path.spot-zone { stroke: var(--indigo); stroke-width: 2; stroke-opacity: .55; fill: var(--indigo); fill-opacity: .12; }
+.popup-area { font-size: 13px; }
+@media (max-width: 768px) { .spot-location-map { height: 220px; } }
+
 /* ---------- Режими: вибір на вході, перемикач у шапці ---------- */
 button.segment { border: 0; background: none; font: inherit; cursor: pointer; }
 .header-nav { display: flex; align-items: center; gap: 18px; }

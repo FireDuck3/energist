@@ -4,7 +4,9 @@ import { hostRating, ratingLabel } from '../trust.js';
 import { openReport } from './report.js';
 import { spotRating, isLiveInBlackout, isOpenAt } from '../filters.js';
 import { formatUAH, sessionCost } from '../pricing.js';
-import { DEVICES, SOURCES, CONNECTORS, COMMERCIAL_PRICE } from '../data.js';
+import { DEVICES, SOURCES, CONNECTORS, COMMERCIAL_PRICE, AREA_RADIUS_M } from '../data.js';
+import { routeUrl, visibleSpots } from '../stations.js';
+import { TILES, spotPin } from './map.js';
 import { openBooking } from './booking.js';
 import { detailFacts, hostSince, sessionsLabel } from '../host-profile.js';
 
@@ -27,7 +29,57 @@ function hostCardLines(card, own) {
   ];
 }
 
-function renderSpot(spot, host, { blackout, spots }, store, session, userHistory, pilot, card) {
+// Карта «Розташування». Створюється один раз і лише переставляється при перемальовуванні сторінки
+// (опитування раз на хвилину не перезавантажує тайли). Гостю — коло зони, а не точна точка.
+function createLocationMap() {
+  const el = h('div', { class: 'spot-location-map card', role: 'region', 'aria-label': 'Розташування точки на карті' });
+  let map = null;
+  let layer = null;
+  let lastKey = '';
+  return {
+    el,
+    update(spot) {
+      if (!window.L) {
+        el.replaceChildren(h('div', { class: 'map-fallback' }, h('b', {}, 'Карта недоступна — перевірте інтернет')));
+        return;
+      }
+      const zone = spot.pilot && !spot.exactLocation;
+      if (!map) {
+        map = L.map(el, { scrollWheelZoom: false });
+        L.tileLayer(TILES.url, { attribution: TILES.attribution, maxZoom: 19 }).addTo(map);
+        layer = L.layerGroup().addTo(map);
+      }
+      map.invalidateSize();
+      const key = JSON.stringify([spot.lat, spot.lng, zone, spot.source, spot.pricePerKwh]);
+      if (key === lastKey) return;
+      lastKey = key;
+      map.setView([spot.lat, spot.lng], zone ? 15 : 16, { animate: false });
+      layer.clearLayers();
+      if (zone) L.circle([spot.lat, spot.lng], { radius: AREA_RADIUS_M, className: 'spot-zone', interactive: false }).addTo(layer);
+      else L.marker([spot.lat, spot.lng], { icon: spotPin(spot), keyboard: false, interactive: false }).addTo(layer);
+    },
+    destroy() { map?.remove(); map = null; },
+  };
+}
+
+// Підпис під картою: що саме видно і коли відкриється точне місце.
+function locationNote(spot, own) {
+  if (!spot.pilot) return null;
+  if (own) {
+    return h('p', { class: 'hint' }, spot.exactLocation
+      ? `Ви бачите точне місце. Гості до підтвердження бронювання бачать лише зону ~${AREA_RADIUS_M} м навколо нього.`
+      : `Гості бачать зону ~${AREA_RADIUS_M} м. Точне місце гість побачить, коли ви підтвердите його бронювання.`);
+  }
+  if (spot.exactLocation) {
+    return h('div', { class: 'location-exact' },
+      h('p', { class: 'muted' }, 'Господар підтвердив ваше бронювання — показуємо точне місце.'),
+      h('a', { class: 'btn btn-secondary btn-sm', href: routeUrl(spot), target: '_blank', rel: 'noopener' }, 'Прокласти маршрут'));
+  }
+  return h('p', { class: 'hint' },
+    `🔒 Точне місце господар відкриє після підтвердження бронювання. Зараз показуємо зону ~${AREA_RADIUS_M} м, де розташована точка.`);
+}
+
+function renderSpot(spot, host, { blackout, spots }, store, session, userHistory, pilot, card, locationMap) {
   const hostName = card?.name ?? spot.hostName ?? host.name;
   const now = spot.pilot
     ? new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Kyiv' }))
@@ -74,6 +126,11 @@ function renderSpot(spot, host, { blackout, spots }, store, session, userHistory
           ...detailFacts(spot.details).map(([label, value]) => fact(label, value))),
         spot.details?.description && h('div', { class: 'spot-terms' }, h('h2', { class: 'reviews-title' }, 'Про станцію'), h('p', {}, spot.details.description)),
         spot.details?.terms && h('div', { class: 'spot-terms' }, h('h2', { class: 'reviews-title' }, 'Умови зарядки'), h('p', {}, spot.details.terms)),
+        h('div', { class: 'spot-location' },
+          h('h2', { class: 'reviews-title' }, 'Розташування'),
+          h('p', { class: 'muted' }, spot.district),
+          locationMap.el,
+          locationNote(spot, own)),
 
         h('h2', { class: 'reviews-title' }, 'Відгуки'),
         spot.reviewsUnavailable && h('p', { role: 'status' }, 'Не вдалося завантажити відгуки. Повторна спроба відбудеться автоматично.'),
@@ -99,7 +156,9 @@ function renderSpot(spot, host, { blackout, spots }, store, session, userHistory
             isOpenAt(spot, now) ? `Відчинено до ${spot.schedule.to}` : `Зачинено · відкриється о ${spot.schedule.from}`),
         h('button', { type: 'button', class: 'btn btn-primary btn-lg btn-block', disabled: dark || own,
           onclick: book }, own ? 'Ваша точка' : 'Забронювати'),
-        h('p', { class: 'book-note muted' }, spot.pilot ? 'Пілот: запит підтверджує господар. Онлайн-оплати немає.' : '🔒 Гроші заморожуються і списуються лише за фактично отриману енергію'),
+        h('p', { class: 'book-note muted' }, spot.pilot
+          ? 'Запит підтверджує господар. Онлайн-оплати поки немає — про оплату домовляєтеся з господарем у чаті.'
+          : '🧪 Демо-режим: оплата лише імітується, справжні гроші не списуються.'),
         spot.pilot && !own && h('button', { type: 'button', class: 'btn btn-ghost btn-sm report-link',
           onclick: () => openReport({ targetType: 'spot', targetId: spot.id, title: spot.title }, session) }, 'Повідомити про проблему'))),
 
@@ -122,11 +181,15 @@ export function render({ id }, root, store, session, userHistory, pilot) {
     card = next;
     update();
   }
+  const locationMap = createLocationMap();
   function update() {
     const state = store.getState();
-    const spot = state.spots.find((s) => s.id === id);
+    const { status } = session.getState();
+    const found = state.spots.find((s) => s.id === id);
+    // Демо-точку (стару закладку чи посилання) відкриваємо лише в демо-режимі.
+    const spot = found && visibleSpots([found], status).length ? found : null;
     if (!spot) {
-      if (/^[0-9a-f-]{36}$/i.test(id) && !state.pilotReady) {
+      if ((/^[0-9a-f-]{36}$/i.test(id) && !state.pilotReady) || (found && status === 'loading')) {
         root.replaceChildren(h('p', { class: 'container muted' }, 'Завантаження точки…'));
         return;
       }
@@ -134,11 +197,12 @@ export function render({ id }, root, store, session, userHistory, pilot) {
       return;
     }
     const host = state.hosts.find((x) => x.id === spot.hostId);
-    root.replaceChildren(renderSpot(spot, host, state, store, session, userHistory, pilot, card));
+    root.replaceChildren(renderSpot(spot, host, state, store, session, userHistory, pilot, card, locationMap));
+    locationMap.update(spot);
   }
   update();
   void loadCard();
-  if (store.getState().spots.some((s) => s.id === id)) userHistory?.recordSpot(id);
+  if (visibleSpots(store.getState().spots, session.getState().status).some((s) => s.id === id)) userHistory?.recordSpot(id);
   const offStore = store.subscribe(update);
   // Увійшли чи вийшли — контакти могли стати доступними або навпаки.
   let account = session.getState().user?.uid;
@@ -146,6 +210,6 @@ export function render({ id }, root, store, session, userHistory, pilot) {
     if (session.getState().user?.uid !== account) { account = session.getState().user?.uid; card = null; void loadCard(); }
     update();
   });
-  return () => { gone = true; offStore(); offSession(); };
+  return () => { gone = true; offStore(); offSession(); locationMap.destroy(); };
 }
 

@@ -51,6 +51,25 @@ test('toPilotSpot: порожні шляхи фото відкидаються, 
   eq([s.photoPaths, s.photos], [['u/p1/a.jpg'], ['https://cdn/u/p1/a.jpg']]);
 });
 
+test('toPilotSpot: гостю — центр зони, господарю й підтвердженому гостю — точне місце', async () => {
+  const { toPilotSpot } = await import('../js/supabase.js');
+  const row = { id: 'p1', title: 'Т', district: 'Д', area_lat: '49.2251', area_lng: '28.4402', power_kw: 1, price_per_kwh: 10,
+    devices: ['ev'], opens: '08:00:00', closes: '20:00:00' };
+  const guest = toPilotSpot(row, [], (p) => p);
+  eq([guest.lat, guest.lng, guest.exactLocation, guest.area], [49.2251, 28.4402, false, { lat: 49.2251, lng: 28.4402 }]);
+  const owner = toPilotSpot(row, [], (p) => p, false, { spot_id: 'p1', lat: '49.2237', lng: '28.4386' });
+  eq([owner.lat, owner.lng, owner.exactLocation, owner.area], [49.2237, 28.4386, true, { lat: 49.2251, lng: 28.4402 }]);
+});
+
+test('PILOT_SPOT_COLUMNS: без точних lat/lng, з усіма полями анкети', async () => {
+  const { PILOT_SPOT_COLUMNS } = await import('../js/supabase.js');
+  const cols = PILOT_SPOT_COLUMNS.split(',');
+  eq([cols.includes('lat'), cols.includes('lng'), cols.includes('area_u'), cols.includes('area_lat'), cols.includes('area_lng')], [false, false, false, true, true]);
+  eq(['description', 'ses_type', 'ses_power_kw', 'has_evse', 'parking_type', 'inverter', 'storage_kwh', 'charging_terms']
+    .filter((c) => !cols.includes(c)), []);
+  eq(new Set(cols).size, cols.length);
+});
+
 test('toPilotSpot: verified лише коли є verified_at', async () => {
   const { toPilotSpot } = await import('../js/supabase.js');
   const row = { id: 'p1', title: 'Т', district: 'Д', lat: 1, lng: 1, power_kw: 1, price_per_kwh: 10, devices: ['ev'], opens: '08:00:00', closes: '20:00:00' };

@@ -5,9 +5,9 @@ import { RADII, POWER_BANDS, CONNECTOR_FILTERS, distanceKm, matchSpotExtra, matc
 import { locate, geoMessage } from '../geolocate.js';
 import { openReport } from './report.js';
 import { formatUAH } from '../pricing.js';
-import { DEVICES, SOURCES, CONNECTORS, VINNYTSIA_CENTER } from '../data.js';
+import { DEVICES, SOURCES, CONNECTORS, VINNYTSIA_CENTER, AREA_RADIUS_M } from '../data.js';
 import { searchBox } from './search-box.js';
-import { loadPublicStations, loadStationDetails, loadStationsDetails, routeUrl, statusLabel, attribution, connectorLabel, spotKind, safeUrl } from '../stations.js';
+import { loadPublicStations, loadStationDetails, loadStationsDetails, routeUrl, statusLabel, attribution, connectorLabel, spotKind, safeUrl, visibleSpots } from '../stations.js';
 
 // Тайли OpenStreetMap; світлу й темну (блекаут) тему дає CSS-фільтр на .leaflet-tile-pane.
 export const TILES = {
@@ -43,7 +43,7 @@ function spotCard(spot, { blackout, now, origin }) {
       h('div', { class: 'spot-top' },
         h('span', { class: `source-badge source-${spot.source}` }, `${SOURCES[spot.source].icon} ${SOURCES[spot.source].label}`),
         stars(spotRating(spot), spot.reviews.length)),
-      h('h3', { class: 'spot-title' }, spot.title, spot.pilot ? ' · Пілот' : '',
+      h('h3', { class: 'spot-title' }, spot.title,
         spot.verified ? h('span', { class: 'verified-badge verified-sm', title: 'WattWay перевірив точку на місці' }, '✓') : ''),
       h('p', { class: 'spot-meta' }, `${spot.district} · ${String(spot.powerKw).replace('.', ',')} кВт · ${CONNECTORS[spot.connector]}${distanceLabel(spot, origin)}`),
       h('div', { class: 'spot-bottom' },
@@ -57,8 +57,9 @@ function popupContent(spot) {
   return h('div', { class: 'popup' },
     h('img', { src: spotCover(spot), alt: '' }),
     h('div', { class: 'popup-body' },
-      h('b', {}, spot.title, spot.pilot ? ' · Пілот' : ''),
+      h('b', {}, spot.title),
       h('div', { class: 'muted' }, `${spot.district} · `, stars(spotRating(spot))),
+      spot.pilot && !spot.exactLocation && h('div', { class: 'muted popup-area' }, `📍 Приблизне місце, ±${AREA_RADIUS_M} м`),
       h('div', {}, h('b', {}, formatUAH(spot.pricePerKwh)), ' / кВт·год'),
       h('a', { class: 'btn btn-primary btn-sm', href: `#/spot/${spot.id}` }, 'Детальніше')));
 }
@@ -118,15 +119,17 @@ function stationCard(st, onShow, origin, session) {
       ...stationDetails(st), stationActions(st, session)));
 }
 
+const ZONE_MIN_ZOOM = 14;
+
 const chip = (label, active, onclick) =>
   h('button', { type: 'button', class: `chip${active ? ' active' : ''}`, 'aria-pressed': String(active), onclick }, label);
 
 export function render(_params, root, store, session, userHistory) {
-  const search = searchBox(store, userHistory);
+  const search = searchBox(store, userHistory, session);
   const list = h('div', { class: 'spot-list' });
   const count = h('p', { class: 'result-count' });
   const banner = h('div', { class: 'blackout-banner', hidden: true },
-    h('b', {}, '⚡ У вашому районі немає світла з 14:00'), h('span', {}, ' (демо). Показуємо точки з СЕС і батареями — вони працюють і зараз.'));
+    h('b', {}, '⚡ Режим блекауту.'), h('span', {}, ' Показуємо точки з СЕС і акумуляторами — вони працюють і без світла.'));
   const filtersBox = h('div', { class: 'filters' });
   // На телефоні фільтри згорнуті під цією кнопкою (на десктопі її не видно).
   const filtersToggle = h('button', { type: 'button', class: 'btn btn-secondary btn-sm filters-toggle', 'aria-expanded': 'false',
@@ -140,7 +143,7 @@ export function render(_params, root, store, session, userHistory) {
   let origin = null;          // місцеположення лише в пам'яті сторінки
   let originMarker = null;
   let current = { spots: [], stations: [] };
-  let lastDemo = null;
+  let lastDemo = null; // чи був демо-режим (сервер недоступний) при попередньому малюванні
   const geoNote = h('p', { class: 'geo-note muted', role: 'status', hidden: true });
   const setNote = (text) => { geoNote.textContent = text; geoNote.hidden = !text; };
   const viewBtn = h('button', { type: 'button', class: 'btn btn-secondary btn-sm', 'aria-pressed': 'false' });
@@ -162,7 +165,6 @@ export function render(_params, root, store, session, userHistory) {
   const deviceChips = h('div', { class: 'chips' });
   const ratingChips = h('div', { class: 'chips' });
   const nowChip = h('div', { class: 'chips' });
-  const demoChip = h('div', { class: 'chips' });
   const connectorChips = h('div', { class: 'chips' });
   const powerChips = h('div', { class: 'chips' });
   const extraChips = h('div', { class: 'chips' });
@@ -174,11 +176,9 @@ export function render(_params, root, store, session, userHistory) {
     h('div', { class: 'filter-row' }, h('span', { class: 'filter-label' }, 'Роз\'єм'), connectorChips),
     h('div', { class: 'filter-row' }, h('span', { class: 'filter-label' }, 'Потужність'), powerChips),
     h('div', { class: 'filter-row' }, h('span', { class: 'filter-label' }, 'Радіус'), radiusChips),
-    h('div', { class: 'filter-row' }, h('span', { class: 'filter-label' }, 'Додатково'), extraChips),
-    h('div', { class: 'filter-row' }, h('span', { class: 'filter-label' }, 'Точки'), demoChip));
+    h('div', { class: 'filter-row' }, h('span', { class: 'filter-label' }, 'Додатково'), extraChips));
 
-  function renderFilters(f, demoMode) {
-    demoChip.replaceChildren(chip('🧪 Демо-точки', demoMode, () => store.setDemoMode(!demoMode)));
+  function renderFilters(f) {
     deviceChips.replaceChildren(
       chip('Усі', !f.device, () => store.setFilters({ device: null })),
       ...DEVICES.map((d) => chip(d.label, f.device === d.id, () => store.setFilters({ device: f.device === d.id ? null : d.id }))));
@@ -228,6 +228,7 @@ export function render(_params, root, store, session, userHistory) {
   let fitAll = () => {};
   let resizeObserver = null;
   let markers = [];
+  let zoneLayer = null; // кола приблизних зон — видно лише зблизька, щоб не захаращувати місто
   let tilesLoaded = false;
 
   if (window.L) {
@@ -238,12 +239,15 @@ export function render(_params, root, store, session, userHistory) {
     // тягла карту — і popup виїжджав за її край, ніби закривався.
     map.on('popupopen', (e) => fitPopup(e.popup));
     const tiles = L.tileLayer(TILES.url, { attribution: TILES.attribution, maxZoom: 19 }).addTo(map);
+    zoneLayer = L.layerGroup();
+    const syncZones = () => { if (map.getZoom() >= ZONE_MIN_ZOOM) zoneLayer.addTo(map); else zoneLayer.remove(); };
+    map.on('zoomend', syncZones);
+    syncZones();
     tiles.on('load', () => { tilesLoaded = true; fallback.hidden = true; });
     tiles.on('tileerror', () => { if (!tilesLoaded) fallback.hidden = false; });
     // Без анімації: якщо піти з карти посеред анімації масштабу, Leaflet падає на вже прибраній карті.
     fitAll = () => {
-      const { spots, demoMode } = store.getState();
-      const pts = (demoMode ? spots : spots.filter((s) => spotKind(s) === 'private')).map((s) => [s.lat, s.lng]);
+      const pts = visibleSpots(store.getState().spots, session.getState().status).map((s) => [s.lat, s.lng]);
       if (pts.length) map.fitBounds(L.latLngBounds(pts), { padding: [28, 28], animate: false });
       else map.setView(VINNYTSIA_CENTER, 12, { animate: false });
     };
@@ -272,6 +276,10 @@ export function render(_params, root, store, session, userHistory) {
   function renderMarkers(visible, blackout, spots) {
     if (!map) return;
     markers.forEach((m) => m.marker.remove());
+    // Гостю — не точна адреса, а зона: пін стоїть у її центрі, справжня точка десь у колі.
+    zoneLayer.clearLayers();
+    visible.filter((s) => s.pilot && !s.exactLocation).forEach((s) =>
+      L.circle([s.lat, s.lng], { radius: AREA_RADIUS_M, className: 'spot-zone', interactive: false }).addTo(zoneLayer));
     markers = visible.map((spot) => {
       const marker = L.marker([spot.lat, spot.lng], { icon: spotPin(spot), riseOnHover: true })
         .bindPopup(() => popupContent(spot), { closeButton: false, minWidth: 220 })
@@ -391,8 +399,10 @@ export function render(_params, root, store, session, userHistory) {
   paintView();
 
   function update() {
-    const { spots: allSpots, filters, blackout, demoMode } = store.getState();
-    const spots = demoMode ? allSpots : allSpots.filter((s) => spotKind(s) === 'private');
+    const { spots: allSpots, filters, blackout } = store.getState();
+    // Вигадані демо-точки з імітацією оплати — лише в демо-режимі (сервер недоступний), не поруч зі справжніми.
+    const demoMode = session.getState().status === 'demo';
+    const spots = visibleSpots(allSpots, session.getState().status);
     const now = new Date();
     const visible = sortByDistance(filterSpots(spots, filters, { blackout, now })
       .filter((s) => matchSpotExtra(s, filters, { origin })), origin);
@@ -401,7 +411,7 @@ export function render(_params, root, store, session, userHistory) {
       && (!q || normalizeQuery([st.name, st.address, st.operator].filter(Boolean).join(' ')).includes(q)));
     current = { spots: visible, stations };
 
-    renderFilters(filters, demoMode);
+    renderFilters(filters);
     search.update(filters);
     banner.hidden = !blackout;
     count.textContent = resultsLabel(visible.length, stations.length);
@@ -464,6 +474,8 @@ export function render(_params, root, store, session, userHistory) {
     update();
   });
   const unsubscribe = store.subscribe(update);
+  // Перейшли в демо-режим чи увійшли (з'явилися точні місця своїх точок) — перемальовуємо.
+  const offSession = session.subscribe(update);
   // Список найближчих станцій іде за центром карти; маркери при цьому не перебудовуються.
   let moveTimer = null;
   map?.on('moveend', () => { clearTimeout(moveTimer); moveTimer = setTimeout(() => { if (!destroyed && !origin) renderList(); }, 250); });
@@ -471,6 +483,7 @@ export function render(_params, root, store, session, userHistory) {
     clearTimeout(moveTimer);
     destroyed = true;
     unsubscribe();
+    offSession();
     search.destroy();
     resizeObserver?.disconnect();
     map?.remove();

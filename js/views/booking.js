@@ -166,6 +166,8 @@ export function openBooking(spot, store, { now = new Date(), session, userHistor
         row('Коли', `${whenLabel()}, ${sel.start}–${endTime(sel.start, sel.hours)}`),
         row('Очікувано', formatKwh(kwh)),
         row('Ціна', `${formatUAH(spot.pricePerKwh)} / кВт·год`)),
+      spot.pilot && h('p', { class: 'muted' },
+        'Онлайн-оплати поки немає: про оплату домовляєтеся з господарем у чаті. Точне місце точки відкриється, щойно господар підтвердить запит.'),
       !spot.pilot && h('div', { class: 'secure' },
         h('span', { class: 'secure-icon' }, '🔒'),
         h('div', {},
@@ -181,7 +183,7 @@ export function openBooking(spot, store, { now = new Date(), session, userHistor
           try {
             await pilot.request(spot.id, { device: sel.device, start: sel.start, hours: sel.hours, date: sel.date });
             modal.close();
-            notify('Запит надіслано. Статус можна перевірити в профілі.', { href: '#/profile' });
+            notify('Запит надіслано. Статус — у «Мої бронювання».', { href: '#/bookings' });
           } catch (error) {
             if (error.code === '23P01') { // інший гість щойно забронював цей час
               notify('Цей час щойно зайняли — оберіть інший.', { kind: 'error' });

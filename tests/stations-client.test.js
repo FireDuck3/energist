@@ -65,6 +65,15 @@ test('spotKind: пілотна точка — приватна, засіяна �
   eq(spotKind({ id: 'oleh-ses' }), 'demo');
 });
 
+test('visibleSpots: демо-точки — лише в демо-режимі (сервер недоступний)', async () => {
+  const { visibleSpots } = await import('../js/stations.js');
+  const spots = [{ id: 'oleh-ses' }, { id: 'p1', pilot: true }];
+  for (const status of ['loading', 'signedOut', 'signedIn', 'needsProfile', 'unavailable']) {
+    eq(visibleSpots(spots, status).map((s) => s.id), ['p1']);
+  }
+  eq(visibleSpots(spots, 'demo').map((s) => s.id), ['oleh-ses', 'p1']);
+});
+
 test('safeUrl: пропускає лише http(s)', async () => {
   const { safeUrl } = await import('../js/stations.js');
   eq(safeUrl('https://a.ua/'), 'https://a.ua/');

@@ -57,6 +57,10 @@ export const TERRITORIES = {
 };
 
 export const VINNYTSIA_CENTER = [49.2331, 28.4682];
+
+// Радіус зони, яку бачать гості до підтвердження бронювання. Сервер зсуває центр зони
+// до 200 м по кожній осі (міграція 202611230001), тож справжня точка завжди всередині кола.
+export const AREA_RADIUS_M = 300;
 export const VINNYTSIA_BOUNDS = [[49.17, 28.35], [49.29, 28.60]];
 
 export const DEMO_HOST_ID = 'oleh';

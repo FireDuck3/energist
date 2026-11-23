@@ -285,7 +285,11 @@ export function openAddSpot(store, hostName, publish, existing = null, { pilot =
   let map = null;
   const modal = openModal(form, { className: 'modal-wide', onClose: () => map?.remove() });
 
+  // Точне місце власної точки не завантажилось (видно лише центр зони) — поки господар не клікнув
+  // на карті, координат не надсилаємо, і сервер лишає справжні (див. update_pilot_spot).
+  let moved = false;
   function setPoint(lat, lng) {
+    moved = true;
     input.lat = Math.round(lat * 10000) / 10000;
     input.lng = Math.round(lng * 10000) / 10000;
     coordsNote.textContent = `📍 ${input.lat}, ${input.lng}`;
@@ -334,6 +338,7 @@ export function openAddSpot(store, hostName, publish, existing = null, { pilot =
     showErrors({});
 
     const data = { ...input, title: input.title.trim(), district: input.district.trim(), hostName };
+    if (existing?.pilot && !existing.exactLocation && !moved) Object.assign(data, { lat: null, lng: null });
     if (!publish) {
       store.addSpot(data);
       modal.close();

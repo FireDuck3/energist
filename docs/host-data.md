@@ -9,7 +9,7 @@
 |---|---|---|---|
 | 1 | Ім'я, прізвище, телефон, фото | * | `users.first_name/last_name`, `profiles.phone`, `profiles.avatar_path` (Storage `spot-photos/<uid>/avatar/…`) через `set_my_host_contact` |
 | 2 | Назва та короткий опис СЕС | * | `pilot_spots.title`, `description` |
-| 3 | Населений пункт, координати | * | `pilot_spots.district`, `lat`, `lng` |
+| 3 | Населений пункт, координати | * | `pilot_spots.district`, `lat`, `lng` (гостям до підтвердження — лише зона ~300 м) |
 | 4 | Тип СЕС (мережева / автономна / гібридна) | * | `pilot_spots.ses_type` |
 | 5 | Встановлена потужність СЕС | * | `pilot_spots.ses_power_kw` |
 | 6 | Виробник та потужність інвертора | бажано | `pilot_spots.inverter` |
@@ -47,7 +47,7 @@
 
 | Поле | Де зберігається | Хто бачить |
 |---|---|---|
-| Розташування СЕС ✅ | `pilot_spots.lat`, `lng`, `district` | усі (карта) |
+| Розташування СЕС ✅ | `pilot_spots.lat`, `lng`, `district` | точне місце — господар і гість з **підтвердженим або завершеним** бронюванням (`my_exact_spot_locations()`); решта бачать район і зону ~300 м (`area_lat`, `area_lng`, міграції `202611230001/2`) |
 
 ## Технічні характеристики
 

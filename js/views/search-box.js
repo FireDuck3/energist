@@ -2,8 +2,9 @@
 import { h } from '../ui.js';
 import { recentQueries, recentSpots } from '../history.js';
 import { normalizeQuery } from '../filters.js';
+import { visibleSpots } from '../stations.js';
 
-export function searchBox(store, userHistory) {
+export function searchBox(store, userHistory, session = null) {
   const input = h('input', {
     type: 'search', class: 'input search-input', placeholder: 'Район або назва точки',
     'aria-label': 'Пошук точок', autocomplete: 'off', enterkeyhint: 'search',
@@ -32,7 +33,9 @@ export function searchBox(store, userHistory) {
     const { status, searches } = userHistory.getState();
     const typed = normalizeQuery(input.value);
     const queries = recentQueries(searches).filter((q) => !typed || normalizeQuery(q).includes(typed));
-    const spots = typed ? [] : recentSpots(searches, store.getState().spots);
+    // Нещодавні — лише ті точки, які людина зараз може відкрити (без демо поза демо-режимом).
+    const spots = typed ? [] : recentSpots(searches,
+      session ? visibleSpots(store.getState().spots, session.getState().status) : store.getState().spots);
     const sections = [];
 
     if (status === 'off' && !typed) {

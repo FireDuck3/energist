@@ -1,6 +1,6 @@
 import { signInWithGoogle, finishGoogleOAuth } from './oauth.js';
 import { checkedCredentials } from './credentials.js';
-import { detailsFromRow, detailsToColumns, toHostCard } from './host-profile.js';
+import { detailsFromRow, detailsToColumns, toHostCard, DETAIL_COLUMNS, FORM_COLUMNS } from './host-profile.js';
 // Адаптер до Supabase — єдиний модуль, що знає про supabase-js.
 // Решта коду бачить лише AuthService (контракт описано в js/auth.js).
 const SDK_URL = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
@@ -50,13 +50,23 @@ const toUser = (u) => ({ uid: u.id, email: u.email, name: u.user_metadata?.full_
 
 const PHOTO_BUCKET = 'spot-photos';
 
+// Колонки pilot_spots, які сервер віддає всім. Точних lat/lng серед них немає (міграція 202611230002):
+// усі бачать центр зони area_lat/area_lng, а точне місце — лише господар і гість з підтвердженим бронюванням.
+export const PILOT_SPOT_COLUMNS = ['id', 'owner_id', 'title', 'district', 'area_lat', 'area_lng', 'source', 'connector',
+  'power_kw', 'price_per_kwh', 'devices', 'opens', 'closes', 'archived_at', 'paused', 'closed_weekdays', 'photos',
+  'verified_at', ...DETAIL_COLUMNS, ...FORM_COLUMNS].join(',');
+
 // Рядок pilot_spots → точка для карти. photoUrl перетворює шлях у Storage на публічну адресу.
-export function toPilotSpot(row, feedback, photoUrl, reviewsUnavailable = false) {
+// exact — точне місце {lat, lng}, якщо цьому користувачу його можна знати; інакше точка стоїть у центрі зони.
+export function toPilotSpot(row, feedback, photoUrl, reviewsUnavailable = false, exact = null) {
   // Захист від зіпсованого рядка: один порожній шлях не повинен ламати карту для всіх.
   const photoPaths = (row.photos ?? []).filter(p => typeof p === 'string' && p);
+  const area = { lat: Number(row.area_lat ?? row.lat), lng: Number(row.area_lng ?? row.lng) };
   return {
     id: row.id, archivedAt: row.archived_at, ownerId: row.owner_id, pilot: true, hostName: 'Господар точки',
-    title: row.title, district: row.district, lat: Number(row.lat), lng: Number(row.lng),
+    title: row.title, district: row.district,
+    lat: exact ? Number(exact.lat) : area.lat, lng: exact ? Number(exact.lng) : area.lng,
+    exactLocation: Boolean(exact), area,
     source: row.source, connector: row.connector, powerKw: Number(row.power_kw),
     pricePerKwh: Number(row.price_per_kwh), devices: row.devices, reviewsUnavailable,
     reviews: feedback.filter(r => r.spot_id === row.id).map(r => ({
@@ -86,15 +96,22 @@ export async function loadSupabase() {
     return {
       oauthResult,
       async listPilotSpots() {
-        const rows = await call(client.from('pilot_spots').select('*').order('title'));
+        const rows = await call(client.from('pilot_spots').select(PILOT_SPOT_COLUMNS).order('title'));
         let feedback = [], reviewsUnavailable = false;
         try { feedback = await call(client.rpc('list_public_spot_reviews')); }
         catch { reviewsUnavailable = true; }
+        // Точне місце — лише власних точок і тих, де бронювання підтвердили. Не вдалося — лишаються зони.
+        const exact = new Map();
+        if ((await auth.getSession()).data?.session) {
+          try { for (const r of await call(client.rpc('my_exact_spot_locations'))) exact.set(r.spot_id, r); }
+          catch { /* точки показуються зонами */ }
+        }
         const photoUrl = path => client.storage.from(PHOTO_BUCKET).getPublicUrl(path).data.publicUrl;
-        return rows.map(row => toPilotSpot(row, feedback, photoUrl, reviewsUnavailable));
+        return rows.map(row => toPilotSpot(row, feedback, photoUrl, reviewsUnavailable, exact.get(row.id)));
       },
+      // lat/lng = null — місце не змінювали (сервер лишає старе).
       updatePilotSpot: (id, input) => call(client.rpc('update_pilot_spot', {
-        point_id: id, new_title: input.title, new_district: input.district, new_lat: input.lat, new_lng: input.lng,
+        point_id: id, new_title: input.title, new_district: input.district, new_lat: input.lat ?? null, new_lng: input.lng ?? null,
         new_source: input.source, new_connector: input.connector, new_power_kw: input.powerKw, new_price: input.pricePerKwh,
         new_devices: input.devices, new_opens: input.schedule.from, new_closes: input.schedule.to,
       })),
