@@ -17,7 +17,7 @@ const MESSAGES = {
   'auth/verification-failed': 'Не вдалося перевірити акаунт. Спробуйте увійти ще раз',
   'auth/invalid-email': 'Невірний формат email',
   'auth/missing-password': 'Введіть пароль',
-  'auth/weak-password': 'Пароль має бути щонайменше 6 символів',
+  'auth/weak-password': 'Пароль має містити щонайменше 8 символів',
   'auth/email-already-in-use': 'Цей email уже зареєстровано — увійдіть',
   'auth/invalid-credential': 'Невірний email або пароль',
   'auth/invalid-code': 'Код невірний або застарів — надішліть новий',

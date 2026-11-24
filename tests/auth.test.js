@@ -230,3 +230,10 @@ test('authErrorMessage', () => {
   eq(authErrorMessage('auth/popup-blocked'), 'Щось пішло не так. Спробуйте ще раз'); // Google-входу більше немає
   eq(authErrorMessage('щось/нове'), 'Щось пішло не так. Спробуйте ще раз');
 });
+
+test('authErrorMessage: слабкий пароль — та сама довжина, що вимагає форма реєстрації (8)', async () => {
+  const { validateCredentials } = await import('../js/credentials.js');
+  eq(/8 символів/.test(authErrorMessage('auth/weak-password')), true);
+  eq(validateCredentials({ email: 'a@b.ua', password: '1234567', firstName: 'А', lastName: 'Б' }, { signup: true }).ok, false);
+  eq(validateCredentials({ email: 'a@b.ua', password: '12345678', firstName: 'А', lastName: 'Б' }, { signup: true }).ok, true);
+});

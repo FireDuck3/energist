@@ -38,6 +38,7 @@ export function createComposer({ onSend, onTyping, now = () => Date.now() }) {
   return {
     el,
     focus: () => textarea.focus({ preventScroll: true }),
-    setDisabled(on) { textarea.disabled = on; button.disabled = on; },
+    // Закритий чат: поле неактивне й пояснює чому.
+    setDisabled(on) { textarea.disabled = on; button.disabled = on; textarea.placeholder = on ? 'Чат закрито' : 'Повідомлення…'; },
   };
 }

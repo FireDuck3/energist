@@ -41,7 +41,6 @@ const fail = (error, code = toAuthCode(error)) => Object.assign(new Error(error?
 async function call(request) {
   let res;
   try { res = await request; } catch (e) { throw fail(e); }
-  // 23P01 — перетин бронювань, WW429 — ліміт повідомлень: їх показуємо користувачу окремо.
   // 23P01 — перетин бронювань, WW429 — ліміт, 23505 — дубль, 22023 — перевірка сервера: показуємо окремо.
   if (res.error) throw fail(res.error, ['23P01', 'WW429', '23505', '22023'].includes(res.error.code) ? res.error.code : responseCode(res));
   return res.data;
