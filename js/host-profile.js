@@ -11,7 +11,10 @@ export const CONTACT_CHANNELS = [
   { id: 'whatsapp', label: 'WhatsApp' },
   { id: 'email', label: 'Email' },
 ];
-export const channelLabels = (ids = []) => CONTACT_CHANNELS.filter((c) => (ids ?? []).includes(c.id)).map((c) => c.label);
+// Скільки різних господарів на добу людина може відкрити контакти (reveal_host_contacts, міграція 202611240004).
+// Захист від масового збору телефонів і email ботами; число має збігатися з лімітом у SQL.
+export const CONTACT_REVEALS_PER_DAY = 20;
+export const channelLabels =(ids = []) => CONTACT_CHANNELS.filter((c) => (ids ?? []).includes(c.id)).map((c) => c.label);
 
 const toMin = (hhmm) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
 
@@ -106,5 +109,7 @@ export function toHostCard(row, photoUrl = (p) => p) {
     sessions: Number(row.completed_sessions) || 0, recentHours: (row.recent_hours ?? []).map(Number),
     photo: row.avatar_path ? photoUrl(row.avatar_path) : null,
     channels: Array.isArray(row.contact_channels) ? row.contact_channels : [],
+    // Господар обрав дзвінок, месенджер чи email — контакти можна відкрити кнопкою (reveal_host_contacts).
+    hasContacts: Boolean(row.has_contacts),
   };
 }

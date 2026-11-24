@@ -207,9 +207,14 @@ export async function loadSupabase() {
         }));
       },
       setMyContactChannels: ids => call(client.rpc('set_my_contact_channels', { channels: ids })),
-      // Картка господаря: телефон і email сервер віддає лише тим, хто увійшов (анонімам — null).
+      // Картка господаря: телефон і email у ній лише для самого господаря й гостя з підтвердженим бронюванням.
       pilotSpotHostCard: async id => toHostCard((await call(client.rpc('pilot_spot_host_card', { point_id: id })))[0],
         path => client.storage.from(PHOTO_BUCKET).getPublicUrl(path).data.publicUrl),
+      // Решті увійшлих — на запит: лише обрані господарем канали, з денним лімітом (міграція 202611240004).
+      revealHostContacts: async id => {
+        const row = (await call(client.rpc('reveal_host_contacts', { point_id: id })))?.[0];
+        return { phone: row?.phone ?? null, email: row?.email ?? null, limited: Boolean(row?.limited) };
+      },
       listPilotBookings: () => call(client.rpc('list_my_pilot_bookings')),
       // Адмінпанель: кожна функція admin_* на сервері спершу перевіряє, що викликає адміністратор.
       admin: {

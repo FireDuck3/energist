@@ -156,6 +156,13 @@ export function createPilot(session, store, { notifications = bellList } = {}) {
       if (!session.service?.pilotSpotHostCard) return null;
       try { return await session.service.pilotSpotHostCard(id); } catch { return null; }
     },
+    // Телефон і email господаря точки — лише на явний запит (кнопка «Показати контакти»); сервер рахує
+    // денний ліміт. Помилку прокидаємо: кнопка покаже «Спробуйте ще раз».
+    async revealContacts(id) {
+      await session.ready;
+      if (!session.service?.revealHostContacts) throw new Error('Contacts unavailable');
+      return session.service.revealHostContacts(id);
+    },
     // Бажані канали зв'язку господаря (чат, дзвінок, месенджери, email).
     async saveContactChannels(ids) {
       if (!uid() || !session.service?.setMyContactChannels) throw new Error('Sign-in required');

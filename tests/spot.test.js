@@ -83,6 +83,30 @@ test('картка точки: демо-точка поза демо-режим�
   } finally { demo.done(); }
 });
 
+test('картка точки: контакти господаря відкриваються кнопкою, а не разом зі сторінкою', async () => {
+  const revealed = [];
+  const pilot = {
+    ownSpots: () => [], subscribe: () => () => {},
+    hostCard: async () => ({ name: 'Олег Коваль', since: null, verified: false, phone: null, email: null, sessions: 0,
+      recentHours: [], photo: null, channels: ['phone'], hasContacts: true }),
+    revealContacts: async (id) => { revealed.push(id); return { phone: '+380671234567', email: null, limited: false }; },
+  };
+  const store = createStore(memoryStorage());
+  store.setPilotSpots([pilotSpot()]);
+  const root = document.createElement('div');
+  const before = location.hash;
+  const cleanup = render({ id: ID }, root, store, session('signedIn', 'guest'), null, pilot);
+  try {
+    await new Promise((r) => setTimeout(r, 0));
+    eq(root.querySelector('a[href^="tel:"]'), null);
+    const button = [...root.querySelectorAll('button')].find((b) => b.textContent === 'Показати контакти');
+    button.click();
+    await new Promise((r) => setTimeout(r, 0));
+    eq(revealed, [ID]);
+    eq(root.querySelector('a[href="tel:+380671234567"]') !== null, true);
+  } finally { cleanup(); history.replaceState(null, '', before || location.pathname); }
+});
+
 test('картка точки: гість бачить зону й обіцянку точного місця після підтвердження, без маршруту', () => {
   const m = mount(pilotSpot(), 'signedIn', 'guest');
   try {
