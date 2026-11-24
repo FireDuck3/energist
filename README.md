@@ -64,6 +64,8 @@ Static Site `wattway` на Render з публічного репозиторію
 
 Стара адреса https://energist.onrender.com (сервіс `energist`) лишилась лише для старих посилань: `index.html` одразу перекидає з неї на wattway.onrender.com. Щоб перекидання працювало й після змін у `index.html`, деплойте й цей сервіс. У Supabase → Authentication → URL Configuration адреса сайту — https://wattway.onrender.com.
 
+**Сторонній код і CSP.** Leaflet, Leaflet.markercluster і supabase-js лежать у `vendor/` (версії, перевірка й оновлення — [vendor/README.md](vendor/README.md)), а не тягнуться з CDN. `index.html` задає Content-Security-Policy: скрипти лише з самого сайту, мережа — лише Supabase (https і wss), зображення — сайт, Supabase і тайли OpenStreetMap, шрифти — Google Fonts. Підключаєте новий зовнішній сервіс — додайте його домен у CSP, інакше браузер його заблокує (у консолі буде «Refused to …»). Вбудовані `<script>` у `index.html` не працюватимуть — лише окремі файли.
+
 Карта — тайли OpenStreetMap, тож на пітчі потрібен інтернет. Без нього список точок і всі сценарії працюють, замість карти буде підказка.
 
 ## Структура

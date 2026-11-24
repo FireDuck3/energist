@@ -3,10 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <script>
-    // Сайт переїхав: стара адреса веде на нову з тією ж сторінкою (#/map, #/spot/… тощо).
-    if (location.hostname === 'energist.onrender.com') location.replace('https://wattway.onrender.com/' + location.hash);
-  </script>
+  <!-- Content-Security-Policy: скрипти лише з самого сайту (бібліотеки — у vendor/, див. vendor/README.md).
+       Supabase — дані, Realtime (wss) і фото; тайли — OpenStreetMap; шрифти — Google Fonts.
+       Стилі 'unsafe-inline': Leaflet і markercluster пишуть style-атрибути. Новий зовнішній сервіс — додайте сюди. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https://tile.openstreetmap.org https://yxbpobiipcdazwnshime.supabase.co; connect-src 'self' https://yxbpobiipcdazwnshime.supabase.co wss://yxbpobiipcdazwnshime.supabase.co; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+  <script src="js/redirect.js"></script>
   <title>WattWay — енергетичний Airbnb</title>
   <meta name="description" content="P2P-маркетплейс електрики: знайди розетку поруч або заробляй на надлишку своєї сонячної станції.">
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
@@ -15,9 +16,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <!-- Шрифти з дизайн-системи Figma: заголовки — Montserrat Alternates, текст — Manrope, логотип — Rubik, чіпи — Inter. -->
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&family=Montserrat+Alternates:wght@500;600;700&family=Rubik:wght@500&display=swap">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" crossorigin="">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" crossorigin="">
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="vendor/markercluster/MarkerCluster.css">
+  <link rel="stylesheet" href="vendor/markercluster/MarkerCluster.Default.css">
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
@@ -28,8 +29,8 @@
       <span>WattWay · Вінниця, 2026</span>
     </div>
   </footer>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" crossorigin=""></script>
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="vendor/markercluster/leaflet.markercluster.js"></script>
   <script type="module" src="js/app.js"></script>
 </body>
 </html>
