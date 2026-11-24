@@ -1,5 +1,6 @@
 // Карта і список точок — шлях Саші, частина 1.
 import { h, stars, spotCover, plural } from '../ui.js';
+import { icon, iconSvg, withIcon } from '../icons.js';
 import { filterSpots, spotRating, isLiveInBlackout, isOpenAt, normalizeQuery } from '../filters.js';
 import { RADII, POWER_BANDS, CONNECTOR_FILTERS, distanceKm, matchSpotExtra, matchStation, sortByDistance, nearest, nearestN, resultsLabel } from '../map-filters.js';
 import { locate, geoMessage } from '../geolocate.js';
@@ -23,7 +24,7 @@ export function spotPin(spot, { dimmed = false, selected = false } = {}) {
   const label = dimmed ? 'немає світла' : `${spot.pricePerKwh} грн`;
   return L.divIcon({
     className: 'pin-wrap',
-    html: `<div class="${cls}"><span class="pin-icon">${SOURCES[spot.source].icon}</span>${label}</div>`,
+    html: `<div class="${cls}"><span class="pin-icon">${iconSvg(SOURCES[spot.source].icon, { size: 14 })}</span>${label}</div>`,
     iconSize: null,
     iconAnchor: [0, 0],
   });
@@ -43,7 +44,7 @@ function spotCard(spot, { blackout, now, origin }) {
     h('img', { class: 'spot-thumb', src: spotCover(spot), alt: '', loading: 'lazy' }),
     h('div', { class: 'spot-info' },
       h('div', { class: 'spot-top' },
-        h('span', { class: `source-badge source-${spot.source}` }, `${SOURCES[spot.source].icon} ${SOURCES[spot.source].label}`),
+        h('span', { class: `source-badge source-${spot.source}` }, withIcon(SOURCES[spot.source].icon, SOURCES[spot.source].label, { size: 14 })),
         stars(spotRating(spot), spot.reviews.length)),
       h('h3', { class: 'spot-title' }, spot.title,
         spot.verified ? h('span', { class: 'verified-badge verified-sm', title: 'WattWay перевірив точку на місці' }, '✓') : ''),
@@ -51,7 +52,7 @@ function spotCard(spot, { blackout, now, origin }) {
       h('div', { class: 'spot-bottom' },
         h('span', { class: 'spot-price' }, h('b', {}, formatUAH(spot.pricePerKwh)), ' / кВт·год'),
         blackout && isLiveInBlackout(spot)
-          ? h('span', { class: 'live-badge' }, spot.pilot ? 'Уточніть у господаря' : `🔋 ще ~${spot.blackoutHours} год`)
+          ? h('span', { class: 'live-badge' }, spot.pilot ? 'Уточніть у господаря' : withIcon('battery', `ще ~${spot.blackoutHours} год`, { size: 14 }))
           : openingLine(spot, now))));
 }
 
@@ -80,7 +81,7 @@ function popupContent(spot, host) {
     h('div', { class: 'popup-body' },
       h('b', {}, spot.title),
       h('div', { class: 'muted' }, `${spot.district} · `, stars(spotRating(spot))),
-      spot.pilot && !spot.exactLocation && h('div', { class: 'muted popup-area' }, `📍 Приблизне місце, ±${AREA_RADIUS_M} м`),
+      spot.pilot && !spot.exactLocation && h('div', { class: 'muted popup-area' }, withIcon('map-pin', `Приблизне місце, ±${AREA_RADIUS_M} м`, { size: 14 })),
       h('div', {}, h('b', {}, formatUAH(spot.pricePerKwh)), ' / кВт·год'),
       host ?? '',
       h('a', { class: 'btn btn-primary btn-sm', href: `#/spot/${spot.id}` }, 'Детальніше')));
@@ -91,7 +92,7 @@ export function stationPin(station) {
   const kw = station.max_power_kw != null ? `${String(station.max_power_kw).replace('.', ',')} кВт` : 'EV';
   return L.divIcon({
     className: 'pin-wrap',
-    html: `<div class="pin pin-public"><span class="pin-icon">🔌</span>${kw}</div>`,
+    html: `<div class="pin pin-public"><span class="pin-icon">${iconSvg('plug', { size: 14 })}</span>${kw}</div>`,
     iconSize: null, iconAnchor: [0, 0],
   });
 }
@@ -127,7 +128,7 @@ const stationActions = (st, session) => h('div', { class: 'st-actions', onclick:
 function stationPopup(st, session) {
   return h('div', { class: 'popup station-popup' },
     h('div', { class: 'popup-body' },
-      h('span', { class: 'source-badge source-public' }, '🔌 Публічна станція'),
+      h('span', { class: 'source-badge source-public' }, withIcon('plug', 'Публічна станція', { size: 14 })),
       h('b', {}, st.name ?? st.operator ?? 'Зарядна станція'),
       ...stationDetails(st), stationActions(st, session)));
 }
@@ -136,7 +137,7 @@ function stationCard(st, onShow, origin, session) {
   return h('div', { class: 'spot-card card station-card', role: 'button', tabindex: '0', onclick: onShow,
     onkeydown: (e) => { if (e.key === 'Enter') onShow(); } },
     h('div', { class: 'spot-info' },
-      h('span', { class: 'source-badge source-public' }, '🔌 Публічна станція'),
+      h('span', { class: 'source-badge source-public' }, withIcon('plug', 'Публічна станція', { size: 14 })),
       h('h3', { class: 'spot-title' }, st.name ?? st.operator ?? 'Зарядна станція', distanceLabel(st, origin)),
       ...stationDetails(st), stationActions(st, session)));
 }
@@ -151,14 +152,14 @@ export function render(_params, root, store, session, userHistory, pilot) {
   const list = h('div', { class: 'spot-list' });
   const count = h('p', { class: 'result-count' });
   const banner = h('div', { class: 'blackout-banner', hidden: true },
-    h('b', {}, '⚡ Режим блекауту.'), h('span', {}, ' Показуємо точки з СЕС і акумуляторами — вони працюють і без світла.'));
+    h('b', {}, withIcon('zap', 'Режим блекауту.')), h('span', {}, ' Показуємо точки з СЕС і акумуляторами — вони працюють і без світла.'));
   const filtersBox = h('div', { class: 'filters' });
   // На телефоні фільтри згорнуті під цією кнопкою (на десктопі її не видно).
   const filtersToggle = h('button', { type: 'button', class: 'btn btn-secondary btn-sm filters-toggle', 'aria-expanded': 'false',
     onclick: () => { const open = filtersBox.classList.toggle('open'); filtersToggle.setAttribute('aria-expanded', String(open)); } });
   const mapEl = h('div', { class: 'map', id: 'map' });
   const fallback = h('div', { class: 'map-fallback', hidden: true },
-    h('span', { class: 'map-fallback-icon' }, '🗺️'),
+    h('span', { class: 'map-fallback-icon' }, icon('map', { size: 40 })),
     h('b', {}, 'Карта недоступна — перевірте інтернет'),
     h('span', { class: 'muted' }, 'Список точок і бронювання працюють і без неї.'));
 
@@ -169,7 +170,7 @@ export function render(_params, root, store, session, userHistory, pilot) {
   const geoNote = h('p', { class: 'geo-note muted', role: 'status', hidden: true });
   const setNote = (text) => { geoNote.textContent = text; geoNote.hidden = !text; };
   const viewBtn = h('button', { type: 'button', class: 'btn btn-secondary btn-sm', 'aria-pressed': 'false' });
-  const locateBtn = h('button', { type: 'button', class: 'btn btn-secondary btn-sm' }, '📍 Моє місце');
+  const locateBtn = h('button', { type: 'button', class: 'btn btn-secondary btn-sm' }, withIcon('map-pin', 'Моє місце'));
   const nearestBtn = h('button', { type: 'button', class: 'btn btn-primary btn-sm' }, 'Знайти найближчу зарядку');
   const actions = h('div', { class: 'map-actions' }, nearestBtn, locateBtn, viewBtn);
 
@@ -207,7 +208,7 @@ export function render(_params, root, store, session, userHistory, pilot) {
     ratingChips.replaceChildren(
       ...[[0, 'Будь-який'], [4.5, '4,5+'], [4.8, '4,8+']].map(([v, label]) =>
         chip(label, f.minRating === v, () => store.setFilters({ minRating: v }))));
-    nowChip.replaceChildren(chip('🕒 Відчинено зараз', f.availableNow, () => store.setFilters({ availableNow: !f.availableNow })));
+    nowChip.replaceChildren(chip(withIcon('clock', 'Відчинено зараз', { size: 14 }), f.availableNow, () => store.setFilters({ availableNow: !f.availableNow })));
     connectorChips.replaceChildren(...CONNECTOR_FILTERS.map((c) => {
       const on = f.connectors.includes(c.id);
       return chip(c.label, on, () => store.setFilters({ connectors: on ? f.connectors.filter((x) => x !== c.id) : [...f.connectors, c.id] }));
@@ -221,12 +222,12 @@ export function render(_params, root, store, session, userHistory, pilot) {
       return c;
     }));
     extraChips.replaceChildren(
-      chip('🕐 Цілодобово', f.only24h, () => store.setFilters({ only24h: !f.only24h })),
-      chip('🔋 Доступна під час блекауту', f.blackoutReady, () => store.setFilters({ blackoutReady: !f.blackoutReady })));
+      chip(withIcon('clock', 'Цілодобово', { size: 14 }), f.only24h, () => store.setFilters({ only24h: !f.only24h })),
+      chip(withIcon('battery', 'Доступна під час блекауту', { size: 14 }), f.blackoutReady, () => store.setFilters({ blackoutReady: !f.blackoutReady })));
     if (Number(priceInput.value) !== f.maxPrice) priceInput.value = f.maxPrice;
     priceLabel.textContent = `до ${f.maxPrice} грн`;
     const active = [f.device, f.maxPrice < 25, f.minRating > 0, f.availableNow, f.connectors.length, f.power, f.radiusKm, f.only24h, f.blackoutReady].filter(Boolean).length;
-    filtersToggle.textContent = active ? `⚙️ Фільтри · ${active}` : '⚙️ Фільтри';
+    filtersToggle.replaceChildren(withIcon('sliders', active ? `Фільтри · ${active}` : 'Фільтри'));
   }
 
   // ---- Карта ----
@@ -440,7 +441,7 @@ export function render(_params, root, store, session, userHistory, pilot) {
   const paintView = () => {
     layout.classList.toggle('view-list', view === 'list');
     layout.classList.toggle('view-map', view === 'map');
-    viewBtn.textContent = view === 'map' ? '📋 Список' : '🗺️ Карта';
+    viewBtn.replaceChildren(view === 'map' ? withIcon('list', 'Список') : withIcon('map', 'Карта'));
     viewBtn.setAttribute('aria-pressed', String(view === 'list'));
     if (view === 'map') map?.invalidateSize();
   };

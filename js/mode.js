@@ -3,13 +3,13 @@
 
 export const MODES = {
   guest: {
-    icon: '🔌', label: 'Я шукаю енергію', short: 'Шукаю енергію', home: '#/map',
+    icon: 'plug', label: 'Я шукаю енергію', short: 'Шукаю енергію', home: '#/map',
     lead: 'Потрібно зарядити електромобіль, EcoFlow чи телефон — знайдіть точку поруч і забронюйте час.',
     perks: ['Карта точок і публічних станцій поруч', 'Бронювання часу й підтвердження від господаря', 'Чат із господарем і відгуки'],
     cta: 'Знайти енергію',
   },
   host: {
-    icon: '☀️', label: 'Я роздаю енергію', short: 'Роздаю енергію', home: '#/host',
+    icon: 'sun', label: 'Я роздаю енергію', short: 'Роздаю енергію', home: '#/host',
     lead: 'Маєте сонячну станцію чи акумулятор — додайте свою точку й заробляйте на надлишку енергії.',
     perks: ['Карта й список ваших точок', 'Запити на бронювання в одному місці', 'Графік, фото й умови зарядки'],
     cta: 'Роздавати енергію',
@@ -18,19 +18,19 @@ export const MODES = {
 
 const isMode = (m) => m === 'guest' || m === 'host';
 
-// Пункти навігації режиму: [href, іконка, підпис, чи активний для шляху].
+// Пункти навігації режиму: [href, іконка lucide, підпис, чи активний для шляху].
 const NAV = {
   guest: [
-    ['#/map', '🗺️', 'Карта', (p) => p.startsWith('/map') || p.startsWith('/spot')],
-    ['#/bookings', '📅', 'Мої бронювання', (p) => p.startsWith('/bookings')],
-    ['#/chats', '💬', 'Чати', (p) => p.startsWith('/chats')],
-    ['#/profile', '👤', 'Профіль', (p) => p.startsWith('/profile')],
+    ['#/map', 'map', 'Карта', (p) => p.startsWith('/map') || p.startsWith('/spot')],
+    ['#/bookings', 'calendar', 'Мої бронювання', (p) => p.startsWith('/bookings')],
+    ['#/chats', 'message-circle', 'Чати', (p) => p.startsWith('/chats')],
+    ['#/profile', 'user', 'Профіль', (p) => p.startsWith('/profile')],
   ],
   host: [
-    ['#/host', '📍', 'Мої точки', (p) => p === '/host' || p.startsWith('/spot')],
-    ['#/host/bookings', '📅', 'Бронювання', (p) => p.startsWith('/host/bookings')],
-    ['#/chats', '💬', 'Чати', (p) => p.startsWith('/chats')],
-    ['#/profile', '👤', 'Профіль', (p) => p.startsWith('/profile')],
+    ['#/host', 'map-pin', 'Мої точки', (p) => p === '/host' || p.startsWith('/spot')],
+    ['#/host/bookings', 'calendar', 'Бронювання', (p) => p.startsWith('/host/bookings')],
+    ['#/chats', 'message-circle', 'Чати', (p) => p.startsWith('/chats')],
+    ['#/profile', 'user', 'Профіль', (p) => p.startsWith('/profile')],
   ],
 };
 

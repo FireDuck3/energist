@@ -1,5 +1,6 @@
 // Картка точки — шлях Саші, частина 2.
 import { h, stars, spotCover, formatDate, plural } from '../ui.js';
+import { withIcon } from '../icons.js';
 import { hostRating, ratingLabel } from '../trust.js';
 import { openReport } from './report.js';
 import { spotRating, isLiveInBlackout, isOpenAt } from '../filters.js';
@@ -84,7 +85,7 @@ function locationNote(spot, own) {
       h('a', { class: 'btn btn-secondary btn-sm', href: routeUrl(spot), target: '_blank', rel: 'noopener' }, 'Прокласти маршрут'));
   }
   return h('p', { class: 'hint' },
-    `🔒 Точне місце господар відкриє після підтвердження бронювання. Зараз показуємо зону ~${AREA_RADIUS_M} м, де розташована точка.`);
+    withIcon('lock', `Точне місце господар відкриє після підтвердження бронювання. Зараз показуємо зону ~${AREA_RADIUS_M} м, де розташована точка.`));
 }
 
 function renderSpot(spot, host, { blackout, spots }, store, session, userHistory, pilot, card, locationMap) {
@@ -111,7 +112,7 @@ function renderSpot(spot, host, { blackout, spots }, store, session, userHistory
         spot.verified && h('span', { class: 'verified-badge', title: 'WattWay перевірив точку на місці' }, '✓ Перевірена точка'),
         h('p', { class: 'spot-sub' },
           spot.reviews.length || spot.reviewsUnavailable ? stars(rating, spot.reviews.length) : h('span', { class: 'new-badge' }, ratingLabel(null, 0, 'spot')), ' · ', spot.district, ' · ',
-          h('span', { class: `source-badge source-${spot.source}` }, `${SOURCES[spot.source].icon} ${SOURCES[spot.source].label}`)))),
+          h('span', { class: `source-badge source-${spot.source}` }, withIcon(SOURCES[spot.source].icon, SOURCES[spot.source].label, { size: 14 }))))),
     h('img', { class: 'spot-hero', src: spotCover(spot), alt: '' }),
 
     h('div', { class: 'spot-grid' },
@@ -128,7 +129,7 @@ function renderSpot(spot, host, { blackout, spots }, store, session, userHistory
             ...hostCardLines(card, own, session, pilot, spot.id))),
 
         h('div', { class: 'facts' },
-          fact('Джерело енергії', `${SOURCES[spot.source].icon} ${SOURCES[spot.source].label}`),
+          fact('Джерело енергії', withIcon(SOURCES[spot.source].icon, SOURCES[spot.source].label, { size: 14 })),
           fact('Потужність', `${String(spot.powerKw).replace('.', ',')} кВт`),
           fact('Підключення', CONNECTORS[spot.connector]),
           fact('Пристрої', deviceLabels),
@@ -162,14 +163,14 @@ function renderSpot(spot, host, { blackout, spots }, store, session, userHistory
           h('div', { class: 'compare-row muted' }, h('span', {}, `на комерційній (~${COMMERCIAL_PRICE} грн)`), h('s', {}, formatUAH(commercial))),
           h('div', { class: 'compare-save' }, `Економія ${formatUAH(commercial - here)}`)),
         dark
-          ? h('div', { class: 'alert alert-dark' }, h('b', {}, '⚡ Немає світла'), h('span', {}, 'Ця точка живиться від мережі — бронювання недоступне під час блекауту.'))
+          ? h('div', { class: 'alert alert-dark' }, h('b', {}, withIcon('zap', 'Немає світла')), h('span', {}, 'Ця точка живиться від мережі — бронювання недоступне під час блекауту.'))
           : h('p', { class: isOpenAt(spot, now) ? 'open-now' : 'muted' },
             isOpenAt(spot, now) ? `Відчинено до ${spot.schedule.to}` : `Зачинено · відкриється о ${spot.schedule.from}`),
         h('button', { type: 'button', class: 'btn btn-primary btn-lg btn-block', disabled: dark || own,
           onclick: book }, own ? 'Ваша точка' : 'Забронювати'),
         h('p', { class: 'book-note muted' }, spot.pilot
           ? 'Запит підтверджує господар. Онлайн-оплати поки немає — про оплату домовляєтеся з господарем у чаті.'
-          : '🧪 Демо-режим: оплата лише імітується, справжні гроші не списуються.'),
+          : withIcon('flask', 'Демо-режим: оплата лише імітується, справжні гроші не списуються.')),
         spot.pilot && !own && h('button', { type: 'button', class: 'btn btn-ghost btn-sm report-link',
           onclick: () => openReport({ targetType: 'spot', targetId: spot.id, title: spot.title }, session) }, 'Повідомити про проблему'))),
 
@@ -177,7 +178,7 @@ function renderSpot(spot, host, { blackout, spots }, store, session, userHistory
     h('div', { class: 'book-bar' },
       h('div', { class: 'book-bar-price' },
         h('span', {}, h('b', {}, formatUAH(spot.pricePerKwh)), ' / кВт·год'),
-        dark && h('span', { class: 'book-bar-note' }, '⚡ Немає світла')),
+        dark && h('span', { class: 'book-bar-note' }, withIcon('zap', 'Немає світла'))),
       h('button', { type: 'button', class: 'btn btn-primary', disabled: dark || own, onclick: book }, own ? 'Ваша точка' : 'Забронювати')));
 }
 

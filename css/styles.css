@@ -1348,6 +1348,25 @@ body.blackout .btn-primary { color: var(--on-accent); }
 body.blackout .btn-paper { background: var(--white); color: var(--dark-blue); } /* у темному макеті «Зберегти» світла */
 .btn-ok { background: var(--indigo); color: var(--on-accent); }
 .btn .icon, .goal-option .icon { display: inline-grid; flex: none; }
+
+/* ---- Іконки lucide (js/icons.js) замість емодзі: лінійні, колір — currentColor ---- */
+.icon { display: inline-grid; place-items: center; flex: none; line-height: 0; }
+.icon svg { display: block; }
+.with-icon { display: inline-flex; align-items: center; gap: .4em; vertical-align: middle; }
+.demo-note > .with-icon, .hint > .with-icon, .saved-banner > .with-icon, .book-note > .with-icon { display: flex; }
+.segment { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.gate-icon { display: inline-grid; color: var(--indigo); }
+.step-icon { color: var(--heading); }
+.tab-icon { display: inline-grid; place-items: center; filter: none; }
+.map-fallback-icon { display: inline-grid; color: var(--muted); }
+.secure-icon { display: inline-grid; color: var(--ok); }
+.pin-icon { display: inline-grid; }
+.search-icon { display: inline-grid; color: var(--muted); }
+.search-pick .icon { color: var(--muted); }
+.modal-close, .search-clear, .search-remove, .composer-send { display: grid; place-items: center; }
+.chat-back { align-items: center; }
+.chat-ticks .icon { display: inline-grid; vertical-align: -1px; }
+.how-title .icon { color: var(--indigo); }
 .link-btn { color: var(--indigo); }
 
 /* ---- Чіпи: обведені пігулки (у макеті — «Перевага», блакитний контур 2px) ---- */

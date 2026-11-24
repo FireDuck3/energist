@@ -1,5 +1,6 @@
 // Бронювання: «Мої бронювання» (гість, #/bookings) і «Бронювання гостей» (господар, #/host/bookings).
 import { h } from '../ui.js';
+import { icon } from '../icons.js';
 import { signInPrompt } from './auth-modal.js';
 
 function page({ host }, root, session, pilot) {
@@ -11,7 +12,7 @@ function page({ host }, root, session, pilot) {
     }
     if (status === 'demo') {
       root.replaceChildren(h('div', { class: 'container gate' }, h('div', { class: 'gate-card card' },
-        h('span', { class: 'gate-icon' }, '🧪'), h('h1', {}, 'Демо-режим'),
+        h('span', { class: 'gate-icon' }, icon('flask', { size: 40 })), h('h1', {}, 'Демо-режим'),
         h('p', { class: 'muted' }, host
           ? 'Приклад бронювань господаря — у кабінеті «Мої точки».'
           : 'У демо-режимі бронювання проходять одразу на картці точки.'),

@@ -18,9 +18,9 @@ export const DEVICES = [
 ];
 
 export const SOURCES = {
-  solar: { label: 'Сонячна станція', icon: '☀️' },
-  battery: { label: 'Батарея', icon: '🔋' },
-  grid: { label: 'Мережа', icon: '⚡' },
+  solar: { label: 'Сонячна станція', icon: 'sun' },
+  battery: { label: 'Батарея', icon: 'battery' },
+  grid: { label: 'Мережа', icon: 'zap' },
 };
 
 export const CONNECTORS = {

@@ -1,4 +1,5 @@
 // Дрібні DOM-хелпери, спільні для всіх екранів.
+import { icon } from './icons.js';
 
 // h('button', { class: 'btn', onclick: fn }, 'Текст', childNode, [масив], null)
 export function h(tag, attrs = {}, ...children) {
@@ -28,11 +29,11 @@ function append(el, children) {
 // Скільки модалок відкрито: прокрутку сторінки повертаємо, лише коли закрилась остання.
 let openModals = 0;
 
-// Модалка з фоном, кнопкою ×, Esc і кліком повз вікно. body — куди класти вміст.
+// Модалка з фоном, кнопкою закриття, Esc і кліком повз вікно. body — куди класти вміст.
 export function openModal(content, { onClose, className = '' } = {}) {
   const body = h('div', { class: 'modal-body' }, content);
   const dialog = h('div', { class: `modal ${className}`, role: 'dialog', 'aria-modal': 'true' },
-    h('button', { class: 'modal-close', type: 'button', 'aria-label': 'Закрити', onclick: () => close() }, '×'),
+    h('button', { class: 'modal-close', type: 'button', 'aria-label': 'Закрити', onclick: () => close() }, icon('x', { size: 20 })),
     body);
   // Закриваємо лише справжній клік по фону: якщо натиснули у вікні (напр., тягнули карту) і відпустили
   // на фоні, браузер шле click на фон — такий «клік» ігноруємо.

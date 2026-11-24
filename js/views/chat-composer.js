@@ -1,5 +1,6 @@
 // Поле вводу повідомлення: Enter — надіслати, Shift+Enter — новий рядок, авторозмір до 5 рядків.
 import { h } from '../ui.js';
+import { icon } from '../icons.js';
 
 const MAX_ROWS = 5;
 const TYPING_EVERY_MS = 3000;
@@ -8,7 +9,7 @@ const TYPING_EVERY_MS = 3000;
 export function createComposer({ onSend, onTyping, now = () => Date.now() }) {
   let lastTyping = -Infinity;
   const textarea = h('textarea', { class: 'composer-input', rows: 1, maxlength: 2000, placeholder: 'Повідомлення…', 'aria-label': 'Повідомлення' });
-  const button = h('button', { type: 'submit', class: 'composer-send', 'aria-label': 'Надіслати' }, '➤');
+  const button = h('button', { type: 'submit', class: 'composer-send', 'aria-label': 'Надіслати' }, icon('send', { size: 18 }));
 
   const resize = () => {
     textarea.style.height = 'auto';

@@ -1,6 +1,7 @@
 // Адмінпанель (#/admin, #/admin/<вкладка>): огляд, скарги, точки, користувачі, бронювання, журнал.
 // Інтерфейс лише показує кнопки адміністраторам; кожну дію перевіряє сервер (require_admin у функціях admin_*).
 import { h, openModal, plural } from '../ui.js';
+import { icon } from '../icons.js';
 import { signInPrompt } from './auth-modal.js';
 import {
   ADMIN_TABS, adminTab, TARGET_LABEL, REPORT_STATUS, BOOKING_STATUS, BOOKING_PROBLEM, USER_STATUS, ACTION_LABEL,
@@ -42,9 +43,9 @@ export function askNote({ title, text, label = 'Коментар', placeholder =
   return promise;
 }
 
-function gate(icon, title, text, link) {
+function gate(iconName, title, text, link) {
   return h('div', { class: 'container gate' }, h('div', { class: 'gate-card card' },
-    h('span', { class: 'gate-icon' }, icon), h('h1', {}, title), h('p', { class: 'muted' }, text),
+    h('span', { class: 'gate-icon' }, icon(iconName, { size: 40 })), h('h1', {}, title), h('p', { class: 'muted' }, text),
     link && h('a', { class: 'btn btn-primary', href: link[0] }, link[1])));
 }
 
@@ -70,7 +71,7 @@ export function render(params, root, _store, session) {
     }
     if (status === 'demo') {
       shownFor = null;
-      root.replaceChildren(gate('🧪', 'Демо-режим', 'Адмінпанель працює лише з реальною базою. Вийдіть з демо й увійдіть акаунтом адміністратора.', ['#/map', 'До карти']));
+      root.replaceChildren(gate('flask', 'Демо-режим', 'Адмінпанель працює лише з реальною базою. Вийдіть з демо й увійдіть акаунтом адміністратора.', ['#/map', 'До карти']));
       return;
     }
     if (status !== 'signedIn') {
@@ -84,7 +85,7 @@ export function render(params, root, _store, session) {
     }
     if (!user?.isAdmin) {
       shownFor = null;
-      root.replaceChildren(gate('⛔', 'Немає доступу', 'Ця сторінка лише для адміністраторів WattWay.', ['#/map', 'До карти']));
+      root.replaceChildren(gate('ban', 'Немає доступу', 'Ця сторінка лише для адміністраторів WattWay.', ['#/map', 'До карти']));
       return;
     }
     if (shownFor === user.uid) return; // повторна подія сесії — панель уже на екрані

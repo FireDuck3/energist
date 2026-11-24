@@ -2,20 +2,20 @@
 // Від вибору залежить увесь інтерфейс (js/mode.js); вибір запам'ятовується.
 import { h, revealOnScroll } from '../ui.js';
 import { MODES, chooseMode } from '../mode.js';
-import { icon } from '../icons.js';
+import { icon, withIcon } from '../icons.js';
 
 const STEPS = {
   guest: [
-    { icon: '🔍', title: 'Пошук', text: 'Знаходиш точку на карті поруч — з ціною, графіком і типом конектора' },
-    { icon: '📅', title: 'Запит', text: 'Обираєш час і чекаєш підтвердження господаря' },
-    { icon: '💬', title: 'Домовленість', text: 'У чаті уточнюєш адресу, паркування й оплату' },
-    { icon: '⭐', title: 'Відгук', text: 'Після зарядки завершуєш бронювання й оцінюєш господаря' },
+    { icon: 'search', title: 'Пошук', text: 'Знаходиш точку на карті поруч — з ціною, графіком і типом конектора' },
+    { icon: 'calendar', title: 'Запит', text: 'Обираєш час і чекаєш підтвердження господаря' },
+    { icon: 'message-circle', title: 'Домовленість', text: 'У чаті уточнюєш адресу, паркування й оплату' },
+    { icon: 'star', title: 'Відгук', text: 'Після зарядки завершуєш бронювання й оцінюєш господаря' },
   ],
   host: [
-    { icon: '📍', title: 'Точка', text: 'Додаєш СЕС: потужність, акумулятор, конектор, графік і ціну' },
-    { icon: '🔔', title: 'Запити', text: 'Отримуєш запити на бронювання й підтверджуєш зручні' },
-    { icon: '💬', title: 'Зустріч', text: 'Домовляєшся з гостем у чаті про час і місце' },
-    { icon: '💰', title: 'Заробіток', text: 'Надлишок енергії не пропадає, а репутація росте з відгуками' },
+    { icon: 'map-pin', title: 'Точка', text: 'Додаєш СЕС: потужність, акумулятор, конектор, графік і ціну' },
+    { icon: 'bell', title: 'Запити', text: 'Отримуєш запити на бронювання й підтверджуєш зручні' },
+    { icon: 'message-circle', title: 'Зустріч', text: 'Домовляєшся з гостем у чаті про час і місце' },
+    { icon: 'coins', title: 'Заробіток', text: 'Надлишок енергії не пропадає, а репутація росте з відгуками' },
   ],
 };
 
@@ -90,10 +90,10 @@ export function render(_params, root, store, session) {
         h('h2', { class: 'section-title' }, 'Як це працює'),
         h('div', { class: 'how-grid' }, ['host', 'guest'].map((mode) =>
           h('div', { class: 'how-col' },
-            h('h3', { class: 'how-title' }, `${MODES[mode].icon} ${MODES[mode].label}`),
+            h('h3', { class: 'how-title' }, withIcon(MODES[mode].icon, MODES[mode].label, { size: 22 })),
             h('ol', { class: 'steps steps-compact' }, STEPS[mode].map((s, i) =>
               h('li', { class: 'step card', style: `--i: ${i}` },
-                h('span', { class: 'step-icon' }, s.icon),
+                h('span', { class: 'step-icon' }, icon(s.icon, { size: 22 })),
                 h('span', { class: 'step-num' }, `Крок ${i + 1}`),
                 h('h3', {}, s.title),
                 h('p', {}, s.text))))))))),
