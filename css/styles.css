@@ -1555,3 +1555,13 @@ body.blackout .auth .btn-secondary, body.blackout .auth-card .btn-secondary { ba
   .profile-actions { flex-wrap: wrap; }
   .goal-option { min-height: 48px; padding: 0 16px; }
 }
+
+/* Господар у вікні точки на карті */
+.popup-host { display: grid; gap: 2px; margin-top: 4px; padding-top: 6px; border-top: 1px solid var(--line); font-size: 13px; }
+.popup-host .verified-sm { margin-left: 0; justify-self: start; }
+.popup-status { font-weight: 600; }
+.popup-status.status-open { color: var(--ok); }
+.popup-status.status-closed, .popup-status.status-dayoff, .popup-status.status-paused { color: var(--orange); }
+.popup-contacts a { color: var(--indigo); word-break: break-all; }
+.popup-signin { color: var(--muted); }
+.popup-body .popup-signin .btn { margin: 4px 0 0; color: var(--indigo); background: transparent; border: 1px solid var(--indigo); }

@@ -255,3 +255,15 @@ update public.pilot_spots set verified_at = now() where id = '<id точки>';
 - Після синхронізації `run.js` будує стислий знімок `stations-v1.json` (~130 байт на станцію) і кладе його в публічний бакет Supabase `public-data` (`Cache-Control: max-age=3600`). Якщо активних станцій 0 — знімок не перезаписується.
 - Сайт читає саме знімок; повна картка станції довантажується з таблиці при відкритті. Якщо знімка немає — читає таблицю (до 2000 станцій).
 - **Розгортання:** виконайте `supabase/migrations/202611190003_public_data_bucket.sql`, потім запустіть workflow «Sync public charging stations». Перевірка: `https://<проєкт>.supabase.co/storage/v1/object/public/public-data/stations-v1.json` відкривається й містить `count`.
+
+## Картка господаря на карті
+
+У вікні приватної точки на карті — ім'я й прізвище господаря, позначка «Перевірений господар», «на WattWay з …», статус доступності за графіком (відчинено / зачинено / вихідний / пауза), бажані канали зв'язку й контакти. Телефон і email бачать **усі, хто увійшов**; без входу — «Увійдіть, щоб побачити телефон і email». Канали господар обирає в кабінеті (чат WattWay, дзвінок, Telegram, Viber, WhatsApp, email).
+
+**Розгортання:** Supabase → SQL Editor: `supabase/migrations/202611240003_host_contact_channels.sql`.
+
+**Ручна перевірка:**
+1. Анонім: `select phone, email from pilot_spot_host_card('<id точки>')` → обидва `null`.
+2. Увійшлий користувач (не господар і без бронювання) → телефон і email є.
+3. `select set_my_contact_channels('{fax}')` → помилка `22023`; `'{telegram,chat,telegram}'` → зберігається `{chat,telegram}`.
+4. Прихована адміністратором або заблокована точка → картка порожня.

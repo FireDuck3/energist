@@ -4,6 +4,7 @@ import { filterSpots, spotRating, isLiveInBlackout, isOpenAt, normalizeQuery } f
 import { RADII, POWER_BANDS, CONNECTOR_FILTERS, distanceKm, matchSpotExtra, matchStation, sortByDistance, nearest, nearestN, resultsLabel } from '../map-filters.js';
 import { locate, geoMessage } from '../geolocate.js';
 import { openReport } from './report.js';
+import { availabilityLabel, channelLabels, hostSince } from '../host-profile.js';
 import { formatUAH } from '../pricing.js';
 import { DEVICES, SOURCES, CONNECTORS, VINNYTSIA_CENTER, AREA_RADIUS_M } from '../data.js';
 import { searchBox } from './search-box.js';
@@ -53,7 +54,24 @@ function spotCard(spot, { blackout, now, origin }) {
           : openingLine(spot, now))));
 }
 
-function popupContent(spot) {
+// Головне про господаря у вікні точки: ім'я, перевірка, стаж, статус, контакти (увійшлим) і канали зв'язку.
+function hostBlock(spot, card, signedIn, session) {
+  const status = availabilityLabel(spot, new Date());
+  const contacts = [card.phone && h('a', { href: `tel:${card.phone}` }, card.phone), card.email && h('a', { href: `mailto:${card.email}` }, card.email)]
+    .filter(Boolean);
+  return h('div', { class: 'popup-host' },
+    h('div', {}, 'Господар — ', h('b', {}, card.name)),
+    card.verified ? h('span', { class: 'verified-badge verified-sm', title: 'WattWay перевірив особу господаря' }, '✓ Перевірений господар') : '',
+    h('div', { class: 'muted' }, hostSince(card.since) ?? ''),
+    h('div', { class: `popup-status status-${status.state}` }, status.text),
+    contacts.length
+      ? h('div', { class: 'popup-contacts' }, ...contacts.flatMap((c, i) => (i ? [' · ', c] : [c])))
+      : !signedIn && h('div', { class: 'popup-signin' }, 'Увійдіть, щоб побачити телефон і email ',
+        h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => session?.requireAuth?.(() => {}, 'Увійдіть, щоб побачити контакти господаря') }, 'Увійти')),
+    card.channels.length ? h('div', { class: 'muted' }, `Зв'язок: ${channelLabels(card.channels).join(', ')}`) : '');
+}
+
+function popupContent(spot, host) {
   return h('div', { class: 'popup' },
     h('img', { src: spotCover(spot), alt: '' }),
     h('div', { class: 'popup-body' },
@@ -61,6 +79,7 @@ function popupContent(spot) {
       h('div', { class: 'muted' }, `${spot.district} · `, stars(spotRating(spot))),
       spot.pilot && !spot.exactLocation && h('div', { class: 'muted popup-area' }, `📍 Приблизне місце, ±${AREA_RADIUS_M} м`),
       h('div', {}, h('b', {}, formatUAH(spot.pricePerKwh)), ' / кВт·год'),
+      host ?? '',
       h('a', { class: 'btn btn-primary btn-sm', href: `#/spot/${spot.id}` }, 'Детальніше')));
 }
 
@@ -124,7 +143,7 @@ const ZONE_MIN_ZOOM = 14;
 const chip = (label, active, onclick) =>
   h('button', { type: 'button', class: `chip${active ? ' active' : ''}`, 'aria-pressed': String(active), onclick }, label);
 
-export function render(_params, root, store, session, userHistory) {
+export function render(_params, root, store, session, userHistory, pilot) {
   const search = searchBox(store, userHistory, session);
   const list = h('div', { class: 'spot-list' });
   const count = h('p', { class: 'result-count' });
@@ -273,6 +292,27 @@ export function render(_params, root, store, session, userHistory) {
     m.marker.setZIndexOffset(on ? 1000 : 0);
   };
 
+  // Картка господаря довантажується при відкритті вікна (кеш + один запит на точку).
+  const hostCards = new Map();
+  const hostLoads = new Map();
+  function privatePopup(spot) {
+    const signedIn = session?.getState?.().status === 'signedIn';
+    if (!spot.pilot || !pilot?.hostCard) return popupContent(spot);
+    const key = `${spot.id}:${signedIn}`; // після входу картка інша — з контактами
+    const cached = hostCards.get(key);
+    if (cached !== undefined) return popupContent(spot, cached && hostBlock(spot, cached, signedIn, session));
+    const box = h('div', {}, popupContent(spot, h('div', { class: 'popup-host muted' }, 'Завантаження…')));
+    if (!hostLoads.has(key)) hostLoads.set(key, pilot.hostCard(spot.id).catch(() => null).finally(() => hostLoads.delete(key)));
+    hostLoads.get(key).then((card) => {
+      if (destroyed) return;
+      if (card) hostCards.set(key, card); // збій не кешуємо — наступне відкриття спробує ще раз
+      box.replaceChildren(popupContent(spot, card && hostBlock(spot, card, signedIn, session)));
+      const popup = markers.find((m) => m.spot.id === spot.id && !m.dimmed)?.marker.getPopup();
+      if (popup?.isOpen()) fitPopup(popup);
+    });
+    return box;
+  }
+
   function renderMarkers(visible, blackout, spots) {
     if (!map) return;
     markers.forEach((m) => m.marker.remove());
@@ -282,7 +322,7 @@ export function render(_params, root, store, session, userHistory) {
       L.circle([s.lat, s.lng], { radius: AREA_RADIUS_M, className: 'spot-zone', interactive: false }).addTo(zoneLayer));
     markers = visible.map((spot) => {
       const marker = L.marker([spot.lat, spot.lng], { icon: spotPin(spot), riseOnHover: true })
-        .bindPopup(() => popupContent(spot), { closeButton: false, minWidth: 220 })
+        .bindPopup(() => privatePopup(spot), { closeButton: false, minWidth: 220 })
         .on('mouseover', () => highlight(spot.id, true))
         .on('mouseout', () => highlight(spot.id, false))
         .addTo(map);

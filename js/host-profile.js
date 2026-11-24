@@ -1,5 +1,29 @@
 // Опис станції й «паспорт» господаря (поля зі спринту, docs/host-data.md). Чисті функції без DOM.
 import { VOLTAGES, TERRITORIES, SES_TYPES, PARKING_TYPES } from './data.js';
+import { kyivNow, isoWeekday } from './calendar.js';
+
+// Бажані канали зв'язку господаря (profiles.contact_channels, міграція 202611240003).
+export const CONTACT_CHANNELS = [
+  { id: 'chat', label: 'Чат WattWay' },
+  { id: 'phone', label: 'Дзвінок' },
+  { id: 'telegram', label: 'Telegram' },
+  { id: 'viber', label: 'Viber' },
+  { id: 'whatsapp', label: 'WhatsApp' },
+  { id: 'email', label: 'Email' },
+];
+export const channelLabels = (ids = []) => CONTACT_CHANNELS.filter((c) => (ids ?? []).includes(c.id)).map((c) => c.label);
+
+const toMin = (hhmm) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
+
+// Статус доступності точки зараз (за часом Києва) — для вікна на карті й сторінки точки.
+export function availabilityLabel(spot, now = new Date()) {
+  if (spot.paused) return { state: 'paused', text: 'На паузі' };
+  const k = kyivNow(now);
+  if ((spot.closedWeekdays ?? []).includes(isoWeekday(k.day))) return { state: 'dayoff', text: 'Сьогодні вихідний' };
+  const { from, to } = spot.schedule;
+  if (k.minutes >= toMin(from) && k.minutes < toMin(to)) return { state: 'open', text: `Відчинено до ${to}` };
+  return { state: 'closed', text: `Зачинено · відкриється о ${from}` };
+}
 
 // Колонки, які зберігає update_pilot_spot_details (202611200001) і update_pilot_spot_form (202611220001).
 export const DETAIL_COLUMNS = ['install_year', 'voltage_v', 'inverter', 'storage_kwh', 'charging_terms', 'has_wifi', 'territory', 'can_leave_car'];
@@ -81,5 +105,6 @@ export function toHostCard(row, photoUrl = (p) => p) {
     phone: row.phone || null, email: row.email || null,
     sessions: Number(row.completed_sessions) || 0, recentHours: (row.recent_hours ?? []).map(Number),
     photo: row.avatar_path ? photoUrl(row.avatar_path) : null,
+    channels: Array.isArray(row.contact_channels) ? row.contact_channels : [],
   };
 }
