@@ -1,6 +1,6 @@
 import { test, eq } from './runner.js';
 import {
-  dayLabel, groupByDay, messageTicks, chatPreview, filterChats, mergeMessages, bookingActions, systemEvents, isTypingFresh,
+  dayLabel, groupByDay, messageTicks, chatPreview, filterChats, mergeMessages, bookingActions, systemEvents, isTypingFresh, chatClosed, CHAT_OPEN_DAYS_AFTER,
 } from '../js/chat-view-model.js';
 
 const NOW = new Date('2026-11-18T12:00:00Z'); // 14:00 у Києві
@@ -67,4 +67,14 @@ test('systemEvents: запит і поточний статус', () => {
 
 test('isTypingFresh: 5 секунд', () => {
   eq([isTypingFresh(null, 10000), isTypingFresh(6000, 10000), isTypingFresh(4000, 10000)], [false, true, false]);
+});
+
+test('chatClosed: відхилене чи скасоване — закрите; завершене — ще 14 днів після кінця слоту', () => {
+  const b = (status, end = '2026-11-18 12:00:00') => ({ status, slot: `["2026-11-18 10:00:00","${end}")` });
+  eq(CHAT_OPEN_DAYS_AFTER, 14);
+  eq(['pending', 'confirmed'].map((s) => chatClosed(b(s, '2026-10-01 12:00:00'), NOW)), [false, false]);
+  eq(['declined', 'cancelled'].map((s) => chatClosed(b(s), NOW)), [true, true]);
+  eq(chatClosed(b('completed', '2026-11-04 14:01:00'), NOW), false, 'ще в межах 14 днів');
+  eq(chatClosed(b('completed', '2026-11-04 13:59:00'), NOW), true, 'понад 14 днів');
+  eq(chatClosed(b('completed', 'garbage'), NOW), false, 'без кінця слоту не закриваємо');
 });

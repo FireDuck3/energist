@@ -4,7 +4,7 @@ import { icon, withIcon } from '../icons.js';
 import { kyivNow } from '../calendar.js';
 import { formatLastMessage, unreadLabel } from '../chats.js';
 import {
-  groupByDay, messageTicks, chatPreview, filterChats, mergeMessages, bookingActions, systemEvents, isTypingFresh, TYPING_TTL_MS,
+  groupByDay, messageTicks, chatPreview, filterChats, mergeMessages, bookingActions, systemEvents, isTypingFresh, TYPING_TTL_MS, chatClosed,
 } from '../chat-view-model.js';
 import { createComposer } from './chat-composer.js';
 import { openReport } from './report.js';
@@ -108,7 +108,7 @@ export function render({ id }, root, _store, session, _history, pilot) {
     function drawHead() {
       headName.textContent = t.booking.counterpart_name || 'Учасник бронювання';
       headSub.textContent = `${t.booking.spot_title || 'Точка зарядки'} · ${slotLabel(t.booking.slot)} · ${STATUS[t.booking.status] ?? ''}`;
-      composer.setDisabled(['declined', 'cancelled'].includes(t.booking.status));
+      composer.setDisabled(chatClosed(t.booking, new Date()));
     }
 
     threadPane.replaceChildren(

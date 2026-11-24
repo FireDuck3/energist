@@ -68,6 +68,20 @@ export function bookingActions(booking, me, now) {
   return actions;
 }
 
+// Чат закривається: відхилене чи скасоване бронювання — одразу, завершене — через 14 днів після кінця слоту
+// (досить, щоб домовитися про оплату й залишити відгук). Те саме правило — у політиці booking_messages
+// (міграція 202611240008_minor_findings.sql); число має збігатися.
+export const CHAT_OPEN_DAYS_AFTER = 14;
+export function chatClosed(booking, now) {
+  if (['declined', 'cancelled'].includes(booking.status)) return true;
+  if (booking.status !== 'completed') return false;
+  const end = slotEnd(booking.slot);
+  if (!end) return false;
+  const k = kyivNow(now);
+  const limit = `${addDays(end.slice(0, 10), CHAT_OPEN_DAYS_AFTER)} ${end.slice(11, 16)}`;
+  return `${k.day} ${pad(Math.floor(k.minutes / 60))}:${pad(k.minutes % 60)}` >= limit;
+}
+
 const STATUS_TEXT = {
   confirmed: 'Бронювання підтверджено',
   declined: 'Запит відхилено',
