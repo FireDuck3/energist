@@ -206,7 +206,8 @@ export async function loadSupabase() {
           new_territory: c.territory, new_can_leave_car: c.can_leave_car,
         }));
       },
-      // Картка господаря: контакти сервер віддає лише власнику й гостю з підтвердженим бронюванням.
+      setMyContactChannels: ids => call(client.rpc('set_my_contact_channels', { channels: ids })),
+      // Картка господаря: телефон і email сервер віддає лише тим, хто увійшов (анонімам — null).
       pilotSpotHostCard: async id => toHostCard((await call(client.rpc('pilot_spot_host_card', { point_id: id })))[0],
         path => client.storage.from(PHOTO_BUCKET).getPublicUrl(path).data.publicUrl),
       listPilotBookings: () => call(client.rpc('list_my_pilot_bookings')),

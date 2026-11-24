@@ -156,6 +156,11 @@ export function createPilot(session, store, { notifications = bellList } = {}) {
       if (!session.service?.pilotSpotHostCard) return null;
       try { return await session.service.pilotSpotHostCard(id); } catch { return null; }
     },
+    // Бажані канали зв'язку господаря (чат, дзвінок, месенджери, email).
+    async saveContactChannels(ids) {
+      if (!uid() || !session.service?.setMyContactChannels) throw new Error('Sign-in required');
+      await session.service.setMyContactChannels(ids);
+    },
     async setPaused(id, on) { await session.service.setPilotSpotPaused(id, on); await refresh(); },
     async setSchedule(id, schedule) { await session.service.setPilotSpotSchedule(id, schedule); await refresh(); },
     async setPhotos(id, paths) { await session.service.setPilotSpotPhotos(id, paths); await refresh(); },

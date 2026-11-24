@@ -14,6 +14,7 @@ import { kyivNow, addDays, isoWeekday } from '../calendar.js';
 import { checkPhotos, resizeImage, PHOTO_LIMITS } from '../photos.js';
 import { hiddenNotice } from './hidden-notice.js';
 import { icon } from '../icons.js';
+import { CONTACT_CHANNELS } from '../host-profile.js';
 
 const WEEKDAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
 
@@ -103,6 +104,7 @@ export function openAddSpot(store, hostName, publish, existing = null, { pilot =
   const initialContact = savedContact ?? {
     firstName: user?.firstName ?? '', lastName: user?.lastName ?? '',
     phone: profile?.phone ?? '', avatarPath: profile?.avatar_path ?? null,
+    channels: [...(profile?.contact_channels ?? [])],
   };
   const contact = { ...initialContact };
   let avatarBlob = null;
@@ -159,7 +161,7 @@ export function openAddSpot(store, hostName, publish, existing = null, { pilot =
     } });
   const aboutYou = live && h('fieldset', { class: 'form-section' },
     h('legend', {}, '1. Про вас'),
-    h('p', { class: 'hint' }, "Ім'я та фото бачать гості в картці точки. Телефон — лише гості з підтвердженим бронюванням."),
+    h('p', { class: 'hint' }, "Ім'я, фото й бажані канали зв'язку бачать гості в картці точки. Телефон і email — усі, хто увійшов на сайт."),
     h('div', { class: 'avatar-row' }, avatarImg,
       group(req('Ваше фото'), h('button', { type: 'button', class: 'btn btn-secondary btn-sm', onclick: () => avatarInput.click() },
         contact.avatarPath ? 'Змінити фото' : 'Вибрати фото'), 'avatar', 'JPEG, PNG або WebP'),
@@ -168,7 +170,11 @@ export function openAddSpot(store, hostName, publish, existing = null, { pilot =
       field(req("Ім'я"), textInput(contact.firstName, (v) => { contact.firstName = v; }, { maxlength: 60, autocomplete: 'given-name' }), 'firstName'),
       field(req('Прізвище'), textInput(contact.lastName, (v) => { contact.lastName = v; }, { maxlength: 60, autocomplete: 'family-name' }), 'lastName'),
       field(req('Телефон'), h('input', { class: 'input', type: 'tel', autocomplete: 'tel', maxlength: 25, value: contact.phone ?? '',
-        placeholder: '+380 67 123 45 67', oninput: (e) => { contact.phone = e.target.value; } }), 'phone')));
+        placeholder: '+380 67 123 45 67', oninput: (e) => { contact.phone = e.target.value; } }), 'phone')),
+    group('Бажані канали зв\'язку', chips(() => CONTACT_CHANNELS.map((c) => [c.id, c.label]),
+      (id) => (contact.channels ?? []).includes(id),
+      (id) => { const set = new Set(contact.channels ?? []); set.has(id) ? set.delete(id) : set.add(id); contact.channels = [...set]; }).el,
+      'channels', 'Як гостям зручніше з вами зв\'язатися — показується у вікні точки на карті'));
 
   // 2. Станція
   const mapEl = h('div', { class: 'mini-map' });
@@ -360,7 +366,8 @@ export function openAddSpot(store, hostName, publish, existing = null, { pilot =
           try {
             const avatarPath = await pilot.saveHostContact({ firstName: contact.firstName.trim(), lastName: contact.lastName.trim(),
               phone, avatarPath: contact.avatarPath }, avatarBlob);
-            savedContact = { firstName: contact.firstName.trim(), lastName: contact.lastName.trim(), phone: contact.phone, avatarPath };
+            savedContact = { firstName: contact.firstName.trim(), lastName: contact.lastName.trim(), phone: contact.phone, avatarPath,
+              channels: [...(initialContact.channels ?? [])] };
             Object.assign(initialContact, savedContact);
             contact.avatarPath = avatarPath;
             avatarBlob = null;
@@ -370,6 +377,14 @@ export function openAddSpot(store, hostName, publish, existing = null, { pilot =
             return;
           }
         }
+      }
+      // Канали зв'язку — окремим запитом; збій не зупиняє збереження точки.
+      if (live && [...(contact.channels ?? [])].sort().join() !== [...(initialContact.channels ?? [])].sort().join()) {
+        try {
+          await pilot.saveContactChannels(contact.channels ?? []);
+          initialContact.channels = [...(contact.channels ?? [])];
+          savedContact = { ...(savedContact ?? initialContact), channels: initialContact.channels };
+        } catch { warnings.push('канали зв\'язку не збереглися — спробуйте ще раз'); }
       }
       let id;
       try { id = await publish(data); }
