@@ -8,7 +8,10 @@ test('головна: екран вибору — «Я роздаю енергі
   const cleanup = render({}, root, store);
   try {
     eq([...root.querySelectorAll('h1, .section-title')].map((x) => x.textContent), ['Енергетичний Airbnb для України', 'Як це працює']);
-    eq([...root.querySelectorAll('.mode-card-title')].map((x) => x.textContent), ['Я роздаю енергію', 'Я шукаю енергію']);
+    // Як у макеті Figma: дві кнопки вибору режиму й чіпи з перевагами.
+    eq([...root.querySelectorAll('.choice-btn-text')].map((x) => x.textContent), ['Знайти розетку', 'Здати свою енергію']);
+    eq([...root.querySelectorAll('.choice-btn')].map((x) => x.title), ['Я шукаю енергію', 'Я роздаю енергію']);
+    eq(root.querySelectorAll('.hero-chips li').length, 5);
     eq(root.querySelectorAll('.story, .stories, .calc, input[type=range], a[href="#/calc"]').length, 0);
     eq(/калькулятор/i.test(root.textContent), false);
     eq(typeof cleanup, 'function');
@@ -21,9 +24,9 @@ test("головна: вибір режиму запам'ятовується і
   const before = location.hash;
   const cleanup = render({}, root, store);
   try {
-    root.querySelector('.mode-card-host').click();
+    root.querySelector('.choice-btn-host').click();
     eq([store.getState().mode, location.hash], ['host', '#/host']);
-    root.querySelector('.mode-card-guest').click();
+    root.querySelector('.choice-btn-guest').click();
     eq([store.getState().mode, location.hash], ['guest', '#/map']);
   } finally { cleanup?.(); history.replaceState(null, '', before || location.pathname); }
 });

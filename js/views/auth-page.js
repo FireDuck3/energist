@@ -1,6 +1,7 @@
 // Окремі сторінки входу (#/login) і реєстрації (#/signup).
 // Вікно входу (auth-modal.js) лишається для дій, що потребують акаунта посеред сценарію (бронювання).
 import { h } from '../ui.js';
+import { logoMark } from '../icons.js';
 import { disablePush } from '../push.js';
 import { notify } from '../notifications.js';
 import { authErrorMessage } from '../auth.js';
@@ -100,7 +101,7 @@ function renderAuthPage(mode, root, session) {
         signup ? 'Продовжити з Google' : 'Увійти через Google')];
 
     card.replaceChildren(
-      h('div', { class: 'auth-brand' }, h('span', { class: 'logo-mark' }, '⚡'), h('b', {}, 'WattWay')),
+      h('div', { class: 'auth-brand' }, logoMark()),
       h('h1', {}, text.title),
       h('p', { class: 'muted auth-lead' }, text.lead),
       form,

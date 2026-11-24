@@ -8,6 +8,7 @@ import { loadSupabase } from './supabase.js';
 import { createUserHistory } from './user-history.js';
 import { startRouter, currentPath } from './router.js';
 import { h, installRipple } from './ui.js';
+import { logoMark, icon } from './icons.js';
 import { notifications, notify } from './notifications.js';
 import * as landing from './views/landing.js';
 import * as map from './views/map.js';
@@ -77,8 +78,7 @@ function renderHeader() {
 
   document.getElementById('site-header').replaceChildren(
     h('div', { class: 'container header-inner' },
-      h('a', { class: 'logo', href: homeFor(mode) },
-        h('span', { class: 'logo-mark' }, '⚡'), h('span', {}, 'Watt', h('b', {}, 'Way'))),
+      h('a', { class: 'logo', href: homeFor(mode), 'aria-label': 'Wattway — на головну' }, logoMark()),
       mode && h('nav', { class: 'segmented mode-switch', 'aria-label': 'Режим' },
         ['guest', 'host'].map((m) => h('button', { type: 'button', class: `segment${mode === m ? ' active' : ''}`,
           'aria-pressed': String(mode === m), 'aria-label': MODES[m].label, title: MODES[m].label, onclick: () => switchMode(m) },
@@ -90,7 +90,8 @@ function renderHeader() {
         h('label', { class: 'switch', title: 'Режим блекауту' },
           h('input', { type: 'checkbox', checked: blackout, 'aria-label': 'Режим блекауту', onchange: (e) => store.setBlackout(e.target.checked) }),
           h('span', { class: 'switch-track' }, h('span', { class: 'switch-thumb' })),
-          h('span', { class: 'switch-icon', 'aria-hidden': 'true' }, '⚡'),
+          // Як у макеті: сонце — світла тема, місяць — темна (режим блекауту).
+          h('span', { class: 'switch-icon', 'aria-hidden': 'true' }, icon(blackout ? 'moon' : 'sun', { size: 22 })),
           h('span', { class: 'switch-label' }, 'Блекаут')),
         bell.el,
         accountArea())));

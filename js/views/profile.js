@@ -8,6 +8,7 @@ import { signInPrompt } from './auth-modal.js';
 import { logOut } from './auth-page.js';
 import { pushState, enablePush, disablePush, PUSH_STATE_TEXT } from '../push.js';
 import { supabaseConfig } from '../supabase-config.js';
+import { icon } from '../icons.js';
 
 // Блок «Сповіщення на пристрої»: стан, увімкнення й вимкнення push лише за кліком.
 function pushCard(service) {
@@ -38,7 +39,8 @@ function pushCard(service) {
     h('h2', { class: 'panel-title' }, 'Сповіщення на пристрої'), text, button, error);
 }
 
-const ROLES = [['guest', '🔌 Шукаю зарядку'], ['host', '☀️ Маю енергію для продажу']];
+// «Ваша ціль» з макета: збігається з ролями профілю й режимами сайту.
+const GOALS = [['guest', 'plug', 'Знайти розетку'], ['host', 'sun', 'Здати свою енергію']];
 
 const pad = (n) => String(n).padStart(2, '0');
 function when(iso) {
@@ -132,28 +134,25 @@ export function render(_params, root, store, session, userHistory, pilot) {
 
     function draw() {
       box.replaceChildren(
-        h('dl', { class: 'account-details' },
-          [['Ім’я', user.firstName], ['Прізвище', user.lastName], ['Електронна пошта', user.email]]
-            .map(([label, value]) => h('div', {},
-              h('dt', { class: 'field-label' }, label),
-              h('dd', {}, value || 'Не вказано')))),
-        h('label', { class: 'form-field' }, h('span', { class: 'field-label' }, 'Ім’я в WattWay'),
+        h('label', { class: 'form-field' }, h('span', { class: 'field-label' }, 'Юзернейм'),
           h('input', { class: 'input', type: 'text', maxlength: 60, value: draft.name, disabled: busy,
             oninput: (e) => { draft.name = e.target.value; } }),
+          h('span', { class: 'hint' }, 'Так вас бачать інші учасники WattWay.'),
           errors.name && h('span', { class: 'field-error' }, errors.name)),
         h('label', { class: 'form-field' }, h('span', { class: 'field-label' }, 'Телефон'),
           h('input', { class: 'input', type: 'tel', autocomplete: 'tel', maxlength: 25, value: draft.phone ?? '', disabled: busy,
             placeholder: '+380 67 123 45 67', oninput: (e) => { draft.phone = e.target.value; } }),
           h('span', { class: 'hint' }, 'Бачать лише гості з підтвердженим бронюванням ваших точок.'),
           errors.phone && h('span', { class: 'field-error' }, errors.phone)),
-        h('div', { class: 'form-field' }, h('span', { class: 'field-label' }, 'Для чого вам WattWay?'),
-          h('div', { class: 'role-choice' }, ROLES.map(([value, label]) =>
-            h('button', { type: 'button', class: `chip${draft.role === value ? ' active' : ''}`, disabled: busy,
-              onclick: () => { draft.role = value; draw(); } }, label))),
+        h('div', { class: 'form-field' }, h('span', { class: 'field-label' }, 'Ваша ціль'),
+          h('div', { class: 'goal-choice' }, GOALS.map(([value, iconName, label]) =>
+            h('button', { type: 'button', class: `goal-option${draft.role === value ? ' active' : ''}`, disabled: busy,
+              'aria-pressed': String(draft.role === value), onclick: () => { draft.role = value; draw(); } },
+            icon(iconName, { size: 20 }), label))),
           errors.role && h('span', { class: 'field-error' }, errors.role)),
         h('div', { class: 'profile-actions' },
-          h('button', { type: 'button', class: 'btn btn-ghost', disabled: busy, onclick: () => logOut(session) }, 'Вийти'),
-          h('button', { type: 'button', class: 'btn btn-primary', disabled: busy, onclick: save }, busy ? 'Зачекайте…' : 'Зберегти')));
+          h('button', { type: 'button', class: 'btn btn-ghost profile-logout', disabled: busy, onclick: () => logOut(session) }, 'Вийти'),
+          h('button', { type: 'button', class: 'btn btn-paper', disabled: busy, onclick: save }, busy ? 'Зачекайте…' : 'Зберегти')));
     }
 
     async function save() {
@@ -187,9 +186,12 @@ export function render(_params, root, store, session, userHistory, pilot) {
     drawPilot();
     const account = h('div', {},
       h('div', { class: 'card profile-card' },
+        // Як у макеті: аватар, ім'я та прізвище з реєстрації й пошта.
         h('div', { class: 'profile-head' },
-          h('span', { class: 'avatar' }, (draft.name || user.email)[0].toUpperCase()),
-          h('div', {}, h('h2', { class: 'panel-title' }, 'Дані профілю'), h('p', { class: 'muted' }, 'Ці дані бачите лише ви.'))),
+          h('span', { class: 'avatar profile-avatar' }, (draft.name || user.email)[0].toUpperCase()),
+          h('div', { class: 'profile-who' },
+            h('h2', { class: 'profile-name' }, [user.firstName, user.lastName].filter(Boolean).join(' ') || draft.name),
+            h('span', { class: 'profile-email' }, user.email))),
         box),
       pushCard(session.service),
       resetLink());

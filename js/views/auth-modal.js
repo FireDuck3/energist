@@ -1,6 +1,7 @@
 // Вікно входу: вхід і реєстрація паролем, вхід кодом з пошти, скидання пароля кодом,
 // перший крок профілю і демо-режим без інтернету. Одне вікно за раз.
 import { h, openModal } from '../ui.js';
+import { logoMark } from '../icons.js';
 import { checkedCredentials } from '../credentials.js';
 import { authErrorMessage } from '../auth.js';
 
@@ -238,7 +239,7 @@ export function openAuthModal(session, { reason = '', mode, error = null } = {})
 
   function render() {
     modal.setContent(h('div', { class: 'auth' },
-      h('div', { class: 'auth-brand' }, h('span', { class: 'logo-mark' }, '⚡'), h('b', {}, 'WattWay')),
+      h('div', { class: 'auth-brand' }, logoMark()),
       reason && st.mode !== 'profile' && h('p', { class: 'auth-reason' }, reason),
       views[st.mode]()));
     if (st.mode === 'codeSent' || st.mode === 'resetSent') startCountdown();

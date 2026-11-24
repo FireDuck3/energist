@@ -13,6 +13,7 @@ import { signInPrompt } from './auth-modal.js';
 import { kyivNow, addDays, isoWeekday } from '../calendar.js';
 import { checkPhotos, resizeImage, PHOTO_LIMITS } from '../photos.js';
 import { hiddenNotice } from './hidden-notice.js';
+import { icon } from '../icons.js';
 
 const WEEKDAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
 
@@ -601,54 +602,67 @@ export function render(_params, root, store, session, _history, pilot) {
       const stats = pilot.hostStats();
       // Власні точки разом із прихованими: на карті (у store) прихованих немає, а їхні відгуки теж рахуються.
       const rating = hostRating(own, session.getState().user?.uid);
-      const ownSpotBlock = (spot) =>
-          h('div', { class: 'own-spot-wrap' }, ownSpotCard(spot),
+      const visible = own.length - paused - hidden;
+      // Картка точки з макета «Кабінет господаря»: фото, чіп підвиду, назва, опис, «Призупинити» й олівець.
+      const ownSpotTile = (spot) => {
+        const edit = () => openAddSpot(store, undefined, (data) => pilot.update(spot.id, data), spot, { pilot, session });
+        return h('article', { class: 'own-card card', dataset: { id: spot.id } },
+          h('a', { class: 'own-card-photo', href: `#/spot/${spot.id}`, tabindex: '-1', 'aria-hidden': 'true' },
+            h('img', { src: spotCover(spot), alt: '' })),
+          h('div', { class: 'own-card-body' },
+            h('span', { class: 'own-card-chip' }, `${SOURCES[spot.source].icon} ${SOURCES[spot.source].label}`),
+            h('a', { class: 'own-card-title', href: `#/spot/${spot.id}` }, spot.title),
+            h('span', { class: 'own-card-meta' }, `${spot.district} · ${formatUAH(spot.pricePerKwh)} / кВт·год · `,
+              stars(spotRating(spot), spot.reviews.length)),
+            h('p', { class: 'own-card-desc' }, spot.details?.description || spot.details?.terms || 'Опис з\'явиться, коли ви додасте його в «Редагувати».'),
             spot.hiddenAt && hiddenNotice(spot, pilot),
             spot.paused && h('span', { class: 'badge badge-warn' }, 'На паузі — гості не бачать точку'),
-            h('div', { class: 'own-spot-actions' },
-              h('button', { type: 'button', class: 'btn btn-secondary btn-sm',
-                onclick: () => openAddSpot(store, undefined, (data) => pilot.update(spot.id, data), spot, { pilot, session }) }, 'Редагувати'),
-              h('button', { type: 'button', class: 'btn btn-secondary btn-sm', onclick: () => openSchedule(spot, pilot) }, 'Графік'),
-              h('button', { type: 'button', class: 'btn btn-secondary btn-sm', onclick: () => openPhotos(spot, pilot) }, 'Фото'),
-              h('button', { type: 'button', class: 'btn btn-secondary btn-sm', async onclick(e) {
+            h('div', { class: 'own-card-tools' },
+              h('button', { type: 'button', class: 'link-action', onclick: () => openSchedule(spot, pilot) }, 'Графік'),
+              h('button', { type: 'button', class: 'link-action', onclick: () => openPhotos(spot, pilot) }, 'Фото'),
+              h('button', { type: 'button', class: 'link-action link-danger', 'aria-label': `Видалити точку ${spot.title}`,
+                async onclick(e) {
+                  if (!window.confirm(`Прибрати «${spot.title}» з карти? Активні бронювання буде скасовано.`)) return;
+                  const button = e.currentTarget;
+                  button.disabled = true;
+                  try { await pilot.archive(spot.id); notify('Точку прибрано з карти'); }
+                  catch { notify('Не вдалося видалити точку. Спробуйте ще раз.', { kind: 'error' }); }
+                  finally { button.disabled = false; }
+                } }, 'Видалити')),
+            h('div', { class: 'own-card-foot' },
+              h('button', { type: 'button', class: 'link-action own-card-pause', async onclick(e) {
                 const ok = await busy(e.currentTarget, null, () => pilot.setPaused(spot.id, !spot.paused), 'Не вдалося змінити стан точки. Спробуйте ще раз.');
                 if (ok) notify(spot.paused ? 'Точку знову видно на карті' : 'Точку поставлено на паузу');
-              } }, spot.paused ? 'Увімкнути' : 'На паузу')),
-            h('button', { type: 'button', class: 'btn btn-danger-ghost btn-sm',
-              'aria-label': `Видалити точку ${spot.title}`,
-              async onclick(e) {
-                if (!window.confirm(`Прибрати «${spot.title}» з карти? Активні бронювання буде скасовано.`)) return;
-                const button = e.currentTarget;
-                button.disabled = true;
-                try { await pilot.archive(spot.id); notify('Точку прибрано з карти'); }
-                catch { notify('Не вдалося видалити точку. Спробуйте ще раз.', { kind: 'error' }); }
-                finally { button.disabled = false; }
-              },
-            }, 'Видалити точку'));
-      root.replaceChildren(h('div', { class: 'container host-page' },
-        h('div', { class: 'host-head' },
-          h('div', {},
-            h('h1', {}, 'Мої точки'),
-            h('p', { class: 'muted' }, 'Ваші точки на карті, запити гостей, графік і фото.')),
-          h('button', { type: 'button', class: 'btn btn-primary btn-lg', onclick: addSpot }, '+ Додати точку')),
-        h('div', { class: 'stats host-stats' },
-          tile('Точок на карті', String(own.length - paused - hidden),
-            [paused && `${paused} на паузі`, hidden && `${hidden} приховано модератором`].filter(Boolean).join(' · ') || 'усі видно гостям'),
-          h('a', { class: `stat card stat-link${stats.pending ? ' stat-attention' : ''}`, href: '#/host/bookings' },
-            h('span', { class: 'stat-label' }, 'Нові запити'),
-            h('b', { class: 'stat-value' }, String(stats.pending)),
-            h('span', { class: 'stat-note' }, stats.pending ? 'Переглянути й підтвердити →' : 'Усі запити оброблено')),
-          tile('Підтверджені бронювання', String(stats.confirmed), 'чекають на зарядку'),
-          tile('Рейтинг', rating.count ? `★ ${rating.avg.toFixed(1).replace('.', ',')}` : '—', ratingLabel(rating.avg, rating.count, 'host'))),
+              } }, spot.paused ? 'Увімкнути' : 'Призупинити'),
+              h('button', { type: 'button', class: 'icon-btn', 'aria-label': `Редагувати «${spot.title}»`, title: 'Редагувати', onclick: edit },
+                icon('pencil', { size: 18 })))));
+      };
+      const requests = stats.pending
+        ? `${stats.pending} ${plural(stats.pending, ['запит чекає', 'запити чекають', 'запитів чекають'])} на вашу відповідь.`
+        : stats.confirmed ? 'Нових запитів немає.' : 'Бронювань ще немає.';
+      root.replaceChildren(h('div', { class: 'container host-page host-cabinet' },
+        h('h1', { class: 'host-title' }, 'Кабінет господаря'),
+        h('section', { class: `card requests-panel${stats.pending ? ' requests-attention' : ''}` },
+          h('h2', { class: 'panel-title' }, 'Запити гостей'),
+          h('p', { class: 'requests-text' }, requests),
+          h('p', { class: 'requests-meta' },
+            `Підтверджено: ${stats.confirmed} · На карті: ${visible} з ${own.length}`,
+            [paused && ` · ${paused} на паузі`, hidden && ` · ${hidden} приховано модератором`].filter(Boolean).join(''),
+            ` · ${rating.count ? `★ ${rating.avg.toFixed(1).replace('.', ',')}` : ratingLabel(rating.avg, rating.count, 'host')}`),
+          h('a', { class: 'btn btn-primary', href: '#/host/bookings' }, stats.pending ? 'Переглянути запити' : 'Усі бронювання')),
+        h('div', { class: 'own-head' },
+          h('h2', { class: 'own-title' }, 'Мої точки'),
+          h('button', { type: 'button', class: 'icon-btn icon-btn-add', 'aria-label': 'Додати точку', title: 'Додати точку', onclick: addSpot },
+            icon('plus', { size: 22 }))),
         own.length
-          ? h('div', { class: 'host-overview' },
-            spotsMap.el,
-            h('div', { class: 'own-spots own-spots-list' }, own.map(ownSpotBlock)))
+          ? h('div', { class: 'own-grid' }, own.map(ownSpotTile))
           : h('div', { class: 'card host-empty' },
             h('span', { class: 'gate-icon' }, '📍'),
             h('h2', {}, 'У вас ще немає точок'),
             h('p', { class: 'muted' }, 'Додайте свою СЕС: потужність, акумулятор, конектор, графік і ціну. Після цього її побачать гості на карті.'),
-            h('button', { type: 'button', class: 'btn btn-primary btn-lg', onclick: addSpot }, '+ Додати першу точку'))));
+            h('button', { type: 'button', class: 'btn btn-primary btn-lg', onclick: addSpot }, '+ Додати першу точку')),
+        own.length && h('section', { class: 'host-map-section' },
+          h('h2', { class: 'own-title' }, 'Мої точки на карті'), spotsMap.el)));
       if (own.length) spotsMap.update(own);
       return;
     }
