@@ -25,3 +25,14 @@ test('buildPayload: посилання веде одразу в чат брон�
   eq(buildPayload({ body: 'x', booking_id: 'b1' }).url, '#/chats/b1');
   eq(buildPayload({ body: 'x' }).url, '#/chats');
 });
+
+test('isPushEndpoint: лише https-адреси справжніх push-сервісів браузерів', async () => {
+  const { isPushEndpoint } = await import('../supabase/functions/send-push/payload.js');
+  const ok = ['https://fcm.googleapis.com/fcm/send/abc:APA91', 'https://updates.push.services.mozilla.com/wpush/v2/gAAA',
+    'https://web.push.apple.com/QGx', 'https://wns2-par02p.notify.windows.com/w/?token=BQY'];
+  const bad = ['http://fcm.googleapis.com/fcm/send/x', 'https://evil.example/fcm.googleapis.com/x', 'https://fcm.googleapis.com.evil.example/x',
+    'https://evil.example/?h=web.push.apple.com', 'https://notify.windows.com.evil.example/w', 'https://user@fcm.googleapis.com/x',
+    'https://fcm.googleapis.com:8443/x', 'https://127.0.0.1/x', 'javascript:alert(1)', '', null, undefined, 42];
+  eq(ok.map(isPushEndpoint), ok.map(() => true));
+  eq(bad.map(isPushEndpoint), bad.map(() => false));
+});

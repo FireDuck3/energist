@@ -1,8 +1,9 @@
 import { test, eq } from './runner.js';
-import { urlBase64ToUint8Array, pushSupported, pushState, enablePush, disablePush } from '../js/push.js';
+import { urlBase64ToUint8Array, pushSupported, pushState, enablePush, disablePush, pushErrorText } from '../js/push.js';
 
 // Підроблене середовище браузера з керованим дозволом і підпискою.
-function fakeEnv({ permission = 'default', subscription = null, grant = 'granted' } = {}) {
+const FCM = 'https://fcm.googleapis.com/fcm/send/new';
+function fakeEnv({ permission = 'default', subscription = null, grant = 'granted', newEndpoint = FCM } = {}) {
   const state = { subscription, unsubscribed: false };
   const sub = (endpoint) => ({
     endpoint,
@@ -13,7 +14,7 @@ function fakeEnv({ permission = 'default', subscription = null, grant = 'granted
   const registration = {
     pushManager: {
       getSubscription: async () => state.subscription,
-      subscribe: async (opts) => { state.opts = opts; state.subscription = sub('https://push.example/new'); return state.subscription; },
+      subscribe: async (opts) => { state.opts = opts; state.subscription = sub(newEndpoint); return state.subscription; },
     },
   };
   const env = {
@@ -46,7 +47,7 @@ test('enablePush: підписує й зберігає підписку на с�
   const { env, state } = fakeEnv();
   const saved = [];
   await enablePush({ service: { savePushSubscription: async (s) => saved.push(s) }, vapidKey: 'AQID', env });
-  eq(saved, [{ endpoint: 'https://push.example/new', keys: { p256dh: 'P', auth: 'A' } }]);
+  eq(saved, [{ endpoint: FCM, keys: { p256dh: 'P', auth: 'A' } }]);
   eq(state.opts.userVisibleOnly, true);
 });
 
@@ -71,4 +72,19 @@ test('pushState: підписка цього браузера належить �
   const service = { ownsPushSubscription: async (endpoint) => endpoint === 'https://push.example/other' };
   eq(await pushState({ env, vapidKey: 'K', service }), 'off');
   eq(await pushState({ env, vapidKey: 'K', service: { ownsPushSubscription: async () => true } }), 'on');
+});
+
+test('enablePush: невідомий push-сервіс → code unsupported-service, підписку знято, нічого не збережено', async () => {
+  const { env, state } = fakeEnv({ newEndpoint: 'https://evil.example/collect' });
+  const saved = [];
+  let code = null;
+  try { await enablePush({ service: { savePushSubscription: async (s) => saved.push(s) }, vapidKey: 'AQID', env }); }
+  catch (e) { code = e.code; }
+  eq([code, saved.length, state.unsubscribed], ['unsupported-service', 0, true]);
+});
+
+test('pushErrorText: зрозумілі тексти для відмови й невідомого сервісу', () => {
+  eq(/заблоковані/.test(pushErrorText('denied')), true);
+  eq(/не підтримує/.test(pushErrorText('unsupported-service')), true);
+  eq(pushErrorText('whatever'), 'Не вдалося змінити налаштування. Спробуйте ще раз.');
 });

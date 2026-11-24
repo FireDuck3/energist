@@ -220,6 +220,8 @@ insert into public.admins(user_id) select id from public.users where email = 'ad
 
 **Як це працює:** нові повідомлення й сповіщення приходять через Supabase Realtime (опитування лишається запасним: чат 20 с, дзвіночок 60 с). У «Мої чати» видно непрочитані й час останнього повідомлення; відкритий чат позначається прочитаним. Ліміт — 10 повідомлень за хвилину й 300 за добу. У профілі блок «Сповіщення на пристрої» вмикає push (лише після вашого кліку й дозволу браузера). Код: `js/chats.js`, `js/push.js`, `sw.js`, `supabase/functions/send-push/`.
 
+**Лише справжні push-сервіси** (міграція `202611240007_push_endpoints.sql`, захист від SSRF): база приймає підписку лише з адресою FCM (Chrome, Edge, Opera, Samsung), Mozilla (Firefox), Apple (Safari) чи WNS (`*.notify.windows.com`), а функція `send-push` пропускає будь-які інші адреси. Список один на сайт і функцію — `isPushEndpoint` у `supabase/functions/send-push/payload.js` — і повторений у міграції. Після зміни `payload.js` чи `index.ts` перерозгорніть функцію `send-push` (Supabase → Edge Functions → `send-push` → вставити обидва файли → Deploy).
+
 ## Скарги й перевірені точки (Етап 4б)
 
 **Розгортання:** Supabase → SQL Editor: виконайте `supabase/migrations/202611190001_trust.sql`.
