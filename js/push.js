@@ -1,5 +1,6 @@
 // Push-сповіщення на пристрої: підписка лише після кліку користувача й дозволу браузера.
 // env — для тестів (за замовчуванням справжній браузер).
+import { isPushEndpoint } from '../supabase/functions/send-push/payload.js';
 
 export function urlBase64ToUint8Array(s) {
   const base64 = (s + '='.repeat((4 - (s.length % 4)) % 4)).replace(/-/g, '+').replace(/_/g, '/');
@@ -37,6 +38,11 @@ export async function enablePush({ service, vapidKey, env = globalThis }) {
   const registration = await env.navigator.serviceWorker.ready;
   const subscription = (await registration.pushManager.getSubscription())
     ?? await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapidKey) });
+  // Сервер приймає лише відомі push-сервіси; незнайомий (рідкісний браузер) — знімаємо підписку й пояснюємо.
+  if (!isPushEndpoint(subscription.endpoint)) {
+    await subscription.unsubscribe().catch(() => {});
+    throw fail('unsupported-service');
+  }
   await service.savePushSubscription(subscription.toJSON());
 }
 
@@ -57,3 +63,10 @@ export const PUSH_STATE_TEXT = {
   on: 'Увімкнено: нові запити, рішення, повідомлення й нагадування прийдуть, навіть коли сайт закритий.',
   off: 'Вимкнено. Події видно лише під дзвіночком на сайті.',
 };
+
+// Текст помилки кнопки «Увімкнути / Вимкнути» сповіщення.
+export function pushErrorText(code) {
+  if (code === 'denied') return PUSH_STATE_TEXT.denied;
+  if (code === 'unsupported-service') return 'Сервіс сповіщень цього браузера WattWay не підтримує. Спробуйте Chrome, Edge, Firefox або Safari.';
+  return 'Не вдалося змінити налаштування. Спробуйте ще раз.';
+}

@@ -9,7 +9,7 @@
 // WEBHOOK_SECRET. SUPABASE_URL і SUPABASE_SERVICE_ROLE_KEY Supabase передає функції автоматично.
 import webpush from 'npm:web-push@3.6.7';
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
-import { buildPayload, secretMatches } from './payload.js';
+import { buildPayload, secretMatches, isPushEndpoint } from './payload.js';
 
 const env = (name: string) => {
   const value = Deno.env.get(name);
@@ -49,8 +49,12 @@ Deno.serve(async (req) => {
     .select('id, endpoint, p256dh, auth').eq('user_id', record.recipient_id);
   if (error) { console.error('load subscriptions failed', error.code); return json(500, { error: 'db' }); }
 
+  // Захист у глибину: база й так приймає лише адреси push-сервісів, але чужих адрес функція не чіпає ніколи.
+  const valid = (subs ?? []).filter((s) => isPushEndpoint(s.endpoint));
+  if (valid.length < (subs ?? []).length) console.error('skipped non-push endpoints', (subs ?? []).length - valid.length);
+
   const payload = JSON.stringify(buildPayload(record));
-  const results = await Promise.allSettled((subs ?? []).map((s) =>
+  const results = await Promise.allSettled(valid.map((s) =>
     webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, { TTL: 3600 })));
 
   // Мертві підписки (пристрій відписався або браузер їх скасував) прибираємо; інші помилки лише в лог.
@@ -58,7 +62,7 @@ Deno.serve(async (req) => {
   results.forEach((r, i) => {
     if (r.status === 'fulfilled') return;
     const code = (r.reason as { statusCode?: number })?.statusCode;
-    if (code === 404 || code === 410) dead.push(subs![i].id);
+    if (code === 404 || code === 410) dead.push(valid[i].id);
     else console.error('push failed', code ?? 'network');
   });
   if (dead.length) await db.from('push_subscriptions').delete().in('id', dead);

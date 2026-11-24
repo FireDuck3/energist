@@ -6,7 +6,7 @@ import { formatUAH, formatKwh } from '../pricing.js';
 import { isoDay } from '../data.js';
 import { signInPrompt } from './auth-modal.js';
 import { logOut } from './auth-page.js';
-import { pushState, enablePush, disablePush, PUSH_STATE_TEXT } from '../push.js';
+import { pushState, enablePush, disablePush, PUSH_STATE_TEXT, pushErrorText } from '../push.js';
 import { supabaseConfig } from '../supabase-config.js';
 import { icon } from '../icons.js';
 
@@ -29,7 +29,7 @@ function pushCard(service) {
         if (state === 'on') await disablePush({ service });
         else await enablePush({ service, vapidKey });
       } catch (e) {
-        error.textContent = e?.code === 'denied' ? PUSH_STATE_TEXT.denied : 'Не вдалося змінити налаштування. Спробуйте ще раз.';
+        error.textContent = pushErrorText(e?.code);
         error.hidden = false;
       } finally { button.disabled = false; void draw(); }
     };
