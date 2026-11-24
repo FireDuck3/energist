@@ -39,7 +39,7 @@ test('картка господаря: стаж, сесії, контакти', 
     ['Завершених зарядок ще немає', 'Завершених зарядок: 3 · останні: 2 год, 1,5 год, 3 год', 'Завершених зарядок: 1']);
   const card = toHostCard({ host_name: '', registered_at: 'x', host_verified: true, phone: null, email: 'a@b.ua',
     completed_sessions: '4', recent_hours: ['2.0', '1.5'] });
-  eq(card, { name: 'Господар точки', since: 'x', verified: true, phone: null, email: 'a@b.ua', sessions: 4, recentHours: [2, 1.5], photo: null, channels: [] });
+  eq(card, { name: 'Господар точки', since: 'x', verified: true, phone: null, email: 'a@b.ua', sessions: 4, recentHours: [2, 1.5], photo: null, channels: [], hasContacts: false });
   eq(toHostCard({ avatar_path: 'u/avatar/a.jpg' }, (p) => `https://cdn/${p}`).photo, 'https://cdn/u/avatar/a.jpg');
   eq(toHostCard(undefined), null);
 });

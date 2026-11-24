@@ -9,6 +9,7 @@ import { routeUrl, visibleSpots } from '../stations.js';
 import { TILES, spotPin } from './map.js';
 import { openBooking } from './booking.js';
 import { hiddenNotice } from './hidden-notice.js';
+import { hostContacts } from './host-contacts.js';
 import { detailFacts, hostSince, sessionsLabel, channelLabels } from '../host-profile.js';
 
 const EXAMPLE_KWH = 30;
@@ -17,16 +18,21 @@ function fact(label, value) {
   return h('div', { class: 'fact' }, h('span', { class: 'fact-label' }, label), h('span', { class: 'fact-value' }, value));
 }
 
-// Картка господаря реальної точки: верифікація, стаж, останні сесії, контакти (увійшлим) і канали зв'язку.
-function hostCardLines(card, own, signedIn) {
+// Картка господаря реальної точки: верифікація, стаж, останні сесії, канали зв'язку й контакти
+// (увійшлим — кнопкою «Показати контакти», див. host-contacts.js).
+function hostCardLines(card, own, session, pilot, spotId) {
   if (!card) return [];
-  const contacts = [card.phone && h('a', { href: `tel:${card.phone}` }, card.phone), card.email && h('span', {}, card.email)].filter(Boolean);
   return [
     card.verified && h('span', { class: 'verified-badge verified-host', title: 'WattWay перевірив особу господаря' }, '✓ Перевірений господар'),
     h('div', { class: 'muted' }, [hostSince(card.since), sessionsLabel(card.sessions, card.recentHours)].filter(Boolean).join(' · ')),
-    contacts.length
-      ? h('div', { class: 'host-contacts' }, h('b', {}, own ? 'Ваші контакти для гостей: ' : 'Контакти: '), ...contacts.flatMap((c, i) => (i ? [' · ', c] : [c])))
-      : !own && !signedIn && h('div', { class: 'hint' }, 'Увійдіть, щоб побачити телефон і email господаря.'),
+    hostContacts(card, {
+      own,
+      signedIn: session.getState().status === 'signedIn',
+      reveal: pilot?.revealContacts ? () => pilot.revealContacts(spotId) : null,
+      requireAuth: (reason) => session.requireAuth?.(() => {}, reason),
+      // Сторінка перемальовується раз на хвилину: відкриті контакти тримаємо в самій картці.
+      onRevealed: (contacts) => Object.assign(card, contacts),
+    }),
     card.channels?.length ? h('div', { class: 'muted' }, `Зв'язок: ${channelLabels(card.channels).join(', ')}`) : null,
   ];
 }
@@ -119,7 +125,7 @@ function renderSpot(spot, host, { blackout, spots }, store, session, userHistory
             spot.pilot && !spot.reviewsUnavailable && h('div', { class: 'muted' }, (() => { const r = hostRating(spots, spot.ownerId); return `${ratingLabel(r.avg, r.count, 'host')}${r.count ? ' про господаря' : ''}`; })()),
             host && h('div', { class: 'muted' },
               `${host.chargesCount} ${plural(host.chargesCount, ['зарядка', 'зарядки', 'зарядок'])} · на WattWay з ${host.sinceYear} року`),
-            ...hostCardLines(card, own, session.getState().status === 'signedIn'))),
+            ...hostCardLines(card, own, session, pilot, spot.id))),
 
         h('div', { class: 'facts' },
           fact('Джерело енергії', `${SOURCES[spot.source].icon} ${SOURCES[spot.source].label}`),

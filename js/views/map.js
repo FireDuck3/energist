@@ -8,6 +8,7 @@ import { availabilityLabel, channelLabels, hostSince } from '../host-profile.js'
 import { formatUAH } from '../pricing.js';
 import { DEVICES, SOURCES, CONNECTORS, VINNYTSIA_CENTER, AREA_RADIUS_M } from '../data.js';
 import { searchBox } from './search-box.js';
+import { hostContacts } from './host-contacts.js';
 import { loadPublicStations, loadStationDetails, loadStationsDetails, routeUrl, statusLabel, attribution, connectorLabel, spotKind, safeUrl, visibleSpots } from '../stations.js';
 
 // Тайли OpenStreetMap; світлу й темну (блекаут) тему дає CSS-фільтр на .leaflet-tile-pane.
@@ -54,20 +55,22 @@ function spotCard(spot, { blackout, now, origin }) {
           : openingLine(spot, now))));
 }
 
-// Головне про господаря у вікні точки: ім'я, перевірка, стаж, статус, контакти (увійшлим) і канали зв'язку.
-function hostBlock(spot, card, signedIn, session) {
+// Головне про господаря у вікні точки: ім'я, перевірка, стаж, статус, канали зв'язку й контакти
+// (увійшлим — кнопкою «Показати контакти», див. host-contacts.js).
+function hostBlock(spot, card, signedIn, { session, pilot, onRevealed } = {}) {
   const status = availabilityLabel(spot, new Date());
-  const contacts = [card.phone && h('a', { href: `tel:${card.phone}` }, card.phone), card.email && h('a', { href: `mailto:${card.email}` }, card.email)]
-    .filter(Boolean);
   return h('div', { class: 'popup-host' },
     h('div', {}, 'Господар — ', h('b', {}, card.name)),
     card.verified ? h('span', { class: 'verified-badge verified-sm', title: 'WattWay перевірив особу господаря' }, '✓ Перевірений господар') : '',
     h('div', { class: 'muted' }, hostSince(card.since) ?? ''),
     h('div', { class: `popup-status status-${status.state}` }, status.text),
-    contacts.length
-      ? h('div', { class: 'popup-contacts' }, ...contacts.flatMap((c, i) => (i ? [' · ', c] : [c])))
-      : !signedIn && h('div', { class: 'popup-signin' }, 'Увійдіть, щоб побачити телефон і email ',
-        h('button', { type: 'button', class: 'btn btn-ghost btn-sm', onclick: () => session?.requireAuth?.(() => {}, 'Увійдіть, щоб побачити контакти господаря') }, 'Увійти')),
+    hostContacts(card, {
+      own: spot.ownerId != null && spot.ownerId === session?.getState?.().user?.uid,
+      signedIn,
+      reveal: pilot?.revealContacts ? () => pilot.revealContacts(spot.id) : null,
+      requireAuth: (reason) => session?.requireAuth?.(() => {}, reason),
+      onRevealed,
+    }) ?? '',
     card.channels.length ? h('div', { class: 'muted' }, `Зв'язок: ${channelLabels(card.channels).join(', ')}`) : '');
 }
 
@@ -299,16 +302,22 @@ export function render(_params, root, store, session, userHistory, pilot) {
     const signedIn = session?.getState?.().status === 'signedIn';
     if (!spot.pilot || !pilot?.hostCard) return popupContent(spot);
     const key = `${spot.id}:${signedIn}`; // після входу картка інша — з контактами
+    const refit = () => {
+      const popup = markers.find((m) => m.spot.id === spot.id && !m.dimmed)?.marker.getPopup();
+      if (popup?.isOpen()) fitPopup(popup);
+    };
+    // Відкриті контакти запам'ятовуємо в кеші картки: повторне відкриття вікна не питає сервер знову.
+    const block = (card) => card && hostBlock(spot, card, signedIn, { session, pilot,
+      onRevealed: (contacts) => { Object.assign(card, contacts); refit(); } });
     const cached = hostCards.get(key);
-    if (cached !== undefined) return popupContent(spot, cached && hostBlock(spot, cached, signedIn, session));
+    if (cached !== undefined) return popupContent(spot, block(cached));
     const box = h('div', {}, popupContent(spot, h('div', { class: 'popup-host muted' }, 'Завантаження…')));
     if (!hostLoads.has(key)) hostLoads.set(key, pilot.hostCard(spot.id).catch(() => null).finally(() => hostLoads.delete(key)));
     hostLoads.get(key).then((card) => {
       if (destroyed) return;
       if (card) hostCards.set(key, card); // збій не кешуємо — наступне відкриття спробує ще раз
-      box.replaceChildren(popupContent(spot, card && hostBlock(spot, card, signedIn, session)));
-      const popup = markers.find((m) => m.spot.id === spot.id && !m.dimmed)?.marker.getPopup();
-      if (popup?.isOpen()) fitPopup(popup);
+      box.replaceChildren(popupContent(spot, block(card)));
+      refit();
     });
     return box;
   }
