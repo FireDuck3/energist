@@ -1,5 +1,6 @@
 // Поле пошуку точок з підказками: нещодавні запити й переглянуті точки.
 import { h } from '../ui.js';
+import { icon } from '../icons.js';
 import { recentQueries, recentSpots } from '../history.js';
 import { normalizeQuery } from '../filters.js';
 import { visibleSpots } from '../stations.js';
@@ -9,9 +10,9 @@ export function searchBox(store, userHistory, session = null) {
     type: 'search', class: 'input search-input', placeholder: 'Район або назва точки',
     'aria-label': 'Пошук точок', autocomplete: 'off', enterkeyhint: 'search',
   });
-  const clear = h('button', { type: 'button', class: 'search-clear', 'aria-label': 'Очистити пошук', hidden: true }, '×');
+  const clear = h('button', { type: 'button', class: 'search-clear', 'aria-label': 'Очистити пошук', hidden: true }, icon('x', { size: 16 }));
   const panel = h('div', { class: 'search-panel card', hidden: true });
-  const el = h('div', { class: 'search' }, h('span', { class: 'search-icon', 'aria-hidden': 'true' }, '🔍'), input, clear, panel);
+  const el = h('div', { class: 'search' }, h('span', { class: 'search-icon', 'aria-hidden': 'true' }, icon('search', { size: 18 })), input, clear, panel);
   let focused = false;
 
   const apply = (q) => store.setFilters({ query: q });
@@ -46,15 +47,15 @@ export function searchBox(store, userHistory, session = null) {
         h('div', { class: 'search-head' }, h('span', {}, 'Нещодавні пошуки'),
           h('button', { type: 'button', class: 'link-btn', onclick: () => { userHistory.clearQueries(); input.focus(); } }, 'Очистити')),
         queries.map((q) => h('div', { class: 'search-item' },
-          h('button', { type: 'button', class: 'search-pick', onclick: () => choose(q) }, h('span', { 'aria-hidden': 'true' }, '🕘'), q),
+          h('button', { type: 'button', class: 'search-pick', onclick: () => choose(q) }, icon('history', { size: 16 }), q),
           h('button', { type: 'button', class: 'search-remove', 'aria-label': `Видалити «${q}» з історії`,
-            onclick: () => { userHistory.removeQuery(q); input.focus(); } }, '×')))));
+            onclick: () => { userHistory.removeQuery(q); input.focus(); } }, icon('x', { size: 16 }))))));
     }
     if (spots.length) {
       sections.push(h('div', { class: 'search-section' },
         h('div', { class: 'search-head' }, h('span', {}, 'Нещодавно переглянуті')),
         spots.map((s) => h('a', { class: 'search-pick', href: `#/spot/${s.id}`, onclick: close },
-          h('span', { 'aria-hidden': 'true' }, '📍'), h('span', {}, s.title, h('small', { class: 'muted' }, ` · ${s.district}`))))));
+          icon('map-pin', { size: 16 }), h('span', {}, s.title, h('small', { class: 'muted' }, ` · ${s.district}`))))));
     }
     panel.replaceChildren(...sections);
     panel.hidden = sections.length === 0;

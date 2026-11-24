@@ -8,7 +8,7 @@ import { loadSupabase } from './supabase.js';
 import { createUserHistory } from './user-history.js';
 import { startRouter, currentPath } from './router.js';
 import { h, installRipple } from './ui.js';
-import { logoMark, icon } from './icons.js';
+import { logoMark, icon, withIcon } from './icons.js';
 import { notifications, notify } from './notifications.js';
 import * as landing from './views/landing.js';
 import * as map from './views/map.js';
@@ -58,7 +58,7 @@ function accountArea() {
       !demo && h('span', { class: 'account-email muted' }, user.email),
       h('a', { href: '#/profile', onclick: (e) => e.target.closest('details').open = false }, demo ? 'Профіль' : 'Профіль і зарядки'),
       // Лише посилання: доступ до даних адмінки перевіряє сервер.
-      !demo && user?.isAdmin && h('a', { href: '#/admin', onclick: (e) => e.target.closest('details').open = false }, '🛡️ Адмінпанель'),
+      !demo && user?.isAdmin && h('a', { href: '#/admin', onclick: (e) => e.target.closest('details').open = false }, withIcon('shield', 'Адмінпанель')),
       h('button', { type: 'button', onclick: () => (demo ? location.reload() : logOut(session)) },
         demo ? 'Вийти з демо-режиму' : 'Вийти')));
 }
@@ -82,7 +82,7 @@ function renderHeader() {
       mode && h('nav', { class: 'segmented mode-switch', 'aria-label': 'Режим' },
         ['guest', 'host'].map((m) => h('button', { type: 'button', class: `segment${mode === m ? ' active' : ''}`,
           'aria-pressed': String(mode === m), 'aria-label': MODES[m].label, title: MODES[m].label, onclick: () => switchMode(m) },
-        h('span', { 'aria-hidden': 'true' }, MODES[m].icon), ' ', h('span', { class: 'mode-label' }, MODES[m].short)))),
+        icon(MODES[m].icon, { size: 18 }), h('span', { class: 'mode-label' }, MODES[m].short)))),
       h('div', { class: 'header-right' },
         h('nav', { class: 'header-nav', 'aria-label': 'Розділи' }, links.map(([href, , label, isActive]) =>
           h('a', { class: `nav-link${isActive(path) ? ' active' : ''}`, href, 'aria-current': isActive(path) ? 'page' : null },
@@ -124,9 +124,9 @@ function renderTabbar() {
   const { mode } = store.getState();
   tabbar.hidden = !mode || path === '/';
   document.body.classList.toggle('no-tabbar', tabbar.hidden);
-  tabbar.replaceChildren(...navFor(mode).map(([href, icon, label, isActive]) =>
+  tabbar.replaceChildren(...navFor(mode).map(([href, iconName, label, isActive]) =>
     h('a', { class: `tab${isActive(path) ? ' active' : ''}`, href, 'aria-current': isActive(path) ? 'page' : null },
-      h('span', { class: 'tab-icon', 'aria-hidden': 'true' }, icon,
+      h('span', { class: 'tab-icon', 'aria-hidden': 'true' }, icon(iconName, { size: 22 }),
         href === '#/chats' && pilot.totalUnread() > 0 && h('span', { class: 'tab-badge' }, unreadLabel(pilot.totalUnread()))),
       h('span', { class: 'tab-label' }, label))));
 }

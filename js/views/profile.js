@@ -108,7 +108,7 @@ export function render(_params, root, store, session, userHistory, pilot) {
     }
     if (status === 'demo') {
       root.replaceChildren(h('div', { class: 'container gate' }, h('div', { class: 'gate-card card' },
-        h('span', { class: 'gate-icon' }, '🧪'), h('h1', {}, 'Демо-режим'),
+        h('span', { class: 'gate-icon' }, icon('flask', { size: 40 })), h('h1', {}, 'Демо-режим'),
         h('p', { class: 'muted' }, 'У демо-режимі профілю немає. Щоб створити акаунт, потрібен інтернет.')),
       resetLink()));
       return;

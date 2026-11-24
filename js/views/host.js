@@ -13,7 +13,7 @@ import { signInPrompt } from './auth-modal.js';
 import { kyivNow, addDays, isoWeekday } from '../calendar.js';
 import { checkPhotos, resizeImage, PHOTO_LIMITS } from '../photos.js';
 import { hiddenNotice } from './hidden-notice.js';
-import { icon } from '../icons.js';
+import { icon, iconSvg, withIcon } from '../icons.js';
 import { CONTACT_CHANNELS } from '../host-profile.js';
 
 const WEEKDAY_NAMES = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
@@ -72,7 +72,7 @@ function ownSpotCard(spot) {
   return h('a', { class: 'own-spot card', href: `#/spot/${spot.id}` },
     h('img', { src: spotCover(spot), alt: '' }),
     h('div', { class: 'own-spot-body' },
-      h('span', { class: `source-badge source-${spot.source}` }, `${SOURCES[spot.source].icon} ${SOURCES[spot.source].label}`),
+      h('span', { class: `source-badge source-${spot.source}` }, withIcon(SOURCES[spot.source].icon, SOURCES[spot.source].label, { size: 14 })),
       h('b', {}, spot.title),
       h('span', { class: 'muted' }, `${formatUAH(spot.pricePerKwh)} / кВт·год · `, stars(spotRating(spot), spot.reviews.length))));
 }
@@ -300,14 +300,14 @@ export function openAddSpot(store, hostName, publish, existing = null, { pilot =
     moved = true;
     input.lat = Math.round(lat * 10000) / 10000;
     input.lng = Math.round(lng * 10000) / 10000;
-    coordsNote.textContent = `📍 ${input.lat}, ${input.lng}`;
+    coordsNote.replaceChildren(withIcon('map-pin', `${input.lat}, ${input.lng}`, { size: 14 }));
     errorEls.location.hidden = true;
   }
 
   if (window.L) {
     map = L.map(mapEl).setView(existing ? [existing.lat, existing.lng] : VINNYTSIA_CENTER, existing ? 15 : 12);
     L.tileLayer(TILES.url, { attribution: TILES.attribution, maxZoom: 19 }).addTo(map);
-    const pinIcon = () => L.divIcon({ className: 'pin-wrap', html: '<div class="pin pin-solar"><span class="pin-icon">📍</span>Тут</div>', iconSize: null });
+    const pinIcon = () => L.divIcon({ className: 'pin-wrap', html: `<div class="pin pin-solar"><span class="pin-icon">${iconSvg('map-pin', { size: 14 })}</span>Тут</div>`, iconSize: null });
     let marker = existing ? L.marker([existing.lat, existing.lng], { icon: pinIcon() }).addTo(map) : null;
     map.on('click', (e) => {
       setPoint(e.latlng.lat, e.latlng.lng);
@@ -417,7 +417,7 @@ export function openAddSpot(store, hostName, publish, existing = null, { pilot =
     notify(existing ? 'Зміни збережено' : 'Точку додано — її вже видно на карті гостей');
     if (warnings.length) notify(`Точку збережено, але ${warnings.join('; ')}.`, { kind: 'error' });
   }
-  if (existing) coordsNote.textContent = `📍 ${input.lat}, ${input.lng}`;
+  if (existing) coordsNote.replaceChildren(withIcon('map-pin', `${input.lat}, ${input.lng}`, { size: 14 }));
 }
 
 // Кнопка, що блокується на час запиту; помилка показується в переданому елементі.
@@ -625,7 +625,7 @@ export function render(_params, root, store, session, _history, pilot) {
           h('a', { class: 'own-card-photo', href: `#/spot/${spot.id}`, tabindex: '-1', 'aria-hidden': 'true' },
             h('img', { src: spotCover(spot), alt: '' })),
           h('div', { class: 'own-card-body' },
-            h('span', { class: 'own-card-chip' }, `${SOURCES[spot.source].icon} ${SOURCES[spot.source].label}`),
+            h('span', { class: 'own-card-chip' }, withIcon(SOURCES[spot.source].icon, SOURCES[spot.source].label, { size: 14 })),
             h('a', { class: 'own-card-title', href: `#/spot/${spot.id}` }, spot.title),
             h('span', { class: 'own-card-meta' }, `${spot.district} · ${formatUAH(spot.pricePerKwh)} / кВт·год · `,
               stars(spotRating(spot), spot.reviews.length)),
@@ -672,10 +672,10 @@ export function render(_params, root, store, session, _history, pilot) {
         own.length
           ? h('div', { class: 'own-grid' }, own.map(ownSpotTile))
           : h('div', { class: 'card host-empty' },
-            h('span', { class: 'gate-icon' }, '📍'),
+            h('span', { class: 'gate-icon' }, icon('map-pin', { size: 40 })),
             h('h2', {}, 'У вас ще немає точок'),
             h('p', { class: 'muted' }, 'Додайте свою СЕС: потужність, акумулятор, конектор, графік і ціну. Після цього її побачать гості на карті.'),
-            h('button', { type: 'button', class: 'btn btn-primary btn-lg', onclick: addSpot }, '+ Додати першу точку')),
+            h('button', { type: 'button', class: 'btn btn-primary btn-lg', onclick: addSpot }, withIcon('plus', 'Додати першу точку', { size: 20 }))),
         own.length && h('section', { class: 'host-map-section' },
           h('h2', { class: 'own-title' }, 'Мої точки на карті'), spotsMap.el)));
       if (own.length) spotsMap.update(own);
@@ -693,11 +693,11 @@ export function render(_params, root, store, session, _history, pilot) {
     root.replaceChildren(h('div', { class: `container host-page${enter ? ' host-enter' : ''}` },
       h('div', { class: 'host-head' },
         h('div', {},
-          h('h1', {}, `Вітаємо, ${signedIn ? session.currentName() : host.vocative ?? host.name}! 👋`),
+          h('h1', {}, `Вітаємо, ${signedIn ? session.currentName() : host.vocative ?? host.name}!`),
           h('p', { class: 'lead' }, 'Ваша сонячна станція заробляє, поки ви займаєтесь своїми справами.')),
-        h('button', { type: 'button', class: 'btn btn-primary btn-lg', onclick: addSpot }, '+ Додати розетку')),
+        h('button', { type: 'button', class: 'btn btn-primary btn-lg', onclick: addSpot }, withIcon('plus', 'Додати розетку', { size: 20 }))),
       signedIn && h('p', { class: 'demo-note' },
-        '🧪 Демо-кабінет: статистика — приклад господаря Олега з Вишеньки. Розетки, які ви додасте, з\'являться тут.'),
+        withIcon('flask', 'Демо-кабінет: статистика — приклад господаря Олега з Вишеньки. Розетки, які ви додасте, з\'являться тут.')),
 
       h('div', { class: 'stats' },
         tile(`Заробіток за ${MONTH_NAMES[now.getMonth()]}`, formatUAH(s.monthEarned), 'після комісії сервісу'),
@@ -710,7 +710,7 @@ export function render(_params, root, store, session, _history, pilot) {
           h('h2', { class: 'panel-title' }, 'Заробіток за пів року'),
           chart(s.months),
           h('div', { class: 'payback' },
-            h('div', { class: 'payback-head' }, h('span', {}, '☀️ Окупність СЕС'), h('b', {}, `${String(s.paybackPct).replace('.', ',')}%`)),
+            h('div', { class: 'payback-head' }, withIcon('sun', 'Окупність СЕС'), h('b', {}, `${String(s.paybackPct).replace('.', ',')}%`)),
             h('div', { class: 'progress' }, h('div', { class: 'progress-fill', style: { width: `${Math.min(100, s.paybackPct)}%` } })),
             h('span', { class: 'hint' }, `з ${formatUAH(host.sesCost)} вкладених у станцію`))),
         h('section', { class: 'card panel' },

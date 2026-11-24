@@ -1,5 +1,6 @@
 // Модалка бронювання: час → підтвердження → зарядка (симуляція) → оплата → відгук.
 import { h, openModal, formatDate } from '../ui.js';
+import { icon, withIcon } from '../icons.js';
 import { notify } from '../notifications.js';
 import { bookingRequestError } from '../booking-errors.js';
 import { availableStarts } from '../filters.js';
@@ -170,7 +171,7 @@ export function openBooking(spot, store, { now = new Date(), session, userHistor
       spot.pilot && h('p', { class: 'muted' },
         'Онлайн-оплати поки немає: про оплату домовляєтеся з господарем у чаті. Точне місце точки відкриється, щойно господар підтвердить запит.'),
       !spot.pilot && h('div', { class: 'secure' },
-        h('span', { class: 'secure-icon' }, '🔒'),
+        h('span', { class: 'secure-icon' }, icon('lock', { size: 24 })),
         h('div', {},
           h('b', {}, 'Безпечна угода'),
           h('p', {}, `${formatUAH(hold)} буде заморожено на картці. Спишемо лише за фактично отриману енергію, різницю повернемо одразу після зарядки.`))),
@@ -213,7 +214,7 @@ export function openBooking(spot, store, { now = new Date(), session, userHistor
     const clock = h('b', {}, `0:00 / ${simClock(totalMin)}`);
 
     show(h('div', { class: 'wizard-body' },
-      h('h2', {}, '⚡ Заряджається…'),
+      h('h2', {}, withIcon('zap', 'Заряджається…', { size: 24 })),
       h('div', { class: 'battery' }, h('div', { class: 'battery-body' }, fill, pct), h('div', { class: 'battery-cap' })),
       h('div', { class: 'meters' },
         h('div', { class: 'meter' }, h('span', {}, 'Отримано'), kwhEl),
@@ -265,7 +266,7 @@ export function openBooking(spot, store, { now = new Date(), session, userHistor
         row(`Комісія WattWay ${Math.round(COMMISSION * 100)}%`, formatUAH(paid.fee), 'sum-sub'),
         row('Повернуто із заморожених', formatUAH(round2(paid.heldAmount - paid.total)))),
       saved > 0 && h('div', { class: 'saved-banner' },
-        `💚 Ви зекономили ${formatUAH(saved)} порівняно з комерційною зарядкою (~${COMMERCIAL_PRICE} грн/кВт·год)`),
+        withIcon('heart', `Ви зекономили ${formatUAH(saved)} порівняно з комерційною зарядкою (~${COMMERCIAL_PRICE} грн/кВт·год)`)),
       h('div', { class: 'wizard-actions' },
         h('button', { type: 'button', class: 'btn btn-ghost', onclick: () => modal.close() }, 'Готово'),
         h('button', { type: 'button', class: 'btn btn-primary btn-lg', onclick: stepReview }, 'Залишити відгук'))));

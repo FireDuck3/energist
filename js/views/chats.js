@@ -1,5 +1,6 @@
 // Вкладка «Чати» як у Telegram: список розмов зліва, переписка справа (на телефоні — по черзі).
 import { h } from '../ui.js';
+import { icon, withIcon } from '../icons.js';
 import { kyivNow } from '../calendar.js';
 import { formatLastMessage, unreadLabel } from '../chats.js';
 import {
@@ -16,7 +17,7 @@ const ACTIONS = {
   cancel: ['Скасувати бронювання', 'btn-secondary'],
   complete: ['Завершити співпрацю', 'btn-primary'],
 };
-const TICKS = { sending: '🕓', sent: '✓', read: '✓✓', failed: '!' };
+const TICKS = { sending: () => icon('clock', { size: 12 }), sent: '✓', read: '✓✓', failed: '!' };
 const MONTHS = ['січ', 'лют', 'бер', 'кві', 'тра', 'чер', 'лип', 'сер', 'вер', 'жов', 'лис', 'гру'];
 const pad = (n) => String(n).padStart(2, '0');
 const POLL_MS = 20000;
@@ -89,7 +90,7 @@ export function render({ id }, root, _store, session, _history, pilot) {
     const status = h('p', { class: 'chat-status', role: 'status' });
     const typing = h('span', { class: 'chat-typing' });
     const feed = h('div', { class: 'chat-feed', 'aria-live': 'polite' });
-    const newBtn = h('button', { type: 'button', class: 'chat-new-btn', hidden: true, onclick: () => scrollDown(true) }, '↓ Нові повідомлення');
+    const newBtn = h('button', { type: 'button', class: 'chat-new-btn', hidden: true, onclick: () => scrollDown(true) }, withIcon('arrow-down', 'Нові повідомлення'));
     const actionsBar = h('div', { class: 'chat-actions' });
     const counterpartId = me() === booking.guest_id ? booking.owner_id : booking.guest_id;
     const typingChannel = service?.openTypingChannel?.(booking.id, (uid) => {
@@ -112,7 +113,7 @@ export function render({ id }, root, _store, session, _history, pilot) {
 
     threadPane.replaceChildren(
       h('header', { class: 'chat-head' },
-        h('a', { class: 'chat-back', href: '#/chats', 'aria-label': 'До списку чатів' }, '←'),
+        h('a', { class: 'chat-back', href: '#/chats', 'aria-label': 'До списку чатів' }, icon('arrow-left', { size: 22 })),
         h('span', { class: 'chat-avatar', 'aria-hidden': 'true' }, initial(booking.counterpart_name)),
         h('div', { class: 'chat-head-main' },
           headName, headSub, typing),
@@ -151,7 +152,7 @@ export function render({ id }, root, _store, session, _history, pilot) {
       return h('div', { class: `chat-msg ${mine ? 'mine' : 'theirs'}${m.failed ? ' failed' : ''}` },
         h('div', { class: 'chat-bubble' },
           h('span', { class: 'chat-text' }, m.body),
-          h('span', { class: 'chat-meta' }, timeOf(m.created_at), ticks && h('span', { class: `chat-ticks ticks-${ticks}` }, TICKS[ticks]))),
+          h('span', { class: 'chat-meta' }, timeOf(m.created_at), ticks && h('span', { class: `chat-ticks ticks-${ticks}` }, typeof TICKS[ticks] === 'function' ? TICKS[ticks]() : TICKS[ticks]))),
         m.failed && h('button', { type: 'button', class: 'chat-retry', onclick: () => send(m) }, 'Не надіслано · Повторити'));
     }
 

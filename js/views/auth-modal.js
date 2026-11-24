@@ -1,13 +1,13 @@
 // Вікно входу: вхід і реєстрація паролем, вхід кодом з пошти, скидання пароля кодом,
 // перший крок профілю і демо-режим без інтернету. Одне вікно за раз.
 import { h, openModal } from '../ui.js';
-import { logoMark } from '../icons.js';
+import { logoMark, icon, withIcon } from '../icons.js';
 import { checkedCredentials } from '../credentials.js';
 import { authErrorMessage } from '../auth.js';
 
 const RESEND_SECONDS = 60;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const ROLES = [['guest', '🔌 Шукаю зарядку'], ['host', '☀️ Маю енергію для продажу']];
+const ROLES = [['guest', 'plug', 'Шукаю зарядку'], ['host', 'sun', 'Маю енергію для продажу']];
 // Після цих помилок пропонуємо вхід паролем.
 const SUGGEST_PASSWORD = new Set(['auth/email-not-allowed', 'auth/email-rate-limit']);
 
@@ -25,7 +25,7 @@ const invalid = (message) => Object.assign(new Error(message), { local: message 
 export function signInPrompt({ title, text, reason }, session) {
   return h('div', { class: 'container gate' },
     h('div', { class: 'gate-card card' },
-      h('span', { class: 'gate-icon' }, '🔐'),
+      h('span', { class: 'gate-icon' }, icon('lock', { size: 40 })),
       h('h1', {}, title),
       h('p', { class: 'muted' }, text),
       h('button', { type: 'button', class: 'btn btn-primary btn-lg', onclick: () => session.requireAuth(() => {}, reason) }, 'Увійти')));
@@ -226,9 +226,9 @@ export function openAuthModal(session, { reason = '', mode, error = null } = {})
       st.fieldErrors.name && h('span', { class: 'field-error' }, st.fieldErrors.name),
       h('div', { class: 'form-field' },
         h('span', { class: 'field-label' }, 'Для чого вам WattWay?'),
-        h('div', { class: 'role-choice' }, ROLES.map(([value, label]) =>
+        h('div', { class: 'role-choice' }, ROLES.map(([value, iconName, label]) =>
           h('button', { type: 'button', class: `chip${st.role === value ? ' active' : ''}`, disabled: st.busy,
-            onclick: () => { st.role = value; render(); } }, label)))),
+            onclick: () => { st.role = value; render(); } }, withIcon(iconName, label))))),
       st.fieldErrors.role && h('span', { class: 'field-error' }, st.fieldErrors.role),
       errorBlock(), primary('Продовжити'))],
 

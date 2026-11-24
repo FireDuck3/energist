@@ -1,13 +1,13 @@
 // Окремі сторінки входу (#/login) і реєстрації (#/signup).
 // Вікно входу (auth-modal.js) лишається для дій, що потребують акаунта посеред сценарію (бронювання).
 import { h } from '../ui.js';
-import { logoMark } from '../icons.js';
+import { logoMark, icon, withIcon } from '../icons.js';
 import { disablePush } from '../push.js';
 import { notify } from '../notifications.js';
 import { authErrorMessage } from '../auth.js';
 import { validateLogin, validateSignup, displayName, homePath, failureAdvice } from '../auth-forms.js';
 
-const ROLES = [['guest', '🔌 Шукаю зарядку'], ['host', '☀️ Маю енергію для продажу']];
+const ROLES = [['guest', 'plug', 'Шукаю зарядку'], ['host', 'sun', 'Маю енергію для продажу']];
 const TEXT = {
   signin: { title: 'Вхід', lead: 'Раді бачити вас знову', submit: 'Увійти' },
   signup: { title: 'Створити акаунт', lead: 'Реєстрація займає хвилину', submit: 'Створити акаунт' },
@@ -38,19 +38,19 @@ function renderAuthPage(mode, root, session) {
     const { status } = session.getState();
     if (status === 'loading') return card.replaceChildren(h('p', { class: 'muted' }, 'Завантаження…'));
     if (status === 'signedIn' || status === 'demo') {
-      return card.replaceChildren(h('span', { class: 'gate-icon' }, '✅'),
+      return card.replaceChildren(h('span', { class: 'gate-icon' }, icon('circle-check', { size: 40 })),
         h('h1', {}, `Ви вже в акаунті, ${session.currentName()}`),
         h('a', { class: 'btn btn-primary btn-lg', href: homePath(session.getState().profile?.role) }, 'Перейти до роботи'),
         h('a', { class: 'btn btn-secondary', href: '#/profile' }, 'Мій профіль'));
     }
     if (status === 'needsProfile' && mode === 'signin') {
-      return card.replaceChildren(h('span', { class: 'gate-icon' }, '👤'),
+      return card.replaceChildren(h('span', { class: 'gate-icon' }, icon('user', { size: 40 })),
         h('h1', {}, 'Завершіть профіль'),
         h('p', { class: 'muted' }, 'Акаунт уже створено — лишилось вказати ім\'я та роль.'),
         h('button', { type: 'button', class: 'btn btn-primary btn-lg', onclick: () => session.requireAuth(() => {}, '') }, 'Продовжити'));
     }
     if (status === 'unavailable') {
-      return card.replaceChildren(h('span', { class: 'gate-icon' }, '📡'),
+      return card.replaceChildren(h('span', { class: 'gate-icon' }, icon('wifi-off', { size: 40 })),
         h('h1', {}, 'Вхід недоступний без інтернету'),
         h('p', { class: 'muted' }, 'Не вдалося з\'єднатися із сервером акаунтів. Можна продовжити в демо-режимі.'),
         h('button', { type: 'button', class: 'btn btn-primary btn-lg', onclick: () => session.enterDemo() }, 'Продовжити в демо-режимі'));
@@ -88,9 +88,9 @@ function renderAuthPage(mode, root, session) {
       signup && input('confirm', 'Повторіть пароль', { type: 'password', autocomplete: 'new-password' }),
       signup && h('div', { class: 'form-field' },
         h('span', { class: 'field-label' }, 'Для чого вам WattWay?'),
-        h('div', { class: 'role-choice' }, ROLES.map(([value, label]) =>
+        h('div', { class: 'role-choice' }, ROLES.map(([value, iconName, label]) =>
           h('button', { type: 'button', class: `chip${st.role === value ? ' active' : ''}`, disabled: st.busy,
-            'aria-pressed': String(st.role === value), onclick: () => { st.role = value; draw(); } }, label))),
+            'aria-pressed': String(st.role === value), onclick: () => { st.role = value; draw(); } }, withIcon(iconName, label)))),
         st.errors.role && h('span', { class: 'field-error' }, st.errors.role)),
       errorBlock(),
       h('button', { type: 'submit', class: 'btn btn-primary btn-lg btn-block', disabled: st.busy }, st.busy ? 'Зачекайте…' : text.submit));
