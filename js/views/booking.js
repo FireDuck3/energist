@@ -1,6 +1,7 @@
 // Модалка бронювання: час → підтвердження → зарядка (симуляція) → оплата → відгук.
 import { h, openModal, formatDate } from '../ui.js';
 import { notify } from '../notifications.js';
+import { bookingRequestError } from '../booking-errors.js';
 import { availableStarts } from '../filters.js';
 import { estimateKwh, holdAmount, sessionCost, savingsVsCommercial, formatUAH, formatKwh, round2 } from '../pricing.js';
 import { DEVICES, SIM_DURATION_MS, COMMERCIAL_PRICE, COMMISSION, isoDay } from '../data.js';
@@ -190,7 +191,7 @@ export function openBooking(spot, store, { now = new Date(), session, userHistor
               await loadAvailability();
               return;
             }
-            requestError.textContent = 'Не вдалося надіслати запит. Перевірте час і спробуйте ще раз.';
+            requestError.textContent = bookingRequestError(error);
             requestError.hidden = false;
           } finally { button.disabled = false; }
         } }, 'Надіслати запит'),
