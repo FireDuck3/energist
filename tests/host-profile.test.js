@@ -39,7 +39,7 @@ test('картка господаря: стаж, сесії, контакти', 
     ['Завершених зарядок ще немає', 'Завершених зарядок: 3 · останні: 2 год, 1,5 год, 3 год', 'Завершених зарядок: 1']);
   const card = toHostCard({ host_name: '', registered_at: 'x', host_verified: true, phone: null, email: 'a@b.ua',
     completed_sessions: '4', recent_hours: ['2.0', '1.5'] });
-  eq(card, { name: 'Господар точки', since: 'x', verified: true, phone: null, email: 'a@b.ua', sessions: 4, recentHours: [2, 1.5], photo: null });
+  eq(card, { name: 'Господар точки', since: 'x', verified: true, phone: null, email: 'a@b.ua', sessions: 4, recentHours: [2, 1.5], photo: null, channels: [] });
   eq(toHostCard({ avatar_path: 'u/avatar/a.jpg' }, (p) => `https://cdn/${p}`).photo, 'https://cdn/u/avatar/a.jpg');
   eq(toHostCard(undefined), null);
 });
@@ -80,4 +80,24 @@ test('анкета точки: нові поля з бази й факти дл�
   eq(detailsFromRow({ ses_type: 'nuclear', parking_type: 'roof' }).sesType, null);
   eq(detailFacts(d), [['Тип СЕС', 'Гібридна'], ['Встановлена потужність СЕС', '10 кВт'], ['Накопичувач', 'немає'],
     ['Зарядна станція', 'є (EVSE)'], ['Паркування', "У дворі / на подвір'ї"]]);
+});
+
+test('канали зв\'язку: підписи в сталому порядку, невідомі відкидаються', async () => {
+  const { channelLabels, CONTACT_CHANNELS } = await import('../js/host-profile.js');
+  eq(CONTACT_CHANNELS.map((c) => c.id), ['chat', 'phone', 'telegram', 'viber', 'whatsapp', 'email']);
+  eq(channelLabels(['telegram', 'fax', 'chat']), ['Чат WattWay', 'Telegram']);
+  eq(channelLabels(undefined), []);
+  eq(toHostCard({ host_name: 'Олег', contact_channels: ['phone'] }).channels, ['phone']);
+  eq(toHostCard({ host_name: 'Олег' }).channels, []);
+});
+
+test('availabilityLabel: відчинено, зачинено, вихідний, пауза — за часом Києва', async () => {
+  const { availabilityLabel } = await import('../js/host-profile.js');
+  const spot = { paused: false, closedWeekdays: [], schedule: { from: '08:00', to: '20:00' } };
+  const at = (iso) => new Date(iso); // листопад: Київ = UTC+2
+  eq(availabilityLabel(spot, at('2026-11-24T08:00:00Z')), { state: 'open', text: 'Відчинено до 20:00' });   // 10:00
+  eq(availabilityLabel(spot, at('2026-11-24T18:00:00Z')), { state: 'closed', text: 'Зачинено · відкриється о 08:00' }); // 20:00
+  eq(availabilityLabel(spot, at('2026-11-24T04:00:00Z')).state, 'closed');                                    // 06:00
+  eq(availabilityLabel({ ...spot, closedWeekdays: [7] }, at('2026-11-29T10:00:00Z')), { state: 'dayoff', text: 'Сьогодні вихідний' }); // неділя
+  eq(availabilityLabel({ ...spot, paused: true }, at('2026-11-24T08:00:00Z')), { state: 'paused', text: 'На паузі' });
 });
