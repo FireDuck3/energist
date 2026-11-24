@@ -305,7 +305,7 @@ export function render(_params, root, store, session, userHistory, pilot) {
     if (!hostLoads.has(key)) hostLoads.set(key, pilot.hostCard(spot.id).catch(() => null).finally(() => hostLoads.delete(key)));
     hostLoads.get(key).then((card) => {
       if (destroyed) return;
-      hostCards.set(key, card);
+      if (card) hostCards.set(key, card); // збій не кешуємо — наступне відкриття спробує ще раз
       box.replaceChildren(popupContent(spot, card && hostBlock(spot, card, signedIn, session)));
       const popup = markers.find((m) => m.spot.id === spot.id && !m.dimmed)?.marker.getPopup();
       if (popup?.isOpen()) fitPopup(popup);

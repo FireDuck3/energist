@@ -27,7 +27,7 @@ function hostCardLines(card, own, signedIn) {
     contacts.length
       ? h('div', { class: 'host-contacts' }, h('b', {}, own ? 'Ваші контакти для гостей: ' : 'Контакти: '), ...contacts.flatMap((c, i) => (i ? [' · ', c] : [c])))
       : !own && !signedIn && h('div', { class: 'hint' }, 'Увійдіть, щоб побачити телефон і email господаря.'),
-    card.channels?.length && h('div', { class: 'muted' }, `Зв'язок: ${channelLabels(card.channels).join(', ')}`),
+    card.channels?.length ? h('div', { class: 'muted' }, `Зв'язок: ${channelLabels(card.channels).join(', ')}`) : null,
   ];
 }
 

@@ -80,7 +80,7 @@ function ownSpotCard(spot) {
 // ---- Анкета точки «Додати точку» / «Редагувати точку» (15 полів, docs/host-data.md) ----
 // existing — точка для редагування. publish зберігає (для нової точки повертає її id).
 // pilot і session — лише для реального акаунта: контакти й фото господаря, фото об'єкта, робочі дні.
-let savedContact = null; // збережені контакти: сесія тримає їх старими до наступного входу
+let savedContact = null; // збережені контакти: сесія тримає їх старими до наступного входу (лише для того ж акаунта — uid)
 
 export function openAddSpot(store, hostName, publish, existing = null, { pilot = null, session = null } = {}) {
   const live = Boolean(publish && pilot && session);
@@ -101,7 +101,7 @@ export function openAddSpot(store, hostName, publish, existing = null, { pilot =
 
   // ---- Господар ----
   const { user, profile } = session?.getState() ?? {};
-  const initialContact = savedContact ?? {
+  const initialContact = (savedContact?.uid === user?.uid ? savedContact : null) ?? {
     firstName: user?.firstName ?? '', lastName: user?.lastName ?? '',
     phone: profile?.phone ?? '', avatarPath: profile?.avatar_path ?? null,
     channels: [...(profile?.contact_channels ?? [])],
@@ -366,7 +366,7 @@ export function openAddSpot(store, hostName, publish, existing = null, { pilot =
           try {
             const avatarPath = await pilot.saveHostContact({ firstName: contact.firstName.trim(), lastName: contact.lastName.trim(),
               phone, avatarPath: contact.avatarPath }, avatarBlob);
-            savedContact = { firstName: contact.firstName.trim(), lastName: contact.lastName.trim(), phone: contact.phone, avatarPath,
+            savedContact = { uid: user?.uid, firstName: contact.firstName.trim(), lastName: contact.lastName.trim(), phone: contact.phone, avatarPath,
               channels: [...(initialContact.channels ?? [])] };
             Object.assign(initialContact, savedContact);
             contact.avatarPath = avatarPath;
@@ -383,7 +383,7 @@ export function openAddSpot(store, hostName, publish, existing = null, { pilot =
         try {
           await pilot.saveContactChannels(contact.channels ?? []);
           initialContact.channels = [...(contact.channels ?? [])];
-          savedContact = { ...(savedContact ?? initialContact), channels: initialContact.channels };
+          savedContact = { ...initialContact, uid: user?.uid, channels: initialContact.channels };
         } catch { warnings.push('канали зв\'язку не збереглися — спробуйте ще раз'); }
       }
       let id;
