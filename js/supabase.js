@@ -3,7 +3,8 @@ import { checkedCredentials } from './credentials.js';
 import { detailsFromRow, detailsToColumns, toHostCard, DETAIL_COLUMNS, FORM_COLUMNS } from './host-profile.js';
 // Адаптер до Supabase — єдиний модуль, що знає про supabase-js.
 // Решта коду бачить лише AuthService (контракт описано в js/auth.js).
-const SDK_URL = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
+// Власна копія supabase-js 2.45.4 (vendor/README.md): сторонній CDN не може підмінити код, що бачить сесію.
+export const SDK_SRC = 'vendor/supabase/supabase.js';
 
 const CODES = {
   user_banned: 'auth/account-disabled',
@@ -83,11 +84,30 @@ export function toPilotSpot(row, feedback, photoUrl, reviewsUnavailable = false,
   };
 }
 
-// null — бібліотека чи конфіг не завантажились (немає інтернету): тоді сайт пропонує демо-режим.
-export async function loadSupabase() {
+// supabase-js (UMD-збірка) підвантажується звичайним <script> лише коли потрібна. Повертає window.supabase.
+const sdkLoading = new WeakMap(); // одне завантаження на вікно, навіть якщо попросили кілька разів
+export function loadSdk(env = window) {
+  if (env.supabase?.createClient) return Promise.resolve(env.supabase);
+  if (!sdkLoading.has(env)) {
+    sdkLoading.set(env, new Promise((resolve, reject) => {
+      const script = env.document.createElement('script');
+      script.src = SDK_SRC;
+      script.async = true;
+      script.onload = () => (env.supabase?.createClient ? resolve(env.supabase) : reject(new Error('supabase-js missing')));
+      script.onerror = () => { sdkLoading.delete(env); reject(new Error('supabase-js failed to load')); };
+      env.document.head.append(script);
+    }));
+  }
+  return sdkLoading.get(env);
+}
+
+// null — немає інтернету або бібліотека чи конфіг не завантажились: тоді сайт пропонує демо-режим.
+// Бібліотека лежить на самому сайті, тож без мережі вона завантажилась би — перевіряємо мережу окремо.
+export async function loadSupabase({ env = window } = {}) {
+  if (env.navigator?.onLine === false) return null;
   try {
     const [{ createClient }, { supabaseConfig }] = await Promise.all([
-      import(window.__ENERGIST_SUPABASE_URL ?? SDK_URL),
+      loadSdk(env),
       import('./supabase-config.js'),
     ]);
     const client = createClient(supabaseConfig.url, supabaseConfig.anonKey, {
