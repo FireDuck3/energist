@@ -1400,7 +1400,7 @@ body.blackout .btn-paper { background: var(--white); color: var(--dark-blue); } 
 /* ---- Головна (PC1: заголовок, текст, дві кнопки, чіпи-переваги, ілюстрація) ---- */
 .hero-landing { padding: 72px 0 64px; }
 .hero-landing::before { display: none; }
-.hero-landing .hero-inner { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 56px; }
+@media (min-width: 901px) { .hero-landing .hero-inner { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 56px; } }
 .hero-landing h1 { font-size: clamp(2rem, 3.4vw, 3rem); margin: 0 0 28px; max-width: 14em; }
 .hero-landing .lead { max-width: 36em; margin: 0; }
 .hero-landing .hero-cta { margin: 40px 0 22px; gap: 18px; }
@@ -1410,7 +1410,8 @@ body.blackout .btn-paper { background: var(--white); color: var(--dark-blue); } 
   background: transparent; border: 2px solid var(--chip-line); color: var(--text); box-shadow: none; backdrop-filter: none;
   font-family: var(--font-chip); font-weight: 500; font-size: 1rem; padding: 8px 22px;
 }
-.hero-landing .hero-art img { border-radius: 0; box-shadow: none; aspect-ratio: 521 / 647; max-height: 600px; animation: none; }
+.hero-landing .hero-art img { border-radius: 0; box-shadow: none; animation: none; }
+@media (min-width: 901px) { .hero-landing .hero-art img { aspect-ratio: 521 / 647; max-height: 600px; } }
 .hero-auth { margin-top: 26px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .section-alt { background: var(--surface); }
 .step { background: var(--paper); border: 0; box-shadow: none; }
@@ -1533,8 +1534,24 @@ body.blackout .auth .btn-secondary, body.blackout .auth-card .btn-secondary { ba
   .tab.active { background: var(--indigo); color: var(--on-accent); }
   body.blackout .tab.active { background: var(--mint); color: var(--dark-blue); }
   .tab.active::before { display: none; }
-  .tab-icon { filter: none; }
+  .tab { gap: 1px; padding: 2px 4px; min-width: 0; }
+  .tab-icon { filter: none; font-size: 1.15rem; }
+  /* «Мої бронювання» не влазить в один рядок плитки — два рядки дрібніше, без виштовхування іконки */
+  .tab-label { font-size: .66rem; line-height: 1.1; text-align: center; max-width: 100%; overflow-wrap: anywhere; }
   .own-grid { grid-template-columns: 1fr; }
   .requests-panel { padding: 18px; }
   .profile-card { padding: 20px; }
+  /* Особистий кабінет як у Mobile2: одна колонка, меню — сітка 2×2, далі картка профілю.
+     Правило для двох колонок вище стоїть без медіазапиту, тож тут його треба скасувати явно. */
+  .cabinet-page { padding-top: 24px; }
+  .cabinet-page > h1 { font-size: 2rem; margin-bottom: 18px; }
+  .cabinet-site-menu { display: none; } /* на телефоні ці розділи вже є в нижній панелі */
+  .cabinet-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .cabinet-menu { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 10px; gap: 6px; }
+  .cabinet-menu-item { text-align: left; font-size: 1rem; padding: 10px 12px; }
+  .profile-head { gap: 14px; }
+  .profile-avatar { width: 52px; height: 52px; font-size: 1.2rem; }
+  .profile-name { font-size: 1.15rem; }
+  .profile-actions { flex-wrap: wrap; }
+  .goal-option { min-height: 48px; padding: 0 16px; }
 }
