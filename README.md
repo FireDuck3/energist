@@ -60,7 +60,16 @@ py tests/serve.py 8420
 
 ## Хостинг (Render)
 
-Static Site `wattway` на Render з публічного репозиторію `FireDuck3/energist`, гілка `main`, без збірки, папка — корінь. Автодеплою немає: після пушу натисніть у Render **Manual Deploy → Deploy latest commit**. Власний домен — Settings → Custom Domains.
+Static Site `wattway` на Render з публічного репозиторію `FireDuck3/energist`, гілка `main`, без збірки, папка — корінь. Власний домен — Settings → Custom Domains.
+
+**Автодеплой.** Render деплоїть кожен пуш у `main` сам (Settings → Auto-Deploy: On Commit). Для цього застосунку Render у GitHub потрібен доступ до репозиторію: GitHub → Settings → Applications → Installed GitHub Apps → Render → Configure → Repository access. Якщо після пушу в Render → Events немає нового деплою — перевірте цей доступ; деплой вручну — **Manual Deploy → Deploy latest commit**.
+
+**Порядок, коли є міграція.** Сайт оновлюється одразу після пушу в `main`, тож міграції йдуть першими:
+1. Запуште зміни в робочу гілку (не в `main`).
+2. Виконайте міграцію в Supabase → SQL Editor.
+3. Злийте гілку в `main` і запуште — Render задеплоїть сам.
+
+Винятки на кшталт `202611230002_hide_exact_location.sql` (міграція після деплою) описані у відповідних розділах: там спершу пуш у `main`, потім міграція.
 
 Стара адреса https://energist.onrender.com (сервіс `energist`) лишилась лише для старих посилань: `index.html` одразу перекидає з неї на wattway.onrender.com. Щоб перекидання працювало й після змін у `index.html`, деплойте й цей сервіс. У Supabase → Authentication → URL Configuration адреса сайту — https://wattway.onrender.com.
 
