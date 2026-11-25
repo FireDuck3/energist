@@ -667,7 +667,8 @@ export function render(_params, root, store, session, _history, pilot) {
           h('a', { class: 'btn btn-primary', href: '#/host/bookings' }, stats.pending ? 'Переглянути запити' : 'Усі бронювання')),
         h('div', { class: 'own-head' },
           h('h2', { class: 'own-title' }, 'Мої точки'),
-          h('button', { type: 'button', class: 'icon-btn icon-btn-add', 'aria-label': 'Додати точку', title: 'Додати точку', onclick: addSpot },
+          // Одна кнопка «Додати»: поки точок немає — велика в порожній картці, далі — плюс біля заголовка, як у макеті.
+          own.length > 0 && h('button', { type: 'button', class: 'icon-btn icon-btn-add', 'aria-label': 'Додати точку', title: 'Додати точку', onclick: addSpot },
             icon('plus', { size: 22 }))),
         own.length
           ? h('div', { class: 'own-grid' }, own.map(ownSpotTile))
@@ -676,7 +677,7 @@ export function render(_params, root, store, session, _history, pilot) {
             h('h2', {}, 'У вас ще немає точок'),
             h('p', { class: 'muted' }, 'Додайте свою СЕС: потужність, акумулятор, конектор, графік і ціну. Після цього її побачать гості на карті.'),
             h('button', { type: 'button', class: 'btn btn-primary btn-lg', onclick: addSpot }, withIcon('plus', 'Додати першу точку', { size: 20 }))),
-        own.length && h('section', { class: 'host-map-section' },
+        own.length > 0 && h('section', { class: 'host-map-section' },
           h('h2', { class: 'own-title' }, 'Мої точки на карті'), spotsMap.el)));
       if (own.length) spotsMap.update(own);
       return;
