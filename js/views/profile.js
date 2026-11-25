@@ -194,6 +194,8 @@ export function render(_params, root, store, session, userHistory, pilot) {
             h('span', { class: 'profile-email' }, user.email))),
         box),
       pushCard(session.service),
+      h('p', { class: 'profile-privacy' }, 'Хто бачить ваші дані й як їх видалити — у ',
+        h('a', { href: '#/privacy' }, 'Політиці конфіденційності'), '.'),
       resetLink());
     const sections = [
       ['account', 'Профіль', account],

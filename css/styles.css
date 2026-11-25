@@ -1585,3 +1585,33 @@ body.blackout .auth .btn-secondary, body.blackout .auth-card .btn-secondary { ba
 /* ---- Обводка кнопок — лише кольором палітри (--chip-line): зелений у світлій темі, м'ятний у темній ---- */
 .stepper-btn, .day-cell, .mode-card, .goal-option { border-color: var(--chip-line); }
 .add-card { border-color: var(--chip-line); }
+
+/* ---- Політика конфіденційності (#/privacy) ---- */
+.policy-page { padding-top: 40px; padding-bottom: 56px; }
+.policy { max-width: 760px; margin: 0 auto; line-height: 1.65; }
+.policy-head h1 { margin-bottom: 8px; }
+.policy-edition { margin: 0 0 20px; }
+.policy-draft { background: var(--orange-soft); color: #5A2E06; border: 1px solid var(--orange); border-radius: var(--radius-sm); padding: 14px 16px; margin-bottom: 24px; }
+body.blackout .policy-draft { background: var(--paper); color: var(--text); }
+.policy-toc { padding: 18px 22px; margin-bottom: 32px; }
+.policy-toc-title { font-family: var(--font-body); font-size: 1.05rem; margin-bottom: 8px; }
+.policy-toc ol { margin: 0; padding-left: 1.4em; columns: 2; column-gap: 32px; }
+.policy-toc li { break-inside: avoid; padding: 3px 0; }
+.policy-toc a { color: var(--heading); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--chip-line); }
+.policy-section { margin-bottom: 32px; }
+.policy-section h2 { font-size: clamp(1.3rem, 2vw, 1.6rem); scroll-margin-top: 96px; border-radius: 6px; } /* під липкою шапкою; --header-h на телефоні = auto */
+.policy-section h3 { margin: 18px 0 6px; }
+.policy-section p, .policy-section ul { margin: 0 0 12px; }
+.policy-section ul { padding-left: 1.3em; }
+.policy-section li { margin-bottom: 6px; }
+.policy-section a, .privacy-note a, .profile-privacy a, .footer-link { color: var(--indigo); text-decoration: underline; text-underline-offset: 3px; }
+body.blackout .policy-section a, body.blackout .privacy-note a, body.blackout .profile-privacy a { color: var(--blue); }
+.policy-section, .policy-toc { overflow-wrap: anywhere; }
+.privacy-note { margin: 14px 0 0; font-size: .875rem; color: var(--muted); text-align: center; }
+.profile-privacy { margin: 16px 0 0; color: var(--muted); font-size: .9rem; }
+.footer-link { color: var(--text); }
+@media (max-width: 768px) {
+  .policy-page { padding-top: 24px; }
+  .policy-toc ol { columns: 1; }
+  .policy-toc { padding: 16px 18px; }
+}
