@@ -23,19 +23,18 @@ test('реєстрація: усі поля обов\'язкові, помилк
   eq(r.errors.email, 'Вкажіть email');
 });
 
-test('реєстрація: пароль 8–128 символів, підтвердження збігається', () => {
+test('реєстрація: пароль 8–128 символів, повтор пароля не потрібен', () => {
   const base = { firstName: 'Ірина', lastName: 'Коваль', email: 'i@b.ua', role: 'guest' };
-  eq(validateSignup({ ...base, password: '1234567', confirm: '1234567' }).errors,
+  eq(validateSignup({ ...base, password: '1234567' }).errors,
     { password: 'Пароль має містити від 8 до 128 символів' });
-  eq(validateSignup({ ...base, password: 'x'.repeat(129), confirm: 'x'.repeat(129) }).errors.password,
+  eq(validateSignup({ ...base, password: 'x'.repeat(129) }).errors.password,
     'Пароль має містити від 8 до 128 символів');
-  eq(validateSignup({ ...base, password: '12345678', confirm: '1234567' }).errors, { confirm: 'Паролі не збігаються' });
-  const ok = validateSignup({ ...base, email: ' I@B.ua ', password: '12345678', confirm: '12345678' });
+  const ok = validateSignup({ ...base, email: ' I@B.ua ', password: '12345678' });
   eq([ok.ok, ok.value], [true, { email: 'i@b.ua', password: '12345678', firstName: 'Ірина', lastName: 'Коваль', role: 'guest' }]);
 });
 
 test('реєстрація: ім\'я й прізвище 1–60 символів, роль — guest або host', () => {
-  const base = { email: 'i@b.ua', password: '12345678', confirm: '12345678', role: 'guest' };
+  const base = { email: 'i@b.ua', password: '12345678', role: 'guest' };
   eq(Object.keys(validateSignup({ ...base, firstName: ' ', lastName: 'я'.repeat(61) }).errors), ['firstName', 'lastName']);
   eq(validateSignup({ ...base, firstName: 'Ян', lastName: 'Ко', role: 'admin' }).errors, { role: 'Оберіть, для чого вам WattWay' });
 });
