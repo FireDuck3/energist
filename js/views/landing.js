@@ -19,26 +19,6 @@ const STEPS = {
   ],
 };
 
-// Рядок під картками: гостю — «Вже з нами? Увійти» (кнопка «Реєстрація» лише одна — у шапці),
-// тому, хто вже увійшов, — вітання.
-function authRow(session) {
-  const row = h('div', { class: 'hero-auth' });
-  const draw = () => {
-    const { status } = session.getState();
-    if (status === 'signedIn' || status === 'demo') {
-      row.replaceChildren(h('span', { class: 'muted' }, `Привіт, ${session.currentName()}!`),
-        h('a', { class: 'btn btn-secondary btn-sm', href: '#/profile' }, 'Мій профіль'));
-    } else if (status === 'loading') {
-      row.replaceChildren();
-    } else {
-      row.replaceChildren(h('span', { class: 'muted' }, 'Вже з нами?'),
-        h('a', { class: 'btn btn-secondary btn-sm', href: '#/login' }, 'Увійти'));
-    }
-  };
-  draw();
-  return { row, stop: session.subscribe(draw) };
-}
-
 // Дві кнопки вибору режиму з макета: «Знайти розетку» (гість) і «Здати свою енергію» (господар).
 const CHOICES = {
   guest: { icon: 'plug', text: 'Знайти розетку', cls: 'btn-primary' },
@@ -67,8 +47,7 @@ function choiceButton(mode, current, pick) {
 // Опис режиму для екранних читачів — поза кнопкою, щоб не подовжувати її назву.
 const choiceLead = (mode) => h('span', { class: 'sr-only', id: `mode-${mode}-lead` }, `${MODES[mode].label}. ${MODES[mode].lead}`);
 
-export function render(_params, root, store, session) {
-  const auth = session ? authRow(session) : null;
+export function render(_params, root, store, session) { // session — для chooseMode
   const current = store?.getState().mode ?? null;
   const pick = (mode) => {
     location.hash = store ? chooseMode(mode, { store, session }) : MODES[mode].home;
@@ -81,8 +60,7 @@ export function render(_params, root, store, session) {
           h('p', { class: 'lead' }, 'Знайдіть розетку чи зарядну станцію поруч — або заробляйте на надлишку своєї сонячної станції. Оберіть, з чим прийшли: змінити режим можна будь-коли у шапці сайту.'),
           h('div', { class: 'hero-cta' }, choiceButton('guest', current, pick), choiceButton('host', current, pick),
             choiceLead('guest'), choiceLead('host')),
-          h('ul', { class: 'hero-chips', 'aria-label': 'Переваги WattWay' }, PERKS.map((p) => h('li', {}, p))),
-          auth?.row),
+          h('ul', { class: 'hero-chips', 'aria-label': 'Переваги WattWay' }, PERKS.map((p) => h('li', {}, p)))),
         h('div', { class: 'hero-art' }, h('img', { src: HERO_ART, alt: 'Будинок із сонячною станцією, що ділиться енергією' })))),
 
     h('section', { class: 'section section-alt' },
@@ -99,5 +77,5 @@ export function render(_params, root, store, session) {
                 h('p', {}, s.text))))))))),
   );
   const stopReveal = revealOnScroll(root.querySelectorAll('.section'));
-  return () => { stopReveal(); auth?.stop(); };
+  return () => { stopReveal(); };
 }
