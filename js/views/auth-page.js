@@ -26,7 +26,7 @@ export const loginPage = (_params, root, _store, session) => renderAuthPage('sig
 export const signupPage = (_params, root, _store, session) => renderAuthPage('signup', root, session);
 
 function renderAuthPage(mode, root, session) {
-  const st = { firstName: '', lastName: '', email: '', password: '', confirm: '', role: null, errors: {}, error: '', errorCode: '', busy: false };
+  const st = { firstName: '', lastName: '', email: '', password: '', role: null, errors: {}, error: '', errorCode: '', busy: false };
   const text = TEXT[mode];
   let alive = true;
 
@@ -83,9 +83,7 @@ function renderAuthPage(mode, root, session) {
       signup && input('firstName', 'Ім’я', { type: 'text', autocomplete: 'given-name', maxlength: 60 }),
       signup && input('lastName', 'Прізвище', { type: 'text', autocomplete: 'family-name', maxlength: 60 }),
       input('email', 'Email', { type: 'email', autocomplete: 'email', placeholder: 'you@example.com' }),
-      input('password', 'Пароль', { type: 'password', autocomplete: signup ? 'new-password' : 'current-password' },
-        signup ? 'Від 8 до 128 символів' : null),
-      signup && input('confirm', 'Повторіть пароль', { type: 'password', autocomplete: 'new-password' }),
+      input('password', 'Пароль', { type: 'password', autocomplete: signup ? 'new-password' : 'current-password' }),
       signup && h('div', { class: 'form-field' },
         h('span', { class: 'field-label' }, 'Для чого вам WattWay?'),
         h('div', { class: 'role-choice' }, ROLES.map(([value, iconName, label]) =>
@@ -170,7 +168,6 @@ function renderAuthPage(mode, root, session) {
       st.error = authErrorMessage(e.code);
       st.errorCode = e.code ?? '';
       st.password = ''; // пароль не лишаємо в полі після помилки
-      st.confirm = '';
     } finally {
       st.busy = false;
       draw();

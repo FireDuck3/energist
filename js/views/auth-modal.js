@@ -186,7 +186,7 @@ export function openAuthModal(session, { reason = '', mode, error = null } = {})
         field('Ім’я', input('firstName', { type: 'text', autocomplete: 'given-name', maxlength: 60 })),
         field('Прізвище', input('lastName', { type: 'text', autocomplete: 'family-name', maxlength: 60 })),
         emailField(),
-        field('Пароль', input('password', { type: 'password', autocomplete: 'new-password' }), 'Від 8 до 128 символів'),
+        field('Пароль', input('password', { type: 'password', autocomplete: 'new-password' })),
         errorBlock(), primary('Створити акаунт')),
       codesOn() && h('div', { class: 'auth-links' }, linkBtn('Увійти без пароля', 'code')), googleOption()],
 

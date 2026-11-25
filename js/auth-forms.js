@@ -7,7 +7,7 @@ export const MIN_PASSWORD = 8;
 export const MAX_PASSWORD = 128;
 
 // Порядок ключів = порядок полів у формі.
-const ORDER = ['firstName', 'lastName', 'email', 'password', 'confirm', 'role'];
+const ORDER = ['firstName', 'lastName', 'email', 'password', 'role'];
 const inOrder = (errors) => Object.fromEntries(ORDER.filter((k) => errors[k]).map((k) => [k, errors[k]]));
 
 // Пароль при вході не обмежуємо за довжиною: акаунт міг бути створений за старими правилами.
@@ -20,12 +20,11 @@ export function validateLogin({ email, password } = {}) {
   return { ok: Object.keys(errors).length === 0, errors, value };
 }
 
-export function validateSignup({ firstName, lastName, email, password, confirm, role } = {}) {
+export function validateSignup({ firstName, lastName, email, password, role } = {}) {
   const base = validateCredentials({ firstName, lastName, email, password }, { signup: true });
   const errors = { ...base.errors };
   if (!String(email ?? '').trim()) errors.email = 'Вкажіть email';
   const value = { ...base.value, role };
-  if (!errors.password && value.password !== String(confirm ?? '')) errors.confirm = 'Паролі не збігаються';
   const profile = validateProfile({ name: 'x', role });
   if (profile.errors.role) errors.role = profile.errors.role;
   const ordered = inOrder(errors);
