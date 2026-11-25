@@ -19,7 +19,8 @@ const STEPS = {
   ],
 };
 
-// Рядок під картками: гостю — «Увійти» й «Реєстрація», тому, хто вже увійшов, — вітання.
+// Рядок під картками: гостю — «Вже з нами? Увійти» (кнопка «Реєстрація» лише одна — у шапці),
+// тому, хто вже увійшов, — вітання.
 function authRow(session) {
   const row = h('div', { class: 'hero-auth' });
   const draw = () => {
@@ -31,8 +32,7 @@ function authRow(session) {
       row.replaceChildren();
     } else {
       row.replaceChildren(h('span', { class: 'muted' }, 'Вже з нами?'),
-        h('a', { class: 'btn btn-secondary btn-sm', href: '#/login' }, 'Увійти'),
-        h('a', { class: 'btn btn-primary btn-sm', href: '#/signup' }, 'Реєстрація'));
+        h('a', { class: 'btn btn-secondary btn-sm', href: '#/login' }, 'Увійти'));
     }
   };
   draw();
