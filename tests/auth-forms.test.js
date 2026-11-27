@@ -19,12 +19,12 @@ test('вхід: пароль не перевіряється на довжину
 
 test('реєстрація: усі поля обов\'язкові, помилки в порядку полів', () => {
   const r = validateSignup({});
-  eq(Object.keys(r.errors), ['firstName', 'lastName', 'email', 'password', 'role']);
+  eq(Object.keys(r.errors), ['firstName', 'lastName', 'email', 'password', 'role', 'consent']);
   eq(r.errors.email, 'Вкажіть email');
 });
 
 test('реєстрація: пароль 8–128 символів, повтор пароля не потрібен', () => {
-  const base = { firstName: 'Ірина', lastName: 'Коваль', email: 'i@b.ua', role: 'guest' };
+  const base = { firstName: 'Ірина', lastName: 'Коваль', email: 'i@b.ua', role: 'guest', consent: true };
   eq(validateSignup({ ...base, password: '1234567' }).errors,
     { password: 'Пароль має містити від 8 до 128 символів' });
   eq(validateSignup({ ...base, password: 'x'.repeat(129) }).errors.password,
@@ -34,9 +34,17 @@ test('реєстрація: пароль 8–128 символів, повтор 
 });
 
 test('реєстрація: ім\'я й прізвище 1–60 символів, роль — guest або host', () => {
-  const base = { email: 'i@b.ua', password: '12345678', role: 'guest' };
+  const base = { email: 'i@b.ua', password: '12345678', role: 'guest', consent: true };
   eq(Object.keys(validateSignup({ ...base, firstName: ' ', lastName: 'я'.repeat(61) }).errors), ['firstName', 'lastName']);
   eq(validateSignup({ ...base, firstName: 'Ян', lastName: 'Ко', role: 'admin' }).errors, { role: 'Оберіть, для чого вам WattWay' });
+});
+
+test('реєстрація: без згоди з Політикою конфіденційності акаунт не створюється', () => {
+  const base = { firstName: 'Ірина', lastName: 'Коваль', email: 'i@b.ua', password: '12345678', role: 'guest' };
+  for (const consent of [undefined, false, 'true']) {
+    const r = validateSignup({ ...base, consent });
+    eq([r.ok, r.errors], [false, { consent: 'Щоб створити акаунт, погодьтеся з Політикою конфіденційності' }], String(consent));
+  }
 });
 
 test('ім\'я профілю: ім\'я + прізвище, до 60 символів', () => {

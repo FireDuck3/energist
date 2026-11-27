@@ -83,15 +83,90 @@ test('політика: посилання-примітка відкриваєт
   eq([a.getAttribute('href'), a.getAttribute('target'), a.getAttribute('rel')], ['#/privacy', '_blank', 'noopener']);
 });
 
+// Чекбокс згоди: не відмічений заздалегідь, підписаний, з посиланням на політику в новій вкладці.
+function consentBox(root, where) {
+  const boxes = root.querySelectorAll('input[type="checkbox"]');
+  eq(boxes.length, 1, where);
+  const box = boxes[0];
+  eq(box.checked, false, where);
+  const label = root.querySelector(`label[for="${box.id}"]`) ?? box.closest('label');
+  eq(/погоджуюся/i.test(label.textContent), true, where);
+  eq(label.querySelector('a[href="#/privacy"]')?.getAttribute('target'), '_blank', where);
+  return box;
+}
+
 test('реєстрація й вхід: є посилання на політику (зокрема для входу через Google)', () => {
   for (const page of [signupPage, loginPage]) {
     const root = document.createElement('div');
     const cleanup = page({}, root, null, signedOut());
     try {
       eq(root.querySelectorAll('a[href="#/privacy"]').length, 1, page.name);
-      // Жодних прихованих «згоден з усім».
-      eq(root.querySelectorAll('input[type="checkbox"]').length, 0, page.name);
+      eq(/\b(false|null|undefined)\b/.test(root.textContent), false, page.name);
     } finally { cleanup?.(); }
+  }
+});
+
+test('сторінка реєстрації: без згоди акаунт не створюється, зі згодою — створюється', async () => {
+  const calls = [];
+  const service = { signInWithGoogle() {}, async signUpWithPassword(...a) { calls.push(a); } };
+  const root = document.createElement('div');
+  document.body.append(root); // форма поза документом не надсилається
+  const cleanup = signupPage({}, root, null, { ...signedOut(service), waitForSignIn: async () => false });
+  const fill = (id, v) => { const el = root.querySelector(`#auth-signup-${id}`); el.value = v; el.dispatchEvent(new Event('input')); };
+  try {
+    consentBox(root, 'signup');
+    fill('firstName', 'Ірина'); fill('lastName', 'Коваль'); fill('email', 'i@b.ua'); fill('password', '12345678');
+    root.querySelector('.role-choice button').click();
+    root.querySelector('form').requestSubmit();
+    await Promise.resolve();
+    eq(calls.length, 0);
+    const err = root.querySelector('#auth-signup-consent-err');
+    eq(err.textContent, 'Щоб створити акаунт, погодьтеся з Політикою конфіденційності');
+    eq(root.querySelector('input[type="checkbox"]').getAttribute('aria-describedby'), err.id);
+    eq(root.querySelector('input[type="checkbox"]').getAttribute('aria-invalid'), 'true');
+    root.querySelector('input[type="checkbox"]').click();
+    root.querySelector('form').requestSubmit();
+    await new Promise((r) => setTimeout(r));
+    eq(calls.length, 1);
+  } finally { cleanup?.(); root.remove(); }
+});
+
+test('сторінка входу й вкладка входу у вікні: чекбокса згоди немає', () => {
+  const root = document.createElement('div');
+  const cleanup = loginPage({}, root, null, signedOut());
+  try { eq(root.querySelectorAll('input[type="checkbox"]').length, 0); } finally { cleanup?.(); }
+  openAuthModal(signedOut(), { mode: 'signin' });
+  const modal = document.querySelector('.modal-auth');
+  try { eq(modal.querySelectorAll('input[type="checkbox"]').length, 0); } finally { modal.querySelector('.modal-close').click(); }
+});
+
+test('вікно входу: реєстрація й крок профілю (новий акаунт через Google чи код) вимагають згоди', async () => {
+  const calls = [];
+  const service = { signInWithGoogle() {}, async signUpWithPassword(...a) { calls.push(['signup', a]); } };
+  const session = { ...signedOut(service), waitForSignIn: async () => false, async saveProfile(p) { calls.push(['profile', p]); } };
+  for (const mode of ['signup', 'profile']) {
+    openAuthModal(session, { mode, reason: 'тест' });
+    const modal = document.querySelector('.modal-auth');
+    const set = (sel, v) => { const el = modal.querySelector(sel); el.value = v; el.dispatchEvent(new Event('input')); };
+    try {
+      consentBox(modal, mode);
+      if (mode === 'signup') {
+        set('input[autocomplete="given-name"]', 'Ірина'); set('input[autocomplete="family-name"]', 'Коваль');
+        set('input[type="email"]', 'i@b.ua'); set('input[type="password"]', '12345678');
+      } else {
+        set('input[autocomplete="given-name"]', 'Ірина');
+        modal.querySelector('.role-choice button').click();
+      }
+      modal.querySelector('form').requestSubmit();
+      await new Promise((r) => setTimeout(r));
+      eq(calls.length, 0, mode);
+      eq(modal.querySelector('[role="alert"]')?.textContent, 'Щоб створити акаунт, погодьтеся з Політикою конфіденційності', mode);
+      modal.querySelector('input[type="checkbox"]').click();
+      modal.querySelector('form').requestSubmit();
+      await new Promise((r) => setTimeout(r));
+      eq(calls.map((c) => c[0]), [mode], mode);
+      calls.length = 0;
+    } finally { modal.querySelector('.modal-close')?.click(); }
   }
 });
 

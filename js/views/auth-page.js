@@ -6,7 +6,7 @@ import { disablePush } from '../push.js';
 import { notify } from '../notifications.js';
 import { authErrorMessage } from '../auth.js';
 import { validateLogin, validateSignup, displayName, homePath, failureAdvice } from '../auth-forms.js';
-import { privacyNote } from './privacy.js';
+import { privacyNote, consentField } from './privacy.js';
 
 const ROLES = [['guest', 'plug', 'Шукаю зарядку'], ['host', 'sun', 'Маю енергію для продажу']];
 const TEXT = {
@@ -27,7 +27,7 @@ export const loginPage = (_params, root, _store, session) => renderAuthPage('sig
 export const signupPage = (_params, root, _store, session) => renderAuthPage('signup', root, session);
 
 function renderAuthPage(mode, root, session) {
-  const st = { firstName: '', lastName: '', email: '', password: '', role: null, errors: {}, error: '', errorCode: '', busy: false };
+  const st = { firstName: '', lastName: '', email: '', password: '', role: null, consent: false, errors: {}, error: '', errorCode: '', busy: false };
   const text = TEXT[mode];
   let alive = true;
 
@@ -91,6 +91,8 @@ function renderAuthPage(mode, root, session) {
           h('button', { type: 'button', class: `chip${st.role === value ? ' active' : ''}`, disabled: st.busy,
             'aria-pressed': String(st.role === value), onclick: () => { st.role = value; draw(); } }, withIcon(iconName, label)))),
         st.errors.role && h('span', { class: 'field-error' }, st.errors.role)),
+      signup && consentField({ id: 'auth-signup-consent', checked: st.consent, disabled: st.busy, error: st.errors.consent,
+        onchange: (v) => { st.consent = v; } }),
       errorBlock(),
       h('button', { type: 'submit', class: 'btn btn-primary btn-lg btn-block', disabled: st.busy }, st.busy ? 'Зачекайте…' : text.submit));
     // Вхід через Google відкриває сторінку Google і повертає на сайт уже із сесією (js/oauth.js).
@@ -105,7 +107,7 @@ function renderAuthPage(mode, root, session) {
       h('p', { class: 'muted auth-lead' }, text.lead),
       form,
       ...(google || []),
-      privacyNote(),
+      ...(signup ? [] : [privacyNote()]), // при реєстрації посилання вже є в чекбоксі згоди
       h('p', { class: 'auth-switch' },
         signup ? 'Вже є акаунт? ' : 'Ще немає акаунта? ',
         h('a', { href: signup ? '#/login' : '#/signup' }, signup ? 'Увійти' : 'Зареєструватися')));

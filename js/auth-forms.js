@@ -3,11 +3,14 @@
 import { validateProfile } from './auth.js';
 import { validateCredentials } from './credentials.js';
 
+// Новий акаунт створюється лише після згоди з Політикою конфіденційності (js/views/privacy.js, consentField).
+export const CONSENT_ERROR = 'Щоб створити акаунт, погодьтеся з Політикою конфіденційності';
+
 export const MIN_PASSWORD = 8;
 export const MAX_PASSWORD = 128;
 
 // Порядок ключів = порядок полів у формі.
-const ORDER = ['firstName', 'lastName', 'email', 'password', 'role'];
+const ORDER = ['firstName', 'lastName', 'email', 'password', 'role', 'consent'];
 const inOrder = (errors) => Object.fromEntries(ORDER.filter((k) => errors[k]).map((k) => [k, errors[k]]));
 
 // Пароль при вході не обмежуємо за довжиною: акаунт міг бути створений за старими правилами.
@@ -20,13 +23,14 @@ export function validateLogin({ email, password } = {}) {
   return { ok: Object.keys(errors).length === 0, errors, value };
 }
 
-export function validateSignup({ firstName, lastName, email, password, role } = {}) {
+export function validateSignup({ firstName, lastName, email, password, role, consent } = {}) {
   const base = validateCredentials({ firstName, lastName, email, password }, { signup: true });
   const errors = { ...base.errors };
   if (!String(email ?? '').trim()) errors.email = 'Вкажіть email';
   const value = { ...base.value, role };
   const profile = validateProfile({ name: 'x', role });
   if (profile.errors.role) errors.role = profile.errors.role;
+  if (consent !== true) errors.consent = CONSENT_ERROR;
   const ordered = inOrder(errors);
   return { ok: Object.keys(ordered).length === 0, errors: ordered, value };
 }
