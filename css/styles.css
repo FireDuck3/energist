@@ -1604,10 +1604,15 @@ body.blackout .policy-draft { background: var(--paper); color: var(--text); }
 .policy-section p, .policy-section ul { margin: 0 0 12px; }
 .policy-section ul { padding-left: 1.3em; }
 .policy-section li { margin-bottom: 6px; }
-.policy-section a, .privacy-note a, .profile-privacy a, .footer-link { color: var(--indigo); text-decoration: underline; text-underline-offset: 3px; }
-body.blackout .policy-section a, body.blackout .privacy-note a, body.blackout .profile-privacy a { color: var(--blue); }
+.policy-section a, .privacy-note a, .profile-privacy a, .consent a, .footer-link { color: var(--indigo); text-decoration: underline; text-underline-offset: 3px; }
+body.blackout .policy-section a, body.blackout .privacy-note a, body.blackout .profile-privacy a, body.blackout .consent a { color: var(--blue); }
 .policy-section, .policy-toc { overflow-wrap: anywhere; }
 .privacy-note { margin: 14px 0 0; font-size: .875rem; color: var(--muted); text-align: center; }
+/* Згода з політикою при створенні акаунта: великий клікабельний рядок, чекбокс не менший за 20px. */
+.consent { display: flex; align-items: flex-start; gap: 10px; font-size: .9rem; line-height: 1.4; cursor: pointer; }
+.consent input { flex: none; width: 20px; height: 20px; margin: 0; accent-color: var(--indigo); cursor: pointer; }
+body.blackout .consent input { accent-color: var(--blue); }
+.consent input:focus-visible { outline: 2px solid var(--indigo); outline-offset: 2px; }
 .profile-privacy { margin: 16px 0 0; color: var(--muted); font-size: .9rem; }
 .footer-link { color: var(--text); }
 @media (max-width: 768px) {

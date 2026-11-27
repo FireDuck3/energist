@@ -23,6 +23,20 @@ export function privacyNote() {
     h('a', { href: '#/privacy', target: '_blank', rel: 'noopener' }, 'Політиці конфіденційності'), '.');
 }
 
+// Згода при створенні акаунта: не відмічена заздалегідь; посилання відкривається в новій вкладці,
+// щоб не губити заповнену форму. error — текст під полем (для aria-describedby).
+export function consentField({ id, checked, disabled, error, onchange }) {
+  const errId = `${id}-err`;
+  return h('div', { class: 'form-field consent-field' },
+    h('label', { class: 'consent', for: id },
+      h('input', { type: 'checkbox', id, checked, disabled, required: true,
+        'aria-invalid': error ? 'true' : null, 'aria-describedby': error ? errId : null,
+        onchange: (e) => onchange(e.target.checked) }),
+      h('span', {}, 'Я погоджуюся з ',
+        h('a', { href: '#/privacy', target: '_blank', rel: 'noopener' }, 'Політикою конфіденційності'))),
+    error && h('span', { class: 'field-error', id: errId }, error));
+}
+
 export function render(_params, root) {
   const draft = !isPublishable({ status: STATUS, operator: OPERATOR });
   // Хеш-роутер: якорі #id змінили б маршрут, тож зміст переводить фокус і прокручує сам.

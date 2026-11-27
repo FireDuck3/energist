@@ -4,7 +4,8 @@ import { h, openModal } from '../ui.js';
 import { logoMark, icon, withIcon } from '../icons.js';
 import { checkedCredentials } from '../credentials.js';
 import { authErrorMessage } from '../auth.js';
-import { privacyNote } from './privacy.js';
+import { privacyNote, consentField } from './privacy.js';
+import { CONSENT_ERROR } from '../auth-forms.js';
 
 const RESEND_SECONDS = 60;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -40,7 +41,7 @@ export function openAuthModal(session, { reason = '', mode, error = null } = {})
 
   const st = {
     mode: mode ?? defaultMode(session.getState().status),
-    firstName: '', lastName: '', email: '', password: '', code: '', newPassword: '', name: '', role: null,
+    firstName: '', lastName: '', email: '', password: '', code: '', newPassword: '', name: '', role: null, consent: false,
     error: error ? authErrorMessage(error) : '', errorCode: error ?? '', fieldErrors: {}, busy: false, sentAt: 0,
   };
   let timer = null;
@@ -136,6 +137,9 @@ export function openAuthModal(session, { reason = '', mode, error = null } = {})
     if (!pw) throw invalid('Введіть пароль');
     if (pw.length < 6) throw invalid('Пароль має бути щонайменше 6 символів');
   };
+  // Новий акаунт (паролем, через Google чи кодом) проходить або реєстрацію, або крок профілю — там і питаємо згоду.
+  const checkConsent = () => { if (!st.consent) throw invalid(CONSENT_ERROR); };
+  const consent = (id) => consentField({ id, checked: st.consent, disabled: st.busy, onchange: (v) => { st.consent = v; } });
   const checkCode = () => {
     st.code = st.code.replace(/\s/g, '');
     if (!/^\d{6}$/.test(st.code)) throw invalid('Введіть 6 цифр з листа');
@@ -180,6 +184,7 @@ export function openAuthModal(session, { reason = '', mode, error = null } = {})
     signup: () => [tabs('signup'),
       form(async () => {
         const v = checkedCredentials(st, { signup: true });
+        checkConsent();
         await svc().signUpWithPassword(v.email, v.password, { firstName: v.firstName, lastName: v.lastName });
         st.name = `${v.firstName} ${v.lastName}`.slice(0, 60);
         await settled();
@@ -188,8 +193,9 @@ export function openAuthModal(session, { reason = '', mode, error = null } = {})
         field('Прізвище', input('lastName', { type: 'text', autocomplete: 'family-name', maxlength: 60 })),
         emailField(),
         field('Пароль', input('password', { type: 'password', autocomplete: 'new-password' })),
+        consent('auth-modal-signup-consent'),
         errorBlock(), primary('Створити акаунт')),
-      codesOn() && h('div', { class: 'auth-links' }, linkBtn('Увійти без пароля', 'code')), googleOption(), privacyNote()],
+      codesOn() && h('div', { class: 'auth-links' }, linkBtn('Увійти без пароля', 'code')), googleOption()],
 
     code: () => [h('h2', {}, 'Вхід без пароля'),
       h('p', { class: 'muted' }, 'Надішлемо 6-значний код на вашу пошту.'),
@@ -220,6 +226,7 @@ export function openAuthModal(session, { reason = '', mode, error = null } = {})
 
     profile: () => [h('h2', {}, 'Ще один крок'),
       form(async () => {
+        checkConsent();
         await session.saveProfile({ name: st.name, role: st.role });
         if (!reason) location.hash = st.role === 'host' ? '#/host' : '#/map';
       },
@@ -231,7 +238,8 @@ export function openAuthModal(session, { reason = '', mode, error = null } = {})
           h('button', { type: 'button', class: `chip${st.role === value ? ' active' : ''}`, disabled: st.busy,
             onclick: () => { st.role = value; render(); } }, withIcon(iconName, label))))),
       st.fieldErrors.role && h('span', { class: 'field-error' }, st.fieldErrors.role),
-      errorBlock(), primary('Продовжити')), privacyNote()],
+      consent('auth-modal-profile-consent'),
+      errorBlock(), primary('Продовжити'))],
 
     unavailable: () => [h('h2', {}, 'Вхід недоступний без інтернету'),
       h('p', { class: 'muted' }, 'Не вдалося з\'єднатися із сервером акаунтів. Можна продовжити в демо-режимі — від імені Саші.'),
