@@ -17,6 +17,7 @@ import * as host from './views/host.js';
 import * as profile from './views/profile.js';
 import * as bookings from './views/bookings.js';
 import * as admin from './views/admin.js';
+import * as privacy from './views/privacy.js';
 import { MODES, navFor, homeFor, modeForPath, chooseMode } from './mode.js';
 import { openAuthModal } from './views/auth-modal.js';
 import { loginPage, signupPage, logOut } from './views/auth-page.js';
@@ -152,6 +153,7 @@ startRouter({
   '/admin/:tab': view(admin),
   '/login': view({ render: loginPage }),
   '/signup': view({ render: signupPage }),
+  '/privacy': view(privacy), // відкрита без входу
 }, appRoot, {
   onChange(path) {
     // Нова сторінка плавно проявляється. Лише прозорість: transform зсунув би fixed-панелі всередині.

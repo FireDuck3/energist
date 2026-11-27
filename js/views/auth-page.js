@@ -6,6 +6,7 @@ import { disablePush } from '../push.js';
 import { notify } from '../notifications.js';
 import { authErrorMessage } from '../auth.js';
 import { validateLogin, validateSignup, displayName, homePath, failureAdvice } from '../auth-forms.js';
+import { privacyNote } from './privacy.js';
 
 const ROLES = [['guest', 'plug', 'Шукаю зарядку'], ['host', 'sun', 'Маю енергію для продажу']];
 const TEXT = {
@@ -104,6 +105,7 @@ function renderAuthPage(mode, root, session) {
       h('p', { class: 'muted auth-lead' }, text.lead),
       form,
       ...(google || []),
+      privacyNote(),
       h('p', { class: 'auth-switch' },
         signup ? 'Вже є акаунт? ' : 'Ще немає акаунта? ',
         h('a', { href: signup ? '#/login' : '#/signup' }, signup ? 'Увійти' : 'Зареєструватися')));

@@ -4,6 +4,7 @@ import { h, openModal } from '../ui.js';
 import { logoMark, icon, withIcon } from '../icons.js';
 import { checkedCredentials } from '../credentials.js';
 import { authErrorMessage } from '../auth.js';
+import { privacyNote } from './privacy.js';
 
 const RESEND_SECONDS = 60;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -174,7 +175,7 @@ export function openAuthModal(session, { reason = '', mode, error = null } = {})
         emailField(),
         field('Пароль', input('password', { type: 'password', autocomplete: 'current-password' })),
         errorBlock(), primary('Увійти')),
-      codesOn() && h('div', { class: 'auth-links' }, linkBtn('Забули пароль?', 'reset'), linkBtn('Увійти без пароля', 'code')), googleOption()],
+      codesOn() && h('div', { class: 'auth-links' }, linkBtn('Забули пароль?', 'reset'), linkBtn('Увійти без пароля', 'code')), googleOption(), privacyNote()],
 
     signup: () => [tabs('signup'),
       form(async () => {
@@ -188,7 +189,7 @@ export function openAuthModal(session, { reason = '', mode, error = null } = {})
         emailField(),
         field('Пароль', input('password', { type: 'password', autocomplete: 'new-password' })),
         errorBlock(), primary('Створити акаунт')),
-      codesOn() && h('div', { class: 'auth-links' }, linkBtn('Увійти без пароля', 'code')), googleOption()],
+      codesOn() && h('div', { class: 'auth-links' }, linkBtn('Увійти без пароля', 'code')), googleOption(), privacyNote()],
 
     code: () => [h('h2', {}, 'Вхід без пароля'),
       h('p', { class: 'muted' }, 'Надішлемо 6-значний код на вашу пошту.'),
@@ -230,7 +231,7 @@ export function openAuthModal(session, { reason = '', mode, error = null } = {})
           h('button', { type: 'button', class: `chip${st.role === value ? ' active' : ''}`, disabled: st.busy,
             onclick: () => { st.role = value; render(); } }, withIcon(iconName, label))))),
       st.fieldErrors.role && h('span', { class: 'field-error' }, st.fieldErrors.role),
-      errorBlock(), primary('Продовжити'))],
+      errorBlock(), primary('Продовжити')), privacyNote()],
 
     unavailable: () => [h('h2', {}, 'Вхід недоступний без інтернету'),
       h('p', { class: 'muted' }, 'Не вдалося з\'єднатися із сервером акаунтів. Можна продовжити в демо-режимі — від імені Саші.'),
